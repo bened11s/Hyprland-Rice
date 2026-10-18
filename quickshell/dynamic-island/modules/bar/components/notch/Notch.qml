@@ -540,6 +540,7 @@ Item {
         // ihre Breite an dieser Gruppe (compactSide), die Uhr bleibt mittig.
         Row {
             id: compactRight
+            objectName: "notchCompactActions"
 
             anchors {
                 right: parent.right
@@ -548,7 +549,10 @@ Item {
             }
             spacing: 8
             opacity: notch.docked && !notch.open ? 1 : 0
-            visible: opacity > 0
+            // Beim Oeffnen sofort aus dem Layout nehmen: die kompakte
+            // Aktionsgruppe darf nicht hinter der offenen Kopfzeile ausfaden.
+            visible: notch.docked && !notch.open && opacity > 0
+            enabled: visible
 
             Fade on opacity {}
 
@@ -759,12 +763,18 @@ Item {
 
         // ---- Glocke oben rechts ----
         AiAgentButton {
+            id: headerAiButton
+            objectName: "notchHeaderAi"
+
             anchors {
                 right: bell.left
                 rightMargin: 10
                 verticalCenter: clock.verticalCenter
             }
-            visible: notch.cardShown || notch.docked && notch.viewOpen
+            // Im Insel-Layout sitzt hier der Power-Knopf. Beim Aufklappen
+            // erst einblenden, sobald die breite Kopfzeile Platz bietet.
+            visible: notch.docked && (notch.overviewShown || notch.viewOpen)
+                     && notch.width >= notch.pageWidth - 1
         }
 
         // Glocke mit Zaehler. Ein Klick oeffnet das Untermenue
@@ -772,6 +782,7 @@ Item {
         // zurueck zur Uebersicht.
         Item {
             id: bell
+            objectName: "notchHeaderBell"
 
             anchors {
                 right: parent.right
@@ -884,9 +895,11 @@ Item {
         // haengen oben fest, also steht er immer an derselben Stelle.
         Row {
             id: pager
+            objectName: "notchHeaderPager"
 
             anchors {
-                right: bell.left
+                // Eigener Platz links vom KI-Knopf statt derselben Flaeche.
+                right: headerAiButton.left
                 rightMargin: 12
             }
             y: notch.headerCenter - height / 2
