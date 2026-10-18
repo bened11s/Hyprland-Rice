@@ -483,7 +483,7 @@ Surface {
         target: Brightness
 
         function onValueChanged(): void {
-            if (Brightness.ready && !settings.expanded && !settings.wifiOpen
+            if (Brightness.readyFor(settings.QsWindow.window?.screen?.name ?? "") && !settings.expanded && !settings.wifiOpen
                     && !settings.bluetoothOpen && !settings.audioOpen) {
                 settings.showBrightness = true;
                 brightnessDisplayTimer.restart();

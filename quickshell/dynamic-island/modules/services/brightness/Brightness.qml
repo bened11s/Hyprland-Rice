@@ -51,14 +51,24 @@ Singleton {
 
     // ---- je Monitor ----
     function valueFor(name: string): real {
+        if (root.backend === "backlight" && !root.isInternal(name))
+            return 0;
         return root.monitors[name]?.value ?? root.value;
     }
 
+    function isInternal(name: string): bool {
+        return name.startsWith("eDP-") || name.startsWith("LVDS-") || name.startsWith("DSI-");
+    }
+
     function readyFor(name: string): bool {
-        return root.monitors[name]?.ready ?? root.ready;
+        if (root.backend === "backlight")
+            return root.isInternal(name) && root.ready;
+        return root.monitors[name]?.ready ?? false;
     }
 
     function setValueFor(name: string, newValue: real): void {
+        if (!root.readyFor(name))
+            return;
         const clamped = Math.max(0, Math.min(1, newValue));
         if (root.backend !== "ddc" || !root.monitors[name]) {
             root.setValue(clamped);
@@ -109,7 +119,8 @@ Singleton {
     }
 
     function startQuery(): void {
-        if (queryProcess.running || root.backend === "")
+        if (queryProcess.running || root.backend === "" || writeProcess.running
+                || writeTimer.running || settleTimer.running)
             return;
         if (root.backend === "backlight") {
             queryProcess.command = ["brightnessctl", "--device", root.backlightDevice,
@@ -132,7 +143,7 @@ Singleton {
                 return;
             root.backlightActive = root.backlightPending;
             writeProcess.command = ["brightnessctl", "--device", root.backlightDevice,
-                                    "set", root.backlightActive + "%"];
+                                    "--min-value=1", "set", root.backlightActive + "%"];
             writeProcess.running = true;
             return;
         }
@@ -221,6 +232,10 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (root.backend === "backlight") {
+                    // Ein aelterer Leselauf darf den gerade gezogenen Wert
+                    // und insbesondere backlightPending nicht zuruecksetzen.
+                    if (writeProcess.running || writeTimer.running || settleTimer.running)
+                        return;
                     const fields = this.text.trim().split(",");
                     const percentField = fields.find(field => field.endsWith("%"));
                     const current = percentField ? parseInt(percentField) : -1;

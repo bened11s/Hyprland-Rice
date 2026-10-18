@@ -48,8 +48,8 @@ end
 local cfg = {
 	-- Apps
 	terminal = "kitty",
-	browser = "zen-browser",
-	editor = "codium",
+	browser = "opera-gx",
+	editor = "kate",
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
@@ -65,7 +65,7 @@ local cfg = {
 	kbLayout = "de",
 	repeatDelay = 250,
 	repeatRate = 35,
-	cursorTheme = "breeze_cursors",
+	cursorTheme = "WhiteSur-cursors",
 	cursorSize = 24,
 
 	-- Layout / Abstaende
@@ -83,8 +83,8 @@ local cfg = {
 	windowRounding = 15,
 
 	-- Optik
-	activeWindowOpacity = 0.85,
-	inActiveWindowOpacity = 0.60,
+	activeWindowOpacity = 0.96,
+	inActiveWindowOpacity = 0.90,
 	blurEnabled = true,
 	blurSize = 4,
 	blurPasses = 2,
@@ -97,12 +97,14 @@ local cfg = {
 	brightnessStep = 5,
 
 	-- Energie
-	sleepCmd = "systemctl suspend-then-hibernate",
+	sleepCmd = "systemctl suspend",
 
-	-- Workspaces: jeder Monitor hat seine eigene 10er-Gruppe (Anzeige jeweils 1-10)
+	-- Fuenf Workspaces je Monitor; stabile IDs in 10er-Bloecken.
 	wsMonitorOffset = {
-		["HDMI-A-1"] = 0, -- links:  Workspaces 1-10
-		["DP-2"] = 10, -- rechts: Workspaces 11-20
+		["eDP-1"] = 0,
+		["HDMI-A-1"] = 10,
+		["DVI-I-1"] = 20,
+		["DVI-I-2"] = 30,
 	},
 }
 
@@ -130,6 +132,10 @@ hl.env("_JAVA_AWT_WM_NONREPARENTING", "1")
 -- Basis-Config
 --------------------------------------------------------------------------------
 hl.config({
+	-- AMD rendert, HDMI haengt an NVIDIA: Hardware-Cursor-Blits schlagen fehl.
+	cursor = {
+		no_hardware_cursors = true,
+	},
 	general = {
 		layout = cfg.layout,
 		gaps_in = cfg.windowGapsIn,
@@ -225,7 +231,7 @@ hl.window_rule({
 -- Terminals, Bild-/Grafik-Apps und Spiele bleiben deckend
 hl.window_rule({
 	match = {
-		class = "kitty|foot|imv|swappy|krita|gimp|inkscape|blender|kdenlive|zen|firefox|"
+		class = "imv|swappy|krita|gimp|inkscape|blender|kdenlive|zen|firefox|"
 			.. "(steam_app_(default|[0-9]+))|gamescope",
 	},
 	opaque = true,
@@ -289,9 +295,9 @@ hl.workspace_rule({
 	},
 })
 
--- Jede 10er-Gruppe fest an ihren Monitor binden
+-- Je Monitor nur die ersten fuenf IDs des Blocks verwenden
 for monitor, offset in pairs(cfg.wsMonitorOffset) do
-	for i = 1, 10 do
+	for i = 1, 5 do
 		hl.workspace_rule({
 			workspace = tostring(offset + i),
 			monitor = monitor,
@@ -315,14 +321,14 @@ hl.on("hyprland.start", function()
 
 	-- Cursor
 	hl.exec_cmd("hyprctl setcursor " .. cfg.cursorTheme .. " " .. cfg.cursorSize)
-	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme " .. cfg.cursorTheme)
-	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-size " .. cfg.cursorSize)
+	-- Keine globalen GTK-/KDE-Einstellungen veraendern.
 
 	-- Bluetooth-Medientasten an MPRIS weiterreichen
 	hl.exec_cmd("mpris-proxy")
 
-	-- Papierkorb aufraeumen
-	hl.exec_cmd("trash-empty -f 30")
+	-- Passwortdialoge und KDE-Schluesselbund auch unter Hyprland.
+	hl.exec_cmd("pgrep -f '^/usr/lib/polkit-kde-authentication-agent-1$' >/dev/null || /usr/lib/polkit-kde-authentication-agent-1")
+	hl.exec_cmd("kwalletd6")
 
 	-- Shell dieses Profils starten (Zuordnung steht in hypr-profile):
 	-- beendet eine noch laufende Caelestia-Shell und faehrt dynamic-island hoch.
@@ -344,7 +350,7 @@ local function wsaction(action, i)
 	return function()
 		local target = monitor_offset() + i
 		if action == "move" then
-			return hl.dispatch(hl.dsp.window.move({ workspace = target }))
+			return hl.dispatch(hl.dsp.window.move({ workspace = target, follow = false }))
 		end
 		return hl.dispatch(hl.dsp.focus({ workspace = target }))
 	end
@@ -372,9 +378,11 @@ end
 -- Apps
 group = "Apps"
 bind("SUPER + Q", hl.dsp.exec_cmd(cfg.terminal), desc("Terminal"))
+bind("SUPER + Return", hl.dsp.exec_cmd(cfg.terminal), desc("Terminal"))
 bind("SUPER + W", hl.dsp.exec_cmd(cfg.browser), desc("Browser"))
 bind("SUPER + P", hl.dsp.exec_cmd(cfg.editor), desc("Editor"))
 bind("SUPER + E", hl.dsp.exec_cmd(cfg.fileExplorer), desc("Dateimanager"))
+bind("SUPER + G", hl.dsp.exec_cmd("steam steam://open/main"), desc("Steam"))
 bind("CTRL + ALT + V", hl.dsp.exec_cmd(cfg.audioSettings), desc("Audio-Einstellungen"))
 group = "Shell"
 -- Super allein oeffnet das App-Menue der Shell (per Quickshell-IPC).
@@ -433,11 +441,11 @@ bind("SHIFT + ALT + TAB", hl.dsp.window.cycle_next({ next = false }), desc("Vorh
 
 -- Workspaces des fokussierten Monitors
 group = "Workspaces"
-for i = 1, 10 do
-	local key = i % 10 -- 10 liegt auf der Taste 0
-	-- in der Uebersicht eine Zeile fuer alle zehn
-	bind("SUPER + " .. key, wsaction("focus", i), i == 1 and desc("Workspace 1–10", nil, "1 … 0") or {})
-	bind("SUPER + ALT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–10", nil, "1 … 0") or {})
+for i = 1, 5 do
+	local key = i
+	bind("SUPER + " .. key, wsaction("focus", i), i == 1 and desc("Workspace 1–5", nil, "1 … 5") or {})
+	bind("SUPER + ALT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–5", nil, "1 … 5") or {})
+	bind("SUPER + SHIFT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–5", nil, "1 … 5") or {})
 end
 bind("CTRL + SUPER + Left", hl.dsp.focus({ workspace = "m-1" }), desc("Vorheriger Workspace", { repeating = true }))
 bind("CTRL + SUPER + Right", hl.dsp.focus({ workspace = "m+1" }), desc("Nächster Workspace", { repeating = true }))

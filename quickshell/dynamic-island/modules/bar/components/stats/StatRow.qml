@@ -43,7 +43,7 @@ Item {
             leftMargin: 8
             verticalCenter: parent.verticalCenter
         }
-        width: 34
+        width: Math.max(34, implicitWidth)
         text: row.label
         color: Colors.fgBackground
         font.pixelSize: 11

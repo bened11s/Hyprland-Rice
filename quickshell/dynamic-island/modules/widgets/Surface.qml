@@ -180,11 +180,11 @@ Item {
         gradient: Gradient {
             GradientStop {
                 position: 0
-                color: Colors.shade(surface.baseColor, surface.lift)
+                color: Colors.alpha(Colors.shade(surface.baseColor, surface.lift), surface.baseColor.a * Appearance.surfaceOpacity)
             }
             GradientStop {
                 position: 1
-                color: surface.baseColor
+                color: Colors.alpha(surface.baseColor, surface.baseColor.a * Appearance.surfaceOpacity)
             }
         }
     }

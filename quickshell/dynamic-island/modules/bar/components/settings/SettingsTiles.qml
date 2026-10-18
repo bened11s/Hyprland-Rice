@@ -39,6 +39,8 @@ import qs.modules.services.config
 ColumnLayout {
     id: root
 
+    readonly property string monitorName: root.QsWindow.window?.screen?.name ?? ""
+
     spacing: 10
 
     // Raster: `unit` ist eine Spalte breit, eine Kachel belegt `span` davon
@@ -1115,15 +1117,15 @@ ColumnLayout {
         id: brightnessComponent
 
         LevelSlider {
-            title: "Helligkeit"
+            title: Brightness.readyFor(root.monitorName) ? "Helligkeit" : "Helligkeit nicht verfügbar"
             icon: "brightness_6"
-            value: Brightness.value
-            accent: Brightness.value > 0.5
+            value: Brightness.valueFor(root.monitorName)
+            accent: value > 0.5
                     ? Colors.alpha(Colors.primary, 0.78) : Colors.primaryDim
-            foreground: Brightness.value > 0.5 ? Colors.fgPrimary : Colors.fgBackground
-            enabled: Brightness.ready
+            foreground: value > 0.5 ? Colors.fgPrimary : Colors.fgBackground
+            enabled: Brightness.readyFor(root.monitorName)
             opacity: enabled ? 1 : 0.5
-            onAdjusted: value => Brightness.setValue(value)
+            onAdjusted: value => Brightness.setValueFor(root.monitorName, value)
         }
     }
 

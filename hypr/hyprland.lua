@@ -17,32 +17,32 @@
 local home            = os.getenv("HOME")
 local hypr            = home .. "/.config/hypr"
 local profileFile     = hypr .. "/profile"
-local defaultProfile  = "caelestia"
+local defaultProfile  = "simple"
 local switchBind      = "CTRL + SUPER + SHIFT + P"
 
 --------------------------------------------------------------------------------
 -- Monitore (gelten fuer beide Profile)
 --------------------------------------------------------------------------------
 hl.monitor({
-    output   = "HDMI-A-1",
-    mode     = "2560x1440@60",
+    output   = "eDP-1",
+    mode     = "1920x1080@60",
     position = "0x0",
     scale    = 1,
     vrr      = false,
 })
 
 hl.monitor({
-    output   = "DP-2",
-    mode     = "2560x1440@180",
-    position = "2560x0",
+    output   = "HDMI-A-1",
+    mode     = "highres",
+    position = "auto-right",
     scale    = 1,
 })
 
 hl.monitor({
-    output   = "eDP-1",
+    output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = 1.25,
+    scale    = 1,
 })
 
 --------------------------------------------------------------------------------

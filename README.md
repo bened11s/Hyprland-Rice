@@ -5,6 +5,12 @@ Meine Hyprland-Konfiguration mit eigener Quickshell-Oberflaeche
 Theme-Auswahl, WLAN-Einstellungen — dazu die CLI `dynamic-island`
 (Farbschemata, Wallpaper, Screenshots, Aufnahmen).
 
+Der aktuelle persoenliche Shell-Stand (Notch, volle Deckkraft, fuenf
+Workspaces je Monitor) liegt als `dynamic-island/shell.example.json` bei.
+Bei einer neuen Einrichtung kann diese Datei als `shell.json` im selben
+Ordner uebernommen werden. Die aktive `shell.json` bleibt lokal und wird
+nicht durch Git-Updates ueberschrieben.
+
 ## Installieren
 
 ```sh

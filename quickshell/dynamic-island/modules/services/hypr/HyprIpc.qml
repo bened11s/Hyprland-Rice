@@ -19,6 +19,13 @@ import Quickshell.Hyprland
 Singleton {
     id: root
 
+    // Feste 10er-Gruppen wie in simple.lua und workspace.py, unabhaengig
+    // davon, wie viele Punkte der Benutzer einblendet.
+    function workspaceOffset(monitor: HyprlandMonitor): int {
+        const offsets = { "eDP-1": 0, "HDMI-A-1": 10, "DVI-I-1": 20, "DVI-I-2": 30 };
+        return offsets[monitor?.name] ?? 0;
+    }
+
     // Offener Special-Workspace auf `monitor` ("" = keiner)
     function specialOn(monitor: HyprlandMonitor): string {
         return monitor?.lastIpcObject.specialWorkspace?.name ?? "";

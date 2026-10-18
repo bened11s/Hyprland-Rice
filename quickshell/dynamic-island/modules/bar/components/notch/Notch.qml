@@ -553,6 +553,10 @@ Item {
             Fade on opacity {}
 
             // Aufnahme-Punkt, pulst langsam wie sein Gegenstueck im Insel-Layout
+            AiAgentButton {
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
             Rectangle {
                 id: dockedRecordDot
 
@@ -754,6 +758,15 @@ Item {
         }
 
         // ---- Glocke oben rechts ----
+        AiAgentButton {
+            anchors {
+                right: bell.left
+                rightMargin: 10
+                verticalCenter: clock.verticalCenter
+            }
+            visible: notch.cardShown || notch.docked && notch.viewOpen
+        }
+
         // Glocke mit Zaehler. Ein Klick oeffnet das Untermenue
         // "Benachrichtigungen" (wie SUPER+N), steht man schon darin, geht es
         // zurueck zur Uebersicht.
@@ -1381,7 +1394,7 @@ Item {
         x: -width
         y: 0
         size: notch.shoulder
-        color: Appearance.notchColor
+        color: Colors.alpha(Appearance.notchColor, Appearance.surfaceOpacity)
         strokeWidth: pill.borderWidth
         strokeColor: Appearance.notchBorderColor
         visible: notch.docked
@@ -1393,7 +1406,7 @@ Item {
         x: notch.width
         y: 0
         size: notch.shoulder
-        color: Appearance.notchColor
+        color: Colors.alpha(Appearance.notchColor, Appearance.surfaceOpacity)
         strokeWidth: pill.borderWidth
         strokeColor: Appearance.notchBorderColor
         mirrored: true

@@ -58,7 +58,7 @@ Item {
     }
 
     // Welche 10er-Gruppe gehört zu diesem Monitor: 0 bei ws 1-10, 10 bei 11-20
-    readonly property int groupOffset: Math.floor((root.activeWsId - 1) / root.workspacesPerMonitor) * root.workspacesPerMonitor
+    readonly property int groupOffset: HyprIpc.workspaceOffset(root.hyprMonitor)
 
     // { wsId: hatFenster } – einmal gebaut statt zehnmal pro Punkt gefiltert
     readonly property var occupied: {
@@ -108,7 +108,9 @@ Item {
 
                 const dir = wheel.acc > 0 ? "m-1" : "m+1";
                 wheel.acc = 0;
-                Hyprland.dispatch(`hl.dsp.focus({ workspace = "${dir}" })`);
+                Hyprland.dispatch(Hyprland.usingLua
+                    ? `hl.dsp.focus({ workspace = "${dir}" })`
+                    : `workspace ${dir}`);
             }
         }
 

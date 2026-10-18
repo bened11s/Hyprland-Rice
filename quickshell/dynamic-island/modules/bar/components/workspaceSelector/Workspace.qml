@@ -105,9 +105,6 @@ Item {
             // "dynamic-island toggle specialws" CLI-Aufruf - den gibt es
             // nicht, der Klick tat deshalb sichtbar nichts.
             if (root.isActive) {
-                Hyprland.dispatch(Hyprland.usingLua
-                    ? 'hl.dsp.workspace.toggle_special("special")'
-                    : "togglespecialworkspace special");
                 return;
             }
 

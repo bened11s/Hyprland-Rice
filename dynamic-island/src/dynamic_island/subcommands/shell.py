@@ -13,6 +13,7 @@ SHELL_NAME: str = get_config().get("shell", {}).get("name", "dynamic-island")
 # der dynamischen Schwelle blieben sie im Heap und der RSS auf dem Hoechststand.
 # Weniger Arenen, weil Quickshell ~45 Threads hat, die kaum parallel allozieren.
 SHELL_ENV: dict[str, str] = {
+    "QT_QPA_PLATFORMTHEME": "kde",
     "MALLOC_ARENA_MAX": "2",
     "MALLOC_MMAP_THRESHOLD_": "1048576",
 }

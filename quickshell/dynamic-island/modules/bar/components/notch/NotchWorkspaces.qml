@@ -33,7 +33,7 @@ Item {
 
     readonly property HyprlandMonitor hyprMonitor: Hyprland.monitorFor(root.QsWindow.window?.screen ?? null)
     readonly property int activeId: root.hyprMonitor?.activeWorkspace?.id ?? 1
-    readonly property int groupOffset: Math.floor((root.activeId - 1) / root.perMonitor) * root.perMonitor
+    readonly property int groupOffset: HyprIpc.workspaceOffset(root.hyprMonitor)
     // Offener Special-Workspace auf DIESEM Monitor ("" = keiner)
     readonly property string activeSpecial: HyprIpc.specialOn(root.hyprMonitor)
     readonly property bool onSpecial: root.activeSpecial !== ""
@@ -186,11 +186,7 @@ Item {
                     // schliessen (wie der aktive Punkt der grossen Leiste)
                     TapHandler {
                         onTapped: {
-                            if (slot.active)
-                                Hyprland.dispatch(Hyprland.usingLua
-                                    ? 'hl.dsp.workspace.toggle_special("special")'
-                                    : "togglespecialworkspace special");
-                            else
+                            if (!slot.active)
                                 Hyprland.dispatch(Hyprland.usingLua
                                     ? `hl.dsp.focus({ workspace = ${slot.ws} })`
                                     : `workspace ${slot.ws}`);

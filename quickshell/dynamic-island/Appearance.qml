@@ -32,6 +32,7 @@ Singleton {
     // Leichter Verlauf: oben eine Spur heller als der Grund, unten der Grund
     // selbst. Das gibt den Pillen eine Oberseite, auf der Licht liegt.
     readonly property real lift: 0.035
+    readonly property real surfaceOpacity: Math.max(0.65, Math.min(1, Config.appearance.opacity))
 
     // ---- Notch-Layout ----
     // Die angedockte Notch ist schwarz wie ein Displayrahmen und geht ueber

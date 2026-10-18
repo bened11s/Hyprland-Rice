@@ -121,6 +121,7 @@ Singleton {
             min: 8, max: 28, step: 1, unit: "px"
         },
         "appearance.shadow": { title: "Schatten", desc: "Weicher Schatten unter Pillen und Karten" },
+        "appearance.opacity": { title: "Deckkraft", desc: "Transparenz der Shell-Flaechen, Text bleibt deckend", min: 0.65, max: 1, step: 0.05 },
         "appearance.clock": { title: "Uhrzeit", desc: "Anzeigeformat der Uhr in der Notch", options: ["24h", "12h"] },
         // Uebergang beim Wallpaperwechsel (modules/window/WallpaperStage.qml);
         // dieselbe Auswahl steht als Chip-Reihe in der Wallpaper-Auswahl
@@ -362,6 +363,7 @@ Singleton {
                 property string layout: "insel"
                 // Faktor auf Appearance.morphDuration (2 = doppelt so schnell)
                 property real speed: 1.0
+                property real opacity: 1.0
                 property int radius: 20
                 property bool shadow: true
                 property string clock: "24h"

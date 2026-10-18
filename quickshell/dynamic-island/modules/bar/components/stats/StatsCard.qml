@@ -41,7 +41,7 @@ Column {
         width: parent.width
         visible: SystemStats.hasGpu
         icon: "monitoring"
-        label: "GPU"
+        label: "GTX 1650"
         value: SystemStats.gpuUsage
         warn: SystemStats.gpuTemp >= 85 || SystemStats.gpuUsage >= 0.9
         detail: `${Math.round(SystemStats.gpuUsage * 100)} %` +

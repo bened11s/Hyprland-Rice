@@ -1,0 +1,59 @@
+{
+    "appearance": {
+        "bounce": "mittel",
+        "clock": "24h",
+        "font": "SF Pro",
+        "layout": "notch",
+        "opacity": 1,
+        "radius": 20,
+        "shadow": true,
+        "speed": 1
+    },
+    "bar": {
+        "battery": false,
+        "batteryPulse": true,
+        "media": true,
+        "notifications": true,
+        "settings": true,
+        "stats": false,
+        "tray": true,
+        "workspaceCount": 5,
+        "workspaces": true
+    },
+    "notch": {
+        "date": true,
+        "media": true,
+        "messages": true,
+        "visualizer": true,
+        "workspaces": true
+    },
+    "notifications": {
+        "dnd": false,
+        "peekSeconds": 5
+    },
+    "osd": {
+        "brightness": true,
+        "enabled": true,
+        "hideDelay": 2,
+        "hover": true
+    },
+    "quick": {
+        "columns": 4,
+        "rows": [
+            "wifi:2,bluetooth:2",
+            "vpn:2,nosleep:2",
+            "gamemode:2,settings:2",
+            "record:4",
+            "volume:4",
+            "mic:4",
+            "brightness:4"
+        ]
+    },
+    "vpn": {
+        "provider": "nordvpn"
+    },
+    "wallpaper": {
+        "duration": 800,
+        "transition": "kreis"
+    }
+}

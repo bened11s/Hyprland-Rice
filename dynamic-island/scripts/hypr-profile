@@ -10,7 +10,7 @@ set -uo pipefail
 
 HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 PROFILE_FILE="$HYPR_DIR/profile"
-DEFAULT_PROFILE="caelestia"
+DEFAULT_PROFILE="simple"
 
 ################################################################################
 # Welche Quickshell-Config gehoert zu welchem Profil?
@@ -30,7 +30,7 @@ declare -A PROFILE_SHELL=(
 # Array hat keine feste Reihenfolge, darum hier noch einmal als Liste — und
 # sie entscheidet zugleich, welche Namen als Argument gelten. Ein neues Profil
 # braucht drei Dinge: profiles/<name>.lua, einen Eintrag oben und einen hier.
-PROFILE_ORDER=(caelestia simple shell2)
+PROFILE_ORDER=(simple)
 
 # Startbefehl je Shell. Ohne Eintrag wird `qs -c <name> -n -d` benutzt —
 # shell2 laeuft genau so, ohne eigenen CLI-Wrapper.

@@ -2,17 +2,37 @@
     "shell": {
         "name": "dynamic-island"
     },
+    "toggles": {
+        "sysmon": {
+            "btop": {
+                "command": ["kitty", "--class", "btop", "--title", "btop", "btop"]
+            }
+        },
+        "specialws": {
+            "terminal": {
+                "enable": true,
+                "match": [{"class": "kitty"}],
+                "command": ["kitty"],
+                "move": true
+            }
+        }
+    },
     "theme": {
-        "enableTerm": true,
+        "enableTerm": false,
         "enableHypr": true,
         "enableHyprlock": true,
         "enableGtk": true,
         "enableQt": true,
-        "enableBtop": true,
+        "gtkThemeDark": "Breeze",
+        "gtkThemeLight": "Breeze",
+        "iconThemeDark": "breeze-dark",
+        "iconThemeLight": "breeze",
+        "postHook": "python $HOME/.config/dynamic-island/scripts/sync-desktop-theme.py",
+        "enableBtop": false,
         "enableCava": true,
-        "enableDiscord": true,
+        "enableDiscord": false,
 
-        "enableFuzzel": false,
+        "enableFuzzel": true,
         "enableChromium": false,
         "enableSpicetify": false,
         "enableZed": false,
