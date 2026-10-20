@@ -32,6 +32,43 @@ Item {
     // Verstaerkung je Schritt von der Mitte nach aussen (Hoehen sind leiser)
     property real tilt: 0.45
 
+    // Nur der Monitor im Fokus aktualisiert den Pegel-Snapshot. Auf allen
+    // anderen Monitoren bleiben die Balken auf dem letzten Stand stehen.
+    //
+    // Grund: die Shell laeuft auf der iGPU, der Compositor auf der dGPU –
+    // jeder Frame der Shell muss also ueber PCIe kopiert werden, und
+    // Hyprland rendert pro Layer-Frame den GESAMTEN Output neu (5040x1920
+    // bei vier Monitoren). Vier Monitore x 30 Hz Cava waren deshalb 120
+    // Frames/s und genau die GPU-Auslastung, die man beim Oeffnen der Insel
+    // als Spike zu spueren bekommt.
+    property bool live: true
+    property var snapshot: []
+
+    // Kurz nach einem Wechsel zwischen Ruhebogen und Pegeln darf die Hoehe
+    // animiert werden – danach nicht mehr (siehe Behavior unten).
+    property bool transitioning: false
+    onActiveChanged: {
+        root.transitioning = true;
+        transitionTimer.restart();
+    }
+    Timer {
+        id: transitionTimer
+        interval: Appearance.morphDuration
+        onTriggered: root.transitioning = false
+    }
+
+    Connections {
+        target: Cava
+        function onValuesChanged(): void {
+            if (root.live)
+                root.snapshot = Cava.values;
+        }
+    }
+
+    onLiveChanged: if (root.live) root.snapshot = Cava.values
+
+    Component.onCompleted: root.snapshot = Cava.values
+
     // Positionen von der Mitte aus: bei 5 Balken 0 (Mitte), 1, 2
     readonly property int positions: Math.ceil(root.count / 2)
 
@@ -40,7 +77,7 @@ Item {
 
     // Pegel einer Position, 0..1
     function level(pos: int): real {
-        const vals = Cava.values;
+        const vals = root.snapshot.length > 0 ? root.snapshot : Cava.values;
         const usable = Math.max(root.positions, Math.floor(vals.length * root.range));
         const size = usable / root.positions;
         const from = Math.floor(pos * size);
@@ -81,13 +118,17 @@ Item {
             color: root.color
             opacity: root.active ? 1 : 0.4
 
-            // Nur der Wechsel in den Ruhebogen wird animiert. Beim Spielen
-            // folgen die Balken cava direkt: eine 90-ms-Animation je Frame
-            // lief bei 30 cava-Frames/s ohne Pause und liess das ganze
-            // Leistenfenster mit der Monitorrate (180 Hz) neu zeichnen statt
-            // mit 30 Hz.
+            // Nur der Wechsel zwischen Ruhebogen und Pegeln wird animiert.
+            //
+            // Wichtig: die Animation darf NICHT bei jeder Pegel-Aktualisierung
+            // laufen. Eine laufende Animation liess die ganze Shell mit der
+            // Monitorrate neu zeichnen (jeder Frame = Layer-Update =
+            // PCIe-Kopie zur dGPU + Hyprland rendert den Output neu). Statt
+            // einer Behavior auf `height` laeuft die Animation deshalb nur
+            // kurz nach einem Wechsel von `active` – der Ruhebogen-Wechsel
+            // bleibt weich, die Pegel selbst springen direkt.
             Behavior on height {
-                enabled: root.visible && !root.active
+                enabled: root.visible && root.transitioning
                 NumberAnimation { duration: Appearance.morphDuration; easing.type: Easing.OutCubic }
             }
             Behavior on opacity {

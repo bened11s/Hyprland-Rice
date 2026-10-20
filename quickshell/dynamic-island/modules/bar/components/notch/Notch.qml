@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Hyprland
 
 import qs.modules.services.config
 import qs.modules.services.auth
@@ -168,7 +169,10 @@ Item {
     // Datums-Ansicht (per Hover) und Launcher (per Zug nach unten) teilen sich
     // dieselbe Karte – der Launcher hat Vorrang.
     property bool expanded: false
-    readonly property var hostScreen: notch.QsWindow.window?.screen ?? null
+    // Der Bildschirm, auf dem diese Notch liegt. Bar.qml setzt ihn aus
+    // `modelData` – `QsWindow.window?.screen` war bei drei von vier Panels
+    // null und damit unbrauchbar (u.a. fuer den Fokus-Abgleich).
+    required property var hostScreen
     readonly property bool launcherOpen: LauncherState.open && LauncherState.screen === hostScreen
     // Die Karte hat im Launcher-Modus drei Ansichten (siehe LauncherState.mode)
     readonly property bool wallpaperOpen: launcherOpen && LauncherState.mode === "wallpaper"
@@ -685,6 +689,15 @@ Item {
                 count: 5
                 barWidth: 3
                 active: Media.playing
+                // Nur der Monitor im Fokus laeuft die Pegel nach. Die Balken
+                // der anderen Monitore stehen still, sparen aber Frames: jeder
+                // Frame der Shell wird ueber PCIe zur dGPU kopiert und
+                // Hyprland rendert pro Layer-Frame den ganzen Output neu.
+                //
+                // Ist die Insel offen, zeigt die Medienzeile ihre eigenen
+                // Balken – die kleinen neben der Uhr duerfen dann stehen
+                // bleiben, sonst laeuft der Visualizer doppelt.
+                live: Hyprland.focusedMonitor?.name === notch.hostScreen?.name && !notch.open
             }
         }
 

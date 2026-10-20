@@ -318,6 +318,7 @@ Variants {
                 borderWidth: bar.borderWidth   // `this` gibt es in QML-Bindings nicht
                 borderColor: bar.borderColor   // Quelle: eine Ebene weiter oben definiert
                 cardRadius: bar.cardRadius     // dito – teilt sich den Wert mit dem Selektor
+                hostScreen: bar.modelData      // der Bildschirm dieser Leiste
             }
 
             // Beide Nachbarn hängen an der Bildschirmmitte plus der halben
