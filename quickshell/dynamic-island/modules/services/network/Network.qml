@@ -32,6 +32,9 @@ Singleton {
     // [{ ssid, signal, security, secured, active, inRange,
     //    profiles: [{ uuid, name, timestamp }], saved, duplicate, stale }]
     property var networks: []
+    // Kabelanschluesse: [{ device, state, connection, ip,
+    //                      connected, connecting, available }]
+    property var wired: []
     property bool radioOn: true
     property bool loaded: false
 
@@ -139,6 +142,30 @@ Singleton {
         for (const profile of net.profiles)
             root.run(["nmcli", "connection", "delete", "uuid", profile.uuid],
                      `${net.ssid} wird vergessen…`);
+    }
+
+    // LAN laeuft ueber das Geraet, nicht ueber ein Profil: `device connect`
+    // nimmt das passende Profil selbst (oder legt per DHCP eins an).
+    // `device disconnect` sperrt das automatische Verbinden, bis man wieder
+    // verbindet – gewollt, sonst waere Trennen nach Sekunden zurueckgenommen.
+    function connectWired(dev: var): void {
+        root.run(["nmcli", "device", "connect", dev.device], `Verbinde ${dev.device}…`);
+    }
+
+    function disconnectWired(dev: var): void {
+        root.run(["nmcli", "device", "disconnect", dev.device], `Trenne ${dev.device}…`);
+    }
+
+    function wiredStateText(dev: var): string {
+        if (dev.connected)
+            return "Verbunden";
+        if (dev.connecting)
+            return "Verbinde…";
+        if (dev.state === "unavailable")
+            return "Kein Kabel";
+        if (dev.state === "unmanaged")
+            return "Nicht verwaltet";
+        return "Getrennt";
     }
 
     // Die Profile wegwerfen, die nie zu einer Verbindung gefuehrt haben – und
@@ -251,12 +278,19 @@ Singleton {
             + '   [ "$type" = "802-11-wireless" ] || continue;'
             + '   printf "PROFILE %s\t%s\n" "$uuid"'
             + '     "$(nmcli -t -g connection.id,802-11-wireless.ssid,connection.timestamp connection show "$uuid" | tr "\\n" "\t")";'
+            + ' done;'
+            + ' nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device | sed "s/^/DEV /";'
+            + ' nmcli -t -f DEVICE,TYPE,STATE device | while IFS=: read -r dev type state; do'
+            + '   [ "$type" = "ethernet" ] && [ "$state" = "connected" ] &&'
+            + '     echo "IP $dev $(nmcli -t -g IP4.ADDRESS device show "$dev" | head -n1)";'
             + ' done']
 
         stdout: StdioCollector {
             onStreamFinished: {
                 const byName = {};      // SSID -> Eintrag
                 const profiles = [];
+                const wired = [];
+                const ips = {};         // Geraet -> IPv4 (mit /Praefix)
 
                 for (const line of text.split("\n")) {
                     if (line.startsWith("RADIO ")) {
@@ -290,8 +324,28 @@ Singleton {
                             ssid: f[2],
                             timestamp: parseInt(f[3]) || 0
                         });
+                    } else if (line.startsWith("DEV ")) {
+                        const f = root.splitTerse(line.slice(4));
+                        if (f[1] !== "ethernet")
+                            continue;
+                        const state = f[2] ?? "";
+                        wired.push({
+                            device: f[0],
+                            state,
+                            connection: f[3] ?? "",
+                            connected: state === "connected",
+                            connecting: state.startsWith("connecting"),
+                            available: state !== "unavailable" && state !== "unmanaged"
+                        });
+                    } else if (line.startsWith("IP ")) {
+                        const f = line.slice(3).split(" ");
+                        ips[f[0]] = f[1] ?? "";
                     }
                 }
+
+                for (const dev of wired)
+                    dev.ip = (ips[dev.device] ?? "").split("/")[0];
+                root.wired = wired;
 
                 // Gespeicherte Netze ausserhalb der Reichweite trotzdem
                 // zeigen – sonst kann man sie weder aendern noch loeschen

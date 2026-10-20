@@ -279,9 +279,12 @@ Item {
         elide: Text.ElideRight
     }
 
-    // ---- Liste ----
-    Item {
-        id: listWrapper
+    // ---- LAN ----
+    // Kabelanschluesse stehen ueber der WLAN-Liste; ohne Netzwerkkarte faellt
+    // der Abschnitt weg. Er nimmt der Liste Platz, statt die Karte wachsen zu
+    // lassen (siehe listHeight).
+    Column {
+        id: wiredSection
 
         anchors {
             top: statusText.visible ? statusText.bottom : header.bottom
@@ -289,7 +292,138 @@ Item {
             left: parent.left
             right: parent.right
         }
-        height: panel.listHeight
+        visible: Network.wired.length > 0
+        height: visible ? implicitHeight : 0
+        spacing: 4
+
+        Repeater {
+            model: Network.wired
+
+            Rectangle {
+                id: wiredRow
+
+                required property var modelData
+
+                readonly property bool canConnect: !wiredRow.modelData.connected
+                    && !wiredRow.modelData.connecting && wiredRow.modelData.available
+
+                width: wiredSection.width
+                height: panel.rowHeight
+                radius: 14
+                color: wiredRow.modelData.connected ? Colors.alpha(Colors.primary, 0.16)
+                     : wiredRow.canConnect && wiredArea.containsMouse ? Colors.shade(Colors.background, 0.08)
+                     : Colors.shade(Colors.background, 0.05)
+                opacity: wiredRow.modelData.available ? 1 : 0.6
+
+                Behavior on color {
+                    ColorAnimation { duration: 120 }
+                }
+
+                // Klick verbindet; Trennen nur ueber den Knopf, wie beim WLAN
+                MouseArea {
+                    id: wiredArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: wiredRow.canConnect ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: if (wiredRow.canConnect)
+                        Network.connectWired(wiredRow.modelData)
+                }
+
+                Text {
+                    id: wiredIcon
+
+                    anchors {
+                        left: parent.left
+                        leftMargin: 14
+                        verticalCenter: parent.verticalCenter
+                    }
+                    text: "lan"
+                    font.family: "Material Symbols Outlined"
+                    font.pixelSize: 20
+                    color: wiredRow.modelData.connected ? Colors.primary : Colors.fgSurfaceVariant
+                }
+
+                Column {
+                    anchors {
+                        left: wiredIcon.right
+                        leftMargin: 12
+                        right: wiredButton.visible ? wiredButton.left : parent.right
+                        rightMargin: 8
+                        verticalCenter: parent.verticalCenter
+                    }
+                    spacing: 1
+
+                    Text {
+                        font.family: Config.font
+                        width: parent.width
+                        text: wiredRow.modelData.connected && wiredRow.modelData.connection !== ""
+                              ? wiredRow.modelData.connection : "LAN"
+                        color: Colors.fgBackground
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        font.family: Config.font
+                        width: parent.width
+                        text: [Network.wiredStateText(wiredRow.modelData), wiredRow.modelData.device,
+                               wiredRow.modelData.ip].filter(s => s !== "").join(" · ")
+                        color: Colors.fgSurfaceVariant
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    id: wiredButton
+
+                    anchors {
+                        right: parent.right
+                        rightMargin: 8
+                        verticalCenter: parent.verticalCenter
+                    }
+                    width: 28
+                    height: 28
+                    visible: wiredRow.modelData.connected || wiredRow.canConnect
+                    radius: height / 2
+                    color: wiredButtonArea.containsMouse ? Colors.alpha(Colors.fgSurface, 0.1) : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: wiredRow.modelData.connected ? "link_off" : "link"
+                        font.family: "Material Symbols Outlined"
+                        font.pixelSize: 16
+                        color: wiredRow.modelData.connected ? Colors.error : Colors.fgSurfaceVariant
+                    }
+
+                    MouseArea {
+                        id: wiredButtonArea
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: wiredRow.modelData.connected ? Network.disconnectWired(wiredRow.modelData)
+                                                               : Network.connectWired(wiredRow.modelData)
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- Liste ----
+    Item {
+        id: listWrapper
+
+        anchors {
+            top: wiredSection.visible ? wiredSection.bottom
+                 : statusText.visible ? statusText.bottom : header.bottom
+            topMargin: 6
+            left: parent.left
+            right: parent.right
+        }
+        height: panel.listHeight - (wiredSection.visible ? wiredSection.height + 6 : 0)
 
         ListView {
             id: list
