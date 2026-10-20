@@ -20,6 +20,7 @@
 .claude/
 .qmlls.ini
 __pycache__/
+*.bak-*
 *.pyc
 
 # hyprlock: die Bildersammlung aus dem fremden Repo bleibt draussen,

@@ -26,12 +26,17 @@ Singleton {
         "vpn":        { label: "VPN",           icon: "vpn_key",        kind: "pill" },
         "nosleep":    { label: "No Sleep",      icon: "coffee",         kind: "pill" },
         "gamemode":   { label: "Game-Mode",     icon: "sports_esports", kind: "circle" },
+        "performance": { label: "Performance", icon: "speed", kind: "wide" },
+        "monitors":   { label: "Bildschirm",    icon: "monitor",        kind: "circle" },
         "settings":   { label: "Einstellungen", icon: "tune",           kind: "circle" },
         "record":     { label: "Aufnahme",      icon: "screen_record",  kind: "wide" },
         "volume":     { label: "Lautstärke",    icon: "volume_up",      kind: "wide" },
         "mic":        { label: "Mikrofon",      icon: "mic",            kind: "wide" },
         "power":      { label: "Energie",       icon: "bolt",           kind: "pill" },
-        "brightness": { label: "Helligkeit",    icon: "brightness_6",   kind: "wide" }
+        "brightness": { label: "Helligkeit",    icon: "brightness_6",   kind: "wide" },
+        "screenshot": { label: "Screenshot",    icon: "screenshot",     kind: "wide" },
+        "dnd":        { label: "Nicht stören",  icon: "notifications_off", kind: "pill" },
+        "lock":       { label: "Sperren",       icon: "lock",           kind: "circle" }
     })
     readonly property var ids: Object.keys(root.tiles)
 

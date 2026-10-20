@@ -2,6 +2,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Hyprland
+import qs.modules.performance
 
 import qs.modules.services.config
 import qs.modules.services.auth
@@ -37,6 +39,14 @@ Item {
     // der Leiste – Bar.qml blendet die anderen Pillen aus. Etwas hoeher und
     // breiter als die Insel, damit sie als Notch liest und nicht als Pille.
     readonly property bool docked: Config.appearance.layout === "notch"
+    readonly property bool performanceActive: GamePerformance.shown
+        && Hyprland.focusedMonitor?.name === notch.hostScreen?.name
+    readonly property real performanceLimit: Math.max(notch.compactBaseWidth,
+        Math.min(Config.performance.maxWidth, (notch.hostScreen?.width ?? 1920) - 48))
+    readonly property real performanceWidth: Math.min(performanceStrip.implicitWidth, Math.max(50,
+        notch.docked ? (notch.performanceLimit - clock.implicitWidth) / 2
+            - notch.compactGap - notch.compactEdge - notch.compactLeftBase - 8
+        : (notch.performanceLimit - notch.compactBaseWidth) / 2 - 8))
 
     // ---- Angedockte Notch (saneAspect-Vorbild) ----
     // Schwarz wie der Displayrahmen, ohne Rand, mit gewoelbten Schultern an
@@ -52,13 +62,15 @@ Item {
     readonly property real compactGap: 14    // Element -> Uhr
     readonly property real compactMinWidth: 196
     readonly property bool showWorkspaces: docked && Config.notch.workspaces
-    readonly property real compactLeft: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
+    readonly property real compactLeftBase: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
                                       : showWorkspaces ? compactWorkspaces.implicitWidth
                                       : 0
+    readonly property real compactLeft: compactLeftBase + (performanceActive ? 8 + performanceWidth : 0)
     readonly property real compactSide: Math.max(compactLeft, compactRight.implicitWidth)
     // Hoehe des oberen Bands (eingeklappt plus Hover-Wachstum): Uhr und
     // Seitenelemente bleiben darin mittig
-    readonly property real bandHeight: collapsedHeight + growth
+    readonly property real bandHeight: (performanceActive && !open
+        ? Math.max(collapsedHeight, performanceStrip.implicitHeight + 8) : collapsedHeight) + growth
 
     // ---- Aufgeklappt: Uebersicht + Untermenues (Notch-Layout) ----
     // Beim Hover zeigt die Notch nur das Wichtigste (Uebersicht): Uhr mit
@@ -218,9 +230,12 @@ Item {
     // unten und mittig etwas in die Breite.
     // Angedockt: 1 px hoeher, weil der obere Rand ausserhalb liegt (y < 0)
     readonly property real collapsedHeight: docked ? parent.height - 8 : parent.height - verticalMargin
-    readonly property real collapsedWidth: docked
-        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
+    readonly property real compactBaseWidth: docked
+        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (Math.max(compactLeftBase, compactRight.implicitWidth) + compactGap + compactEdge))
         : clock.implicitWidth + 50 + recordReserve
+    readonly property real collapsedWidth: !notch.performanceActive ? notch.compactBaseWidth
+        : docked ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
+        : notch.compactBaseWidth + 2 * (notch.performanceWidth + 8)
     readonly property real launcherWidth: wallpaperOpen ? wallpapers.outerWidth
                                         : themeOpen ? themes.outerWidth
                                         : powerOpen ? powerMenu.outerWidth
@@ -254,7 +269,7 @@ Item {
     // Angedockt mit Kontur: die obere Randlinie liegt ausserhalb des Bildes
     y: docked ? -pill.borderWidth : verticalMargin / 2
     width: open ? expandedWidth : collapsedWidth + 2 * growth
-    height: open ? expandedHeight : collapsedHeight + growth
+    height: open ? expandedHeight : notch.bandHeight
 
     // Die Insel reagiert sofort auf den Zeiger – noch bevor sie aufklappt.
     // Angedockt waechst sie stattdessen (growth): eine skalierte Notch
@@ -470,6 +485,42 @@ Item {
             }
         }
 
+        // Mikrofon stumm (End-Taste, systemweit): kleines durchgestrichenes
+        // Mikro links neben der Uhr, gleiche Optik wie der Aufnahme-Punkt.
+        Text {
+            id: micMutedIcon
+
+            anchors {
+                right: clock.left
+                rightMargin: 6
+                verticalCenter: clock.verticalCenter
+            }
+            font.family: "Material Symbols Outlined"
+            font.pixelSize: 15
+            text: "mic_off"
+            color: notch.open ? Colors.primary : Colors.fgBackground
+            visible: opacity > 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+            }
+            Behavior on color {
+                ColorAnimation { duration: Appearance.fadeDuration }
+            }
+        }
+
+        // Cover/Workspaces -> Performance -> Uhr; KI bleibt rechts der Uhr.
+        // Menus keep their normal layout; closing them restores the live strip.
+        PerformanceStrip {
+            id: performanceStrip
+            objectName: "islandPerformanceStrip"
+            x: notch.compactEdge + notch.growth + notch.compactLeftBase + 8
+            y: (notch.bandHeight - height) / 2
+            width: Math.max(1, Math.min(notch.performanceWidth, clock.x - notch.compactGap - x))
+            height: implicitHeight
+            visible: notch.performanceActive && !notch.open
+        }
+
         // Der Aufnahme-Punkt. Er pulst langsam, damit er als Zustand lesbar
         // ist und nicht als Deko; im Launcher-Modus geht er mit der Uhr.
         Item {
@@ -556,11 +607,13 @@ Item {
 
             Fade on opacity {}
 
-            // Aufnahme-Punkt, pulst langsam wie sein Gegenstueck im Insel-Layout
             AiAgentButton {
+                id: compactAiButton
+                objectName: "notchCompactAiButton"
                 anchors.verticalCenter: parent.verticalCenter
             }
 
+            // Aufnahme-Punkt, pulst langsam wie sein Gegenstueck im Insel-Layout
             Rectangle {
                 id: dockedRecordDot
 
@@ -990,10 +1043,13 @@ Item {
                     || Math.abs(event.pixelDelta.x) > Math.abs(event.pixelDelta.y);
                 const angle = horizontal ? event.angleDelta.x : event.angleDelta.y;
                 const pixels = horizontal ? event.pixelDelta.x : event.pixelDelta.y;
-                // Eine Seite je echter Rastung (120). Das Hi-Res-Rad der G502
-                // liefert die in ~8 Teilen zu 15 – die werden aufsummiert.
-                // Touchpad: 60 px Zug je Seite.
-                const delta = pixels !== 0 ? pixels / 60 : angle / 120;
+                // Eine Seite je echter Rastung (120) – Winkel VOR Pixeln.
+                // Die2,4G-Dongle-Mausen liefern BEIDES pro Rastung
+                // (angle 120 + pixel 15); wer pixel bevorzugt, braeuchte
+                // 4 Rastungen je Seite. Pixel bleiben nur Fallback fuer
+                // G502-Hi-Res (8x15 Winkel, wird aufsummiert) und Touchpad
+                // (nur pixelDelta, 60 px Zug je Seite).
+                const delta = angle !== 0 ? angle / 120 : pixels / 60;
 
                 // Richtungswechsel verwirft den Rest der alten Richtung
                 if (flipWheel.accum !== 0 && Math.sign(delta) !== Math.sign(flipWheel.accum))
@@ -1052,6 +1108,7 @@ Item {
         // ---- Live-Activity: Cover links ----
         Item {
             id: mediaArt
+            objectName: "notchMusicCover"
             transform: Translate { x: notch.songSlide }
 
             anchors {

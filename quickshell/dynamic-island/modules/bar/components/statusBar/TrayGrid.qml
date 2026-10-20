@@ -90,9 +90,13 @@ Item {
             enabled: strip.interactive
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onWheel: event => {
-                const d = event.pixelDelta.y !== 0 ? event.pixelDelta.y
-                        : event.angleDelta.y !== 0 ? event.angleDelta.y / 2
-                        : event.angleDelta.x / 2;
+                // Winkel vor Pixeln (120 = eine Rastung = 60 px Streifenlauf).
+                // Die2,4G-Maus liefert beides, mit pixel-Vorrang bliebe sie
+                // bei 15 px/Rastung haengen. Touchpad: nur pixelDelta.
+                const d = event.angleDelta.y !== 0 ? event.angleDelta.y / 2
+                        : event.angleDelta.x !== 0 ? event.angleDelta.x / 2
+                        : event.pixelDelta.y !== 0 ? event.pixelDelta.y
+                        : event.pixelDelta.x;
                 strip.contentX = Math.max(0, Math.min(strip.contentWidth - strip.width, strip.contentX - d));
             }
         }

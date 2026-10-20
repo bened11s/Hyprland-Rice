@@ -156,6 +156,19 @@ end
 bind_described(switchBind, hl.dsp.exec_cmd(home .. "/.local/bin/hypr-profile toggle"),
     { release = true, description = "Shell|Hypr-Profil wechseln" })
 
+-- Bildschirm-Regeln aus dem Bildschirmmanager (dynamic-island, Kachel
+-- "Bildschirm"). Steht ganz am Ende, damit diese Regeln die festen
+-- Monitore oben UND die Profile ueberschreiben – in Hyprland gewinnt die
+-- letzte passende Regel. Fehlt die Datei (noch nie gespeichert), ist das
+-- still: dann gelten weiter die Regeln oben.
+local monitorsLua = hypr .. "/monitors.lua"
+if io.open(monitorsLua) then
+    local okMon, errMon = pcall(dofile, monitorsLua)
+    if not okMon then
+        io.stderr:write("monitors.lua fehlerhaft: " .. tostring(errMon) .. "\n")
+    end
+end
+
 -- Profiluebergreifendes Idle-Management; nur einmal beim Sessionstart starten.
 hl.on("hyprland.start", function()
     hl.exec_cmd("hypridle")

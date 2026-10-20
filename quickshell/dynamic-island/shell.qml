@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 
 import "modules/bar"
+import "modules/monitors"
 import "modules/osd"
 import "modules/settings"
 import "modules/window"
@@ -22,4 +23,5 @@ ShellRoot {
     Bar {}
     Osd {}
     SettingsWindow {}
+    MonitorWindow {}
 }

@@ -36,8 +36,19 @@ LazyLoader {
         // Suchtext; leert sich beim Oeffnen
         property string filter: ""
         // Gewaehlte Gruppe in der Leiste; "" = alle
-        property string section: Config.sectionOrder[0] ?? ""
+        property string section: SettingsState.requestedSection || Config.sectionOrder[0] || ""
         readonly property bool searching: win.filter.trim() !== ""
+
+        Connections {
+            target: SettingsState
+            function onRequestedSectionChanged(): void {
+                if (SettingsState.requestedSection !== "") {
+                    win.section = SettingsState.requestedSection;
+                    win.filter = "";
+                    search.text = "";
+                }
+            }
+        }
 
         readonly property real inset: 28
 
@@ -77,6 +88,8 @@ LazyLoader {
         onVisibleChanged: {
             if (visible) {
                 win.filter = "";
+                win.section = SettingsState.requestedSection || Config.sectionOrder[0] || "";
+                SettingsState.requestedSection = "";
                 search.text = "";
                 search.forceActiveFocus();
             }

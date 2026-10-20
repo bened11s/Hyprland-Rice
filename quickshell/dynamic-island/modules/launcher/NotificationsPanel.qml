@@ -166,19 +166,22 @@ ViewPanel {
                 event.accepted = true;
                 const max = Math.max(0, list.contentHeight - list.height);
 
+                // Winkel vor Pixeln: die2,4G-Maus liefert pro Rastung angle 120
+                // UND pixel 15 – mit pixel-Vorrang scrollte die Liste 4x zu langsam.
+                if (angle !== 0) {
+                    if (!scrollAnim.running)
+                        list.targetY = list.contentY;
+                    list.targetY = Math.max(0, Math.min(max, list.targetY - angle / 120 * 60));
+                    scrollAnim.to = list.targetY;
+                    scrollAnim.restart();
+                    return;
+                }
+
                 if (pixels !== 0) {
                     scrollAnim.stop();
                     list.contentY = Math.max(0, Math.min(max, list.contentY - pixels));
                     list.targetY = list.contentY;
-                    return;
                 }
-
-                // Laeuft gerade keine Animation, vom aktuellen Stand ausgehen
-                if (!scrollAnim.running)
-                    list.targetY = list.contentY;
-                list.targetY = Math.max(0, Math.min(max, list.targetY - angle / 120 * 60));
-                scrollAnim.to = list.targetY;
-                scrollAnim.restart();
             }
         }
 

@@ -115,7 +115,8 @@ Variants {
         screen: bar.modelData
         WlrLayershell.namespace: "dynamic-island-bar"
         // Authentifizierung muss auch ueber echten Vollbild-Fenstern liegen.
-        WlrLayershell.layer: notch.authOpen ? WlrLayer.Overlay : WlrLayer.Top
+        WlrLayershell.layer: notch.authOpen || (notch.performanceActive && Config.performance.overFullscreen)
+            ? WlrLayer.Overlay : WlrLayer.Top
         // Tastatur holt sich die Leiste nur, wenn wirklich getippt wird:
         // Launcher-Suchfeld oder WLAN-Passwort. Exclusive statt OnDemand, weil
         // der Launcher per Tastenkuerzel aufgeht – da ist kein Klick, der ihm
@@ -153,7 +154,8 @@ Variants {
             Region {
                 width: bar.width
                 // Beim Fangen gilt das ganze Fenster als Eingabeflaeche
-                height: bar.catching ? bar.height : bar.barHeight
+                height: bar.catching ? bar.height
+                    : bar.notchMode && notch.performanceActive ? 0 : bar.barHeight
             }
             Region {
                 item: notch

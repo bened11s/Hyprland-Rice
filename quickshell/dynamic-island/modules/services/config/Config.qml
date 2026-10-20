@@ -31,6 +31,7 @@ Singleton {
     readonly property alias quick: adapter.quick
     readonly property alias osd: adapter.osd
     readonly property alias wallpaper: adapter.wallpaper
+    readonly property alias performance: adapter.performance
 
     // Schrift fuer alle Texte der Shell (Icons behalten Material Symbols)
     readonly property string font: adapter.appearance.font
@@ -45,6 +46,24 @@ Singleton {
     //          requires           Zeile nur aktiv, wenn erfuellt: "bar.battery"
     //                             (Wahrheitswert) oder { "appearance.layout": "notch" }
     readonly property var meta: ({
+        "performance.enabled": { title: "Performance in der Island", desc: "Live-Zeile links neben der Uhr ein-/ausschalten; auch über die FPS-Kachel" },
+        "performance.overFullscreen": { title: "Über Vollbild zeigen", desc: "Die Dynamic Island bei aktiver Performance-Anzeige auch über Vollbildspielen anzeigen" },
+        "performance.onlyGames": { title: "Nur bei Spielen", desc: "Steam-Spiele, Gamescope und mit nox-game-performance gestartete Spiele" },
+        "performance.fps": { title: "FPS", desc: "Echte Spielmessung; automatisch nach vollständigem Neustart von Steam bzw. Modrinth" },
+        "performance.frametime": { title: "Frametime", desc: "Zeit des gemessenen Frames in Millisekunden (kein Monitor-Hz-Ersatz)" },
+        "performance.cpu": { title: "CPU-Auslastung", desc: "Gesamtauslastung aller CPU-Kerne, nicht nur des Spiels" },
+        "performance.gpu": { title: "GPU-Auslastung", desc: "Mit MangoHud: GPU des Spiels; ohne Quelle: System-GPU" },
+        "performance.temperatures": { title: "Temperaturen", desc: "CPU und GPU in Grad Celsius" },
+        "performance.ram": { title: "Arbeitsspeicher", desc: "Gesamter belegter RAM in GiB, nicht nur Spielspeicher" },
+        "performance.vram": { title: "Grafikspeicher", desc: "Belegter VRAM der gemessenen GPU in GiB" },
+        "performance.power": { title: "GPU-Leistungsaufnahme", desc: "Watt, sofern MangoHud und der Treiber den Wert liefern" },
+        "performance.clock": { title: "GPU-Takt", desc: "Kerntakt in MHz aus MangoHud" },
+        "performance.title": { title: "Spieltitel", desc: "Titel des fokussierten Fensters; lange Namen werden gekürzt" },
+        "performance.source": { title: "Messstatus", desc: "FPS-Quelle bzw. Hinweis auf fehlende Messdaten" },
+        "performance.interval": { title: "FPS-Aktualisierung", desc: "Abfrageintervall; MangoHud liefert alle 500 ms, Systemwerte alle 2 s", min: 500, max: 3000, step: 250, unit: "ms" },
+        "performance.fontSize": { title: "Schriftgröße", desc: "Größe der Performance-Anzeigen", min: 10, max: 24, step: 1, unit: "px" },
+        "performance.maxWidth": { title: "Maximale Island-Breite", desc: "Messwerte links der Uhr; bei vielen Anzeigen scrollt die Zeile horizontal", min: 320, max: 1200, step: 40, unit: "px" },
+        "performance.compact": { title: "Kompakt", desc: "Weniger Abstand zwischen Anzeigen und kürzere Titel" },
         "bar.workspaces": { title: "Workspace-Punkte", desc: "Die Punktreihe links aussen" },
         "bar.workspaceCount": {
             title: "Workspaces je Monitor",
@@ -160,8 +179,9 @@ Singleton {
 
     // Reihenfolge und Symbole der Gruppen im Menue (Material-Symbols-Namen).
     // Gruppen, die hier fehlen, haengt das Menue hinten an.
-    readonly property var sectionOrder: ["bar", "quick", "osd", "notch", "appearance", "wallpaper", "notifications", "vpn"]
+    readonly property var sectionOrder: ["bar", "quick", "performance", "osd", "notch", "appearance", "wallpaper", "notifications", "vpn"]
     readonly property var sectionIcons: ({
+        "performance": "speed",
         "bar": "space_dashboard",
         "quick": "dashboard_customize",
         "osd": "volume_up",
@@ -173,6 +193,7 @@ Singleton {
     })
 
     readonly property var sectionMeta: ({
+        "performance": "Spiel-Performance",
         "bar": "Leiste",
         "quick": "Schnelleinstellungen",
         "osd": "Regler am Rand",
@@ -373,6 +394,27 @@ Singleton {
                 property string provider: "nordvpn"
             }
 
+            property JsonObject performance: JsonObject {
+                property bool enabled: false
+                property bool overFullscreen: true
+                property bool onlyGames: true
+                property bool fps: true
+                property bool frametime: true
+                property bool cpu: true
+                property bool gpu: true
+                property bool temperatures: false
+                property bool ram: false
+                property bool vram: false
+                property bool power: false
+                property bool clock: false
+                property bool title: true
+                property bool source: true
+                property int interval: 1000
+                property int fontSize: 13
+                property int maxWidth: 1000
+                property bool compact: true
+            }
+
             // Wallpaperwechsel: Animation und ihre Dauer in ms
             property JsonObject wallpaper: JsonObject {
                 property string transition: "kreis"
@@ -423,6 +465,8 @@ Singleton {
                     "vpn:2,nosleep:2",
                     "gamemode:2,settings:2",
                     "record:4",
+                    "monitors:4",
+                    "performance:4",
                     "volume:4",
                     "mic:4",
                     "brightness:4"

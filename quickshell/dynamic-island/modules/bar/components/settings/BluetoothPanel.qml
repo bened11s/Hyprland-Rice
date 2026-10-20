@@ -29,8 +29,11 @@ Item {
             BluetoothService.setDiscovering(false);
             if (BluetoothService.pairingDevice)
                 BluetoothService.cancelPairing();
-        } else if (BluetoothService.pairingInputRequired) {
-            Qt.callLater(() => pinInput.forceActiveFocus());
+        } else {
+            if (BluetoothService.enabled && !BluetoothService.discovering)
+                Qt.callLater(() => BluetoothService.setDiscovering(true));
+            if (BluetoothService.pairingInputRequired)
+                Qt.callLater(() => pinInput.forceActiveFocus());
         }
     }
 
@@ -531,14 +534,49 @@ Item {
             }
         }
 
-        Text {
-            font.family: Config.font
+        Column {
             anchors.centerIn: parent
             visible: list.count === 0 && !pairingDialog.visible
-            text: !BluetoothService.enabled ? "Bluetooth ist aus"
-                : BluetoothService.discovering ? "Suche nach Geräten…" : "Keine Geräte gefunden"
-            color: Colors.fgSurfaceVariant
-            font.pixelSize: 12
+            spacing: 8
+            width: Math.min(parent.width - 32, 220)
+
+            Text {
+                font.family: Config.font
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: !BluetoothService.enabled ? "Bluetooth ist aus"
+                    : BluetoothService.discovering ? "Suche nach Geräten…" : "Keine Geräte gefunden"
+                color: Colors.fgSurfaceVariant
+                font.pixelSize: 12
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+            }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: BluetoothService.enabled && !BluetoothService.discovering
+                width: Math.min(parent.width, 140)
+                height: 30
+                radius: 15
+                color: scanEmptyArea.containsMouse ? Colors.alpha(Colors.primary, 0.12) : Colors.alpha(Colors.primary, 0.08)
+
+                Text {
+                    font.family: Config.font
+                    anchors.centerIn: parent
+                    text: "Geräte suchen"
+                    color: Colors.primary
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                }
+
+                MouseArea {
+                    id: scanEmptyArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: BluetoothService.setDiscovering(true)
+                }
+            }
         }
 
         MouseArea {

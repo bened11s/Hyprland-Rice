@@ -86,7 +86,9 @@ Item {
         onWheel: event => {
             const angle = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
             const pixels = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.pixelDelta.x;
-            const delta = pixels !== 0 ? pixels / 60 : angle / 120;
+            // Winkel vor Pixeln (s. Notch.flipWheel): die2,4G-Maus liefert
+            // beides, sonst waeren 4 Rastungen noetig. Touchpad: nur pixel.
+            const delta = angle !== 0 ? angle / 120 : pixels / 60;
             if (wheel.accum !== 0 && Math.sign(delta) !== Math.sign(wheel.accum))
                 wheel.accum = 0;
             wheel.accum += delta;

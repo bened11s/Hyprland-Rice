@@ -12,6 +12,7 @@ Singleton {
     id: root
 
     property bool open: false
+    property string requestedSection: ""
     property ShellScreen screen: null
 
     function show(target: ShellScreen): void {

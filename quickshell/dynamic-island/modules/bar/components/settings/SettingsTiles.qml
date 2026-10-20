@@ -2,6 +2,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.UPower
 
 import qs.modules.services.audio
@@ -9,10 +11,13 @@ import qs.modules.services.bluetooth
 import qs.modules.services.brightness
 import qs.modules.services.core
 import qs.modules.services.network
+import qs.modules.services.notifications
 import qs.modules.services.record
 import qs.modules.services.system
 import qs.modules.services.vpn
 
+import qs.modules.monitors
+import qs.modules.services.monitors
 import qs.modules.settings
 
 import qs
@@ -104,12 +109,17 @@ ColumnLayout {
         "vpn": vpnComponent,
         "nosleep": noSleepComponent,
         "gamemode": gameModeComponent,
+        "performance": performanceComponent,
+        "monitors": monitorsComponent,
         "settings": settingsComponent,
         "record": recordComponent,
         "volume": volumeComponent,
         "mic": micComponent,
         "power": powerComponent,
-        "brightness": brightnessComponent
+        "brightness": brightnessComponent,
+        "screenshot": screenshotComponent,
+        "dnd": dndComponent,
+        "lock": lockComponent
     })
 
     // Status nur lesen lassen, solange die Kacheln zu sehen sind
@@ -169,6 +179,104 @@ ColumnLayout {
         return Math.max(1, Math.round(sec / 60)) + " min";
     }
 
+    // ---------- Screenshot ----------
+    // grim speichert nach ~/Bilder/Bildschirmfotos und wl-copy legt das Bild
+    // zusätzlich in die Zwischenablage (Plasma/GNOME-Verhalten). Das Kopieren
+    // braucht ein Shell-Rohr ("wl-copy < Datei"), deshalb laufen grim und
+    // Kopieren kontrolliert in einem sh -c; Monitor/Geometrie/Pfad kommen als
+    // Argumente ($1..$3), nicht als Text ins Skript.
+    property string shotFeedback: ""
+    property int shotCountdown: -1
+
+    Timer {
+        id: shotFeedbackReset
+
+        interval: 3500
+        onTriggered: root.shotFeedback = ""
+    }
+
+    // 5-Sekunden-Verzoegerung; der fokussierte Monitor gilt beim Ausloesen
+    Timer {
+        id: shotDelay
+
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            if (root.shotCountdown <= 1) {
+                stop();
+                root.shotCountdown = -1;
+                root.fireShot("-o", Hyprland.focusedMonitor?.name ?? "");
+            } else {
+                root.shotCountdown--;
+                root.shotFeedback = "Screenshot in " + root.shotCountdown + " s …";
+            }
+        }
+    }
+
+    Process {
+        id: shotProc
+
+        stdout: StdioCollector {
+            onStreamFinished: if (text.trim() !== "")
+                root.shotDone("Gespeichert · in der Zwischenablage")
+        }
+        onExited: (code) => {
+            if (code !== 0)
+                root.shotDone("Screenshot fehlgeschlagen (" + code + ")");
+        }
+    }
+
+    Process {
+        id: slurpProc
+
+        // Nur die Geometrie ("x,y BreitexHoehe") kommt hier an
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const geom = text.trim();
+                if (geom !== "")
+                    root.fireShot("-g", geom);
+            }
+        }
+        onExited: (code) => {
+            if (code !== 0)
+                root.shotFeedback = "";   // Auswahl abgebrochen (Esc/Rechtsklick)
+        }
+    }
+
+    function shotDone(msg: string): void {
+        root.shotFeedback = msg;
+        shotFeedbackReset.restart();
+    }
+
+    // kind: "-o" (Monitorname) oder "-g" (slurp-Geometrie); leerer Wert =
+    // ganzer virtueller Bildschirm. $1 = kind-Ziel, $2 = Pfad, $3 = Ordner.
+    function fireShot(kind: string, value: string): void {
+        const dir = Quickshell.env("HOME") + "/Bilder/Bildschirmfotos";
+        const path = dir + "/Screenshot_" + Qt.formatDateTime(new Date(), "yyyyMMdd_hhmmss") + ".png";
+        const target = value !== "" ? kind + ' "$1" ' : "";
+        const script = 'mkdir -p "$3" && grim ' + target + '"$2" '
+                     + '&& wl-copy -t image/png < "$2" && echo "$2"';
+        shotProc.command = ["sh", "-c", script, "sh", value, path, dir];
+        shotProc.running = false;
+        shotProc.running = true;
+    }
+
+    function takeScreenshot(region: bool, delayed: bool): void {
+        if (region) {
+            // Bereich zuerst waehlen, dann sofort; die Verzoegerung gilt
+            // nur fuer Vollbild-Screenshots
+            root.shotFeedback = "Rahmen ziehen …";
+            slurpProc.running = false;
+            slurpProc.running = true;
+        } else if (delayed) {
+            root.shotCountdown = 5;
+            root.shotFeedback = "Screenshot in 5 s …";
+            shotDelay.restart();
+        } else {
+            root.fireShot("-o", Hyprland.focusedMonitor?.name ?? "");
+        }
+    }
+
     // ---------- Kacheln ----------
     component Tile: Rectangle {
         id: tile
@@ -186,6 +294,7 @@ ColumnLayout {
         // false = die Kachel togglet nicht selbst (No-Sleep hat einen
         // eigenen Guard, damit Dropdown-Klicks nicht doppelt ausloesen)
         property bool tapEnabled: true
+        property real trailingSpace: 0
         signal toggled()
 
         // Schmale Zelle (eine Rasterspalte): nur das Symbol, mittig; Texte,
@@ -223,6 +332,7 @@ ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
             anchors.leftMargin: tile.compact ? (tile.width - 28) / 2 : 16
+            anchors.rightMargin: 10 + tile.trailingSpace
             spacing: 12
 
             Item {
@@ -499,6 +609,80 @@ ColumnLayout {
             icon: "sports_esports"
             active: root.gameMode
             onToggled: root.toggleGameMode()
+        }
+    }
+
+    Component {
+        id: performanceComponent
+
+        Tile {
+            id: performanceTile
+            trailingSpace: compact ? 0 : 42
+            icon: "speed"
+            title: "Spiel-Performance"
+            subtitle: Config.performance.enabled ? "Ein · FPS & Auslastung" : "Aus · FPS & Auslastung"
+            active: Config.performance.enabled
+            tapEnabled: false
+            onToggled: Config.set("performance", "enabled", !Config.performance.enabled)
+
+            TapHandler {
+                id: performanceTap
+                onTapped: {
+                    if (performanceTile.compact || performanceTap.point.position.x < performanceTile.width - 46)
+                        Config.set("performance", "enabled", !Config.performance.enabled);
+                }
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                width: 34
+                height: 34
+                radius: 17
+                color: performanceTile.controlColor
+                visible: !performanceTile.compact
+                Text {
+                    anchors.centerIn: parent
+                    text: "tune"
+                    font.family: "Material Symbols Outlined"
+                    font.pixelSize: 18
+                    color: performanceTile.fg
+                }
+                TapHandler {
+                    onTapped: {
+                        SettingsState.requestedSection = "performance";
+                        SettingsState.show(SettingsState.focusedScreen());
+                    }
+                }
+            }
+        }
+    }
+
+    // Bildschirm-Manager: oeffnet das Monitor-Fenster (modules/monitors).
+    // Zeigt, wie viele Monitore aktiv sind; der Punkt leuchtet akzentfarben,
+    // solange Aenderungen noch nicht angewandt sind.
+    Component {
+        id: monitorsComponent
+
+        Tile {
+            icon: "monitor"
+            title: "Bildschirm"
+            subtitle: MonitorState.open ? "Fenster offen"
+                     : Monitors.loaded
+                       ? Monitors.monitors.filter(m => !Monitors.eff(m.name, "enabled", !m.disabled)).length === 0
+                         ? Monitors.monitors.length + " Monitore aktiv"
+                         : Monitors.monitors.filter(m => Monitors.eff(m.name, "enabled", !m.disabled)).length
+                           + " von " + Monitors.monitors.length + " aktiv"
+                       : "Ausrichtung & Modus"
+            active: MonitorState.open || Monitors.dirty
+            onToggled: MonitorState.toggleOnFocused()
+
+            // Status nur lesen, solange die Karte sichtbar ist
+            DemandRequest {
+                demand: Monitors.demand
+                active: root.visible
+            }
         }
     }
 
@@ -906,6 +1090,90 @@ ColumnLayout {
                     onTapped: Recorder.sound = !Recorder.sound
                 }
             }
+        }
+    }
+
+    Component {
+        id: screenshotComponent
+
+        Tile {
+            id: shotTile
+
+            tapEnabled: false   // Ausloesen macht der bewachte TapHandler unten
+
+            // Modus wie bei der Aufnahme-Kachel: die Knoepfe rechts waehlen,
+            // die Kachel selbst loest aus (links tippen)
+            property bool region: false
+            property bool delayed: false
+
+            icon: "screenshot"
+            title: "Screenshot"
+            subtitle: root.shotFeedback !== "" ? root.shotFeedback
+                      : shotTile.region ? "Bereich wählen · Zwischenablage"
+                      : shotTile.delayed ? "Vollbild · in 5 s"
+                      : "Vollbild · sofort · Zwischenablage"
+            // Waehrend des Countdowns leuchtet die Kachel auf
+            active: root.shotCountdown > 0
+
+            TapHandler {
+                id: shotTap
+
+                onTapped: {
+                    if (shotTile.compact || shotTap.point.position.x < shotTile.width - 90)
+                        root.takeScreenshot(shotTile.region, shotTile.delayed);
+                }
+            }
+
+            Row {
+                anchors {
+                    right: parent.right
+                    rightMargin: 8
+                    verticalCenter: parent.verticalCenter
+                }
+                visible: !shotTile.compact
+                spacing: 6
+
+                MiniButton {
+                    bg: shotTile.controlColor
+                    bgHover: shotTile.controlHover
+                    fg: shotTile.fg
+                    // Vollbild = fokussierter Monitor, Bereich = Rahmen mit slurp
+                    icon: shotTile.region ? "screenshot_region" : "fullscreen"
+                    onTapped: shotTile.region = !shotTile.region
+                }
+
+                MiniButton {
+                    bg: shotTile.controlColor
+                    bgHover: shotTile.controlHover
+                    fg: shotTile.fg
+                    // 5 Sekunden Vorlauf, um Menues aufzubekommen
+                    icon: shotTile.delayed ? "timer" : "photo_camera"
+                    onTapped: shotTile.delayed = !shotTile.delayed
+                }
+            }
+        }
+    }
+
+    Component {
+        id: dndComponent
+
+        Tile {
+            icon: Notifications.dnd ? "notifications_off" : "notifications_active"
+            title: "Nicht stören"
+            subtitle: Notifications.dnd ? "An · Nachrichten kommen still" : "Aus"
+            active: Notifications.dnd
+            onToggled: Notifications.toggleDnd()
+        }
+    }
+
+    Component {
+        id: lockComponent
+
+        // Action-Knopf ohne Zustand – deshalb bleibt active aus
+        CircleToggle {
+            icon: "lock"
+            active: false
+            onToggled: Quickshell.execDetached(["hyprlock"])
         }
     }
 
