@@ -170,6 +170,11 @@ if io.open(monitorsLua) then
 end
 
 -- Profiluebergreifendes Idle-Management; nur einmal beim Sessionstart starten.
+-- Die Shell dynamic-island ebenfalls beim Sessionstart – AUF DER IGPU (wenn
+-- vorhanden): die Env schaltet NVIDIA-EGL fuer qs ab, nur Mesa bleibt, und auf
+-- diesem Rechner kann nur die iGPU (AMD, renderD129) ueber Mesa rendern.
+-- Ohne das wuerde die Shell die dGPU belegen, die Spiele brauchen.
 hl.on("hyprland.start", function()
     hl.exec_cmd("hypridle")
+    hl.exec_cmd("env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json qs -c dynamic-island")
 end)

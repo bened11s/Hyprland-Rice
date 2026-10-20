@@ -3,6 +3,14 @@
         "name": "dynamic-island"
     },
     "toggles": {
+        "steam": {
+            "steam": {
+                "enable": true,
+                "match": [{"class": "steam", "title": "Steam"}],
+                "command": ["/home/benedikt/.local/bin/steam-clean", "steam://open/main"],
+                "move": true
+            }
+        },
         "sysmon": {
             "btop": {
                 "command": ["kitty", "--class", "btop", "--title", "btop", "btop"]

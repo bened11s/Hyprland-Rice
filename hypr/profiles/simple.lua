@@ -268,6 +268,7 @@ hl.window_rule({
 })
 
 -- Feste Plaetze auf den Special-Workspaces (Binds siehe unten)
+hl.window_rule({ match = { class = "steam", title = "Steam" }, workspace = "special:steam" })
 hl.window_rule({ match = { class = "btop" }, workspace = "special:sysmon" })
 hl.window_rule({
 	match = { class = "feishin|Spotify|Supersonic|Cider|com.github.th_ch.youtube_music|Plexamp" },
@@ -382,7 +383,6 @@ bind("SUPER + Return", hl.dsp.exec_cmd(cfg.terminal), desc("Terminal"))
 bind("SUPER + W", hl.dsp.exec_cmd(cfg.browser), desc("Browser"))
 bind("SUPER + P", hl.dsp.exec_cmd(cfg.editor), desc("Editor"))
 bind("SUPER + E", hl.dsp.exec_cmd(cfg.fileExplorer), desc("Dateimanager"))
-bind("SUPER + G", hl.dsp.exec_cmd("steam steam://open/main"), desc("Steam"))
 bind("CTRL + ALT + V", hl.dsp.exec_cmd(cfg.audioSettings), desc("Audio-Einstellungen"))
 group = "Shell"
 -- Super allein oeffnet das App-Menue der Shell (per Quickshell-IPC).
@@ -456,6 +456,7 @@ bind("CTRL + SUPER + SHIFT + Right", hl.dsp.window.move({ workspace = "m+1" }), 
 
 -- Special-Workspaces (Scratchpads)
 group = "Scratchpads"
+bind("SUPER + G", hl.dsp.exec_cmd("dynamic-island toggle steam"), desc("Steam"))
 -- ueber die CLI: startet die zugehoerige App gleich mit, wenn der Workspace leer ist
 -- (Zuordnung in ~/.config/dynamic-island/cli.json unter "toggles")
 bind("SUPER + S", hl.dsp.exec_cmd("dynamic-island toggle specialws"), desc("Scratchpad"))
@@ -487,6 +488,11 @@ group = "Audio & Medien"
 bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), desc("Ton stumm", { locked = true }))
 bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), desc("Ton stumm", { locked = true }))
 bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), desc("Mikrofon stumm", { locked = true }))
+-- Alle angeschlossenen Mikrofone auf einmal (nicht nur die Standardquelle):
+-- Taste End schaltet alles stumm bzw. wieder an. Skript prueft selbst, dass
+-- Monitore (Systemton) unberuehrt bleiben; liegt auch als klassische
+-- Bindung in hypr/binds.conf fuer den Alt-Einstieg hyprland.conf.
+bind("End", hl.dsp.exec_cmd(home .. "/.local/bin/mic-mute"), desc("Alle Mikrofone stumm/an", { locked = true }))
 bind(
 	"XF86AudioRaiseVolume",
 	hl.dsp.exec_cmd(

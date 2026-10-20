@@ -33,6 +33,7 @@ __pycache__/
 # dynamic-island/src/dynamic_island/data/templates/hyprlock.conf.
 # install.sh (seed_scheme) legt beide nach einem frischen Clone wieder an.
 /hypr/scheme/current.lua
+/hypr/scheme/current.conf
 /hypr/scheme/hyprlock.conf
 
 # Zustand, keine Konfiguration: welches Profil und welches Theme gerade laufen.
