@@ -21,6 +21,10 @@ Singleton {
     // Eingang (Mikrofon) – das Gegenstueck zu volume/muted
     readonly property real sourceVolume: source?.audio?.volume ?? 0
     readonly property bool sourceMuted: source?.audio?.muted ?? false
+    // true, wenn ALLE angeschlossenen Mikrofone stumm sind (End-Taste
+    // schaltet systemweit). Ohne Mikro -> false, sonst loggt das Icon
+    // "stumm", obwohl gar kein Geraet da waere.
+    readonly property bool allSourcesMuted: sources.length > 0 && sources.every(n => n.audio?.muted ?? false)
 
     function setVolume(value: real): void {
         if (sink?.audio)

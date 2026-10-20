@@ -26,7 +26,6 @@ Singleton {
         "vpn":        { label: "VPN",           icon: "vpn_key",        kind: "pill" },
         "nosleep":    { label: "No Sleep",      icon: "coffee",         kind: "pill" },
         "gamemode":   { label: "Game-Mode",     icon: "sports_esports", kind: "circle" },
-        "performance": { label: "Performance", icon: "speed", kind: "wide" },
         "monitors":   { label: "Bildschirm",    icon: "monitor",        kind: "circle" },
         "settings":   { label: "Einstellungen", icon: "tune",           kind: "circle" },
         "record":     { label: "Aufnahme",      icon: "screen_record",  kind: "wide" },

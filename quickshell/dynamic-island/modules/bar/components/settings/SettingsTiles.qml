@@ -109,7 +109,6 @@ ColumnLayout {
         "vpn": vpnComponent,
         "nosleep": noSleepComponent,
         "gamemode": gameModeComponent,
-        "performance": performanceComponent,
         "monitors": monitorsComponent,
         "settings": settingsComponent,
         "record": recordComponent,
@@ -609,53 +608,6 @@ ColumnLayout {
             icon: "sports_esports"
             active: root.gameMode
             onToggled: root.toggleGameMode()
-        }
-    }
-
-    Component {
-        id: performanceComponent
-
-        Tile {
-            id: performanceTile
-            trailingSpace: compact ? 0 : 42
-            icon: "speed"
-            title: "Spiel-Performance"
-            subtitle: Config.performance.enabled ? "Ein · FPS & Auslastung" : "Aus · FPS & Auslastung"
-            active: Config.performance.enabled
-            tapEnabled: false
-            onToggled: Config.set("performance", "enabled", !Config.performance.enabled)
-
-            TapHandler {
-                id: performanceTap
-                onTapped: {
-                    if (performanceTile.compact || performanceTap.point.position.x < performanceTile.width - 46)
-                        Config.set("performance", "enabled", !Config.performance.enabled);
-                }
-            }
-
-            Rectangle {
-                anchors.right: parent.right
-                anchors.rightMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
-                width: 34
-                height: 34
-                radius: 17
-                color: performanceTile.controlColor
-                visible: !performanceTile.compact
-                Text {
-                    anchors.centerIn: parent
-                    text: "tune"
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 18
-                    color: performanceTile.fg
-                }
-                TapHandler {
-                    onTapped: {
-                        SettingsState.requestedSection = "performance";
-                        SettingsState.show(SettingsState.focusedScreen());
-                    }
-                }
-            }
         }
     }
 

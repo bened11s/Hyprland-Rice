@@ -2,11 +2,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell
-import Quickshell.Hyprland
-import qs.modules.performance
 
 import qs.modules.services.config
 import qs.modules.services.auth
+import qs.modules.services.audio
 import qs.modules.services.record
 import qs.modules.services.system
 import qs.modules.services.media
@@ -39,14 +38,6 @@ Item {
     // der Leiste – Bar.qml blendet die anderen Pillen aus. Etwas hoeher und
     // breiter als die Insel, damit sie als Notch liest und nicht als Pille.
     readonly property bool docked: Config.appearance.layout === "notch"
-    readonly property bool performanceActive: GamePerformance.shown
-        && Hyprland.focusedMonitor?.name === notch.hostScreen?.name
-    readonly property real performanceLimit: Math.max(notch.compactBaseWidth,
-        Math.min(Config.performance.maxWidth, (notch.hostScreen?.width ?? 1920) - 48))
-    readonly property real performanceWidth: Math.min(performanceStrip.implicitWidth, Math.max(50,
-        notch.docked ? (notch.performanceLimit - clock.implicitWidth) / 2
-            - notch.compactGap - notch.compactEdge - notch.compactLeftBase - 8
-        : (notch.performanceLimit - notch.compactBaseWidth) / 2 - 8))
 
     // ---- Angedockte Notch (saneAspect-Vorbild) ----
     // Schwarz wie der Displayrahmen, ohne Rand, mit gewoelbten Schultern an
@@ -62,15 +53,13 @@ Item {
     readonly property real compactGap: 14    // Element -> Uhr
     readonly property real compactMinWidth: 196
     readonly property bool showWorkspaces: docked && Config.notch.workspaces
-    readonly property real compactLeftBase: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
+    readonly property real compactLeft: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
                                       : showWorkspaces ? compactWorkspaces.implicitWidth
                                       : 0
-    readonly property real compactLeft: compactLeftBase + (performanceActive ? 8 + performanceWidth : 0)
     readonly property real compactSide: Math.max(compactLeft, compactRight.implicitWidth)
     // Hoehe des oberen Bands (eingeklappt plus Hover-Wachstum): Uhr und
     // Seitenelemente bleiben darin mittig
-    readonly property real bandHeight: (performanceActive && !open
-        ? Math.max(collapsedHeight, performanceStrip.implicitHeight + 8) : collapsedHeight) + growth
+    readonly property real bandHeight: collapsedHeight + growth
 
     // ---- Aufgeklappt: Uebersicht + Untermenues (Notch-Layout) ----
     // Beim Hover zeigt die Notch nur das Wichtigste (Uebersicht): Uhr mit
@@ -230,12 +219,9 @@ Item {
     // unten und mittig etwas in die Breite.
     // Angedockt: 1 px hoeher, weil der obere Rand ausserhalb liegt (y < 0)
     readonly property real collapsedHeight: docked ? parent.height - 8 : parent.height - verticalMargin
-    readonly property real compactBaseWidth: docked
-        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (Math.max(compactLeftBase, compactRight.implicitWidth) + compactGap + compactEdge))
+    readonly property real collapsedWidth: docked
+        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
         : clock.implicitWidth + 50 + recordReserve
-    readonly property real collapsedWidth: !notch.performanceActive ? notch.compactBaseWidth
-        : docked ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
-        : notch.compactBaseWidth + 2 * (notch.performanceWidth + 8)
     readonly property real launcherWidth: wallpaperOpen ? wallpapers.outerWidth
                                         : themeOpen ? themes.outerWidth
                                         : powerOpen ? powerMenu.outerWidth
@@ -499,6 +485,7 @@ Item {
             font.pixelSize: 15
             text: "mic_off"
             color: notch.open ? Colors.primary : Colors.fgBackground
+            opacity: Audio.allSourcesMuted && !notch.docked && !notch.launcherOpen && !notch.authOpen ? 0.85 : 0
             visible: opacity > 0
 
             Behavior on opacity {
@@ -507,18 +494,6 @@ Item {
             Behavior on color {
                 ColorAnimation { duration: Appearance.fadeDuration }
             }
-        }
-
-        // Cover/Workspaces -> Performance -> Uhr; KI bleibt rechts der Uhr.
-        // Menus keep their normal layout; closing them restores the live strip.
-        PerformanceStrip {
-            id: performanceStrip
-            objectName: "islandPerformanceStrip"
-            x: notch.compactEdge + notch.growth + notch.compactLeftBase + 8
-            y: (notch.bandHeight - height) / 2
-            width: Math.max(1, Math.min(notch.performanceWidth, clock.x - notch.compactGap - x))
-            height: implicitHeight
-            visible: notch.performanceActive && !notch.open
         }
 
         // Der Aufnahme-Punkt. Er pulst langsam, damit er als Zustand lesbar
