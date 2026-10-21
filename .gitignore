@@ -8,9 +8,10 @@
 !/wallpapers/
 !/hyprlock/
 
-# innerhalb von quickshell nur die eigene Shell
+# innerhalb von quickshell nur die eigenen Shells
 /quickshell/*
 !/quickshell/dynamic-island/
+!/quickshell/tokyonight/
 
 # Shell-Einstellungen: pro Rechner, die Vorgaben stehen im Code
 # (quickshell/dynamic-island/modules/services/config/Config.qml)
