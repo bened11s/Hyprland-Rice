@@ -16,6 +16,12 @@ SHELL_ENV: dict[str, str] = {
     "QT_QPA_PLATFORMTHEME": "kde",
     "MALLOC_ARENA_MAX": "2",
     "MALLOC_MMAP_THRESHOLD_": "1048576",
+    # Die Shell soll auf der iGPU rendern (Mesa), der Compositor laeuft auf
+    # der NVIDIA - so wie beim Autostart in hyprland.lua. Heute greift das
+    # ohnehin, weil auf diesem Rechner nur Mesa zur Verfuegung steht; die
+    # Variable ist die Absicherung, falls jemand doch NVIDIA-EGL aktiviert
+    # und die Shell sonst die dGPU belegt, die die Spiele brauchen.
+    "__EGL_VENDOR_LIBRARY_FILENAMES": "/usr/share/glvnd/egl_vendor.d/50_mesa.json",
 }
 
 
