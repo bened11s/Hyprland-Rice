@@ -147,6 +147,29 @@ Pushen geht nicht, das Repo ist fuer andere nur lesbar. Wenn du deine
 Aenderungen selbst auf GitHub sichern willst: oben rechts auf **Fork**, dann
 deinen Fork klonen.
 
+## Fixes
+
+Die Eingriffe, die nicht direkt im Rice-Stand von Gamecat-HD stecken, haben
+je einen Namen. Im Repo sind sie als **Tag** gesetzt (`git tag -l` listet sie
+auf), damit sich der Stand jederzeit wiederfinden laesst.
+
+| Name | Tag | Was |
+|---|---|---|
+| **island-perf-bar-entfernt** | `island-perf-bar-entfernt` | Die Leistungsanzeige (FPS-Leiste) in der Dynamic Island ist komplett weg - im Code, in der Konfiguration und in den Helfer-Skripten. Sie lief auf allen vier Monitoren und liess die Shell rund um die Uhr mit 120 Frames/s neu zeichnen. Auch die Helfer `nox-game-launcher` und `nox-game-performance` sind entfernt, die Steam-/Modrinth-Wrapper starten die Spiele wieder direkt. |
+| **island-gpu-last** | `island-gpu-last` | Der GPU-Ausschlag beim Oeffnen der Insel. Ursache war nicht die Animation, sondern der Visualizer: er liess alle vier Monitore mit 30 Hz Cava neu zeichnen. Jetzt laeuft er nur auf dem Monitor im Fokus, die Balken der anderen stehen still. Die Animation der Pegel laeuft ausserdem nur noch beim Wechsel zwischen Ruhebogen und Pegeln, nicht bei jeder Aktualisierung. Dazu: `hostScreen` kommt jetzt aus `bar.modelData` (vorher war es bei drei von vier Panels `null`). Messung: GPU-Last beim Oeffnen 23,1 % -> 11,3 %, Shell-Frames 120/s -> 25/s. |
+| **island-start-auf-igpu** | `island-start-auf-igpu` | `dynamic-island shell` startet die Shell jetzt wie der Autostart auf der iGPU (Mesa) statt auf der NVIDIA - die dGPU bleibt fuer die Spiele frei. |
+
+Zwei Dinge sind dabei aufgefallen, die man wissen sollte:
+
+* **Der Sperrbildschirm blockiert die Insel.** `hypridle` sperrt nach
+  Leerlauf; das hyprlock-Fenster liegt dann ueber der Insel und faengt den
+  Hover ab - die Insel geht nicht mehr auf, bis man entsperrt.
+* **Ein Bein mit dem Compositor:** Die Shell rendert auf der iGPU, Hyprland
+  auf der NVIDIA, und Qt meldet bei jedem Commit den *vollen* Monitor als
+  beschaedigt. Jeder Commit der Shell kostet damit einen Vollbild-Render des
+  Monitors durch den Compositor. Deshalb ist die Zahl der Commits die
+  massgebliche Groesse - nicht die Dauer einer Animation.
+
 ## Wenn was nicht geht
 
 * **Keine Leiste / kein Wallpaper:** `hypr-profile status` zeigt, was laeuft.
