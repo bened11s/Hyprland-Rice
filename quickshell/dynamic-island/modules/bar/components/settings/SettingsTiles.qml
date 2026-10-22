@@ -811,13 +811,15 @@ ColumnLayout {
 
                 // Taps im Dropdown-Bereich (rechts) gehoeren dem Dropdown
                 onTapped: {
-                    if (noSleepTile.compact || pillTap.point.position.x < noSleepTile.width - 96)
+                    if (noSleepTile.compact || pillTap.point.position.x < noSleepDropdown.x)
                         root.toggleNoSleep();
                 }
             }
 
             // Dropdown-Knopf: zeigt "–", solange keine Dauer gewaehlt ist
             Rectangle {
+                id: noSleepDropdown
+
                 anchors {
                     right: parent.right
                     rightMargin: 10
@@ -890,10 +892,18 @@ ColumnLayout {
                 }
                 width: 150
                 height: 140
+                // Ueber den Kacheln der Zeile darunter (wie VPN/Power)
+                z: 200
                 radius: 16
                 color: Colors.shade(Colors.background, 0.08)
                 border.width: 1
                 border.color: Colors.outlineVariant
+
+                // Eigene Trefferflaeche, damit Klicks nicht zu den Kacheln
+                // darunter durchfallen
+                MouseArea {
+                    anchors.fill: parent
+                }
 
                 HoverHandler {
                     onHoveredChanged: root.sleepMenuHovered = hovered

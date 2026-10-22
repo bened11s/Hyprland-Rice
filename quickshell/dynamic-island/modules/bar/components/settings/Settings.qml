@@ -27,6 +27,13 @@ Surface {
     // Ein Klick oeffnet die Karte. Hover haelt eine geoeffnete Karte nur noch
     // offen; beim Verlassen greift weiterhin der kurze Schliess-Nachlauf.
     readonly property bool containsMouse: hoverSensor.hovered || tiles.sleepMenuHovered || tiles.vpnMenuHovered || tiles.powerMenuHovered
+    // Qt verliert den Hover, sobald eine Maustaste gedrueckt wird (der Zeiger
+    // wird gegriffen) – die Karte wuerde dann 700 ms spaeter zuklappen,
+    // obwohl der Zeiger noch auf ihr steht. Die Zeigerposition bleibt
+    // aktuell, also wird beim Zuklappen danach entschieden.
+    readonly property point pointerPos: hoverSensor.point.position
+    readonly property bool pointerOnCard: pointerPos.x >= 0 && pointerPos.y >= 0
+        && pointerPos.x <= width && pointerPos.y <= height
     property bool expanded: false
     // Eingebettet in das Steuerungs-Untermenue der Notch (ControlPanel): immer
     // aufgeklappt, ohne eigene Flaeche, kein Peek und kein Zuklappen – die
@@ -468,8 +475,15 @@ Surface {
 
         interval: 700
         // Waehrend eines Passworts darf die Maus rausrutschen
-        onTriggered: if (!settings.embedded && !settings.typingPassword && !BluetoothService.pairingActive)
+        onTriggered: {
+            if (settings.embedded || settings.typingPassword || BluetoothService.pairingActive)
+                return;
+            // Der Zeiger steht noch auf der Karte (z. B. direkt nach einem
+            // Klick, der den Hover mitgenommen hat) -> nicht zuklappen
+            if (settings.pointerOnCard)
+                return;
             settings.expanded = false
+        }
     }
 
     Timer {
