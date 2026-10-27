@@ -23,6 +23,11 @@ class Colour:
     def rgbalpha(self) -> str:
         return f"rgba({','.join(map(str, self._rgb_vals))})"
 
+    @property
+    def ansi(self) -> str:
+        # "r;g;b" fuer Truecolor-Sequenzen (38;2;{{ x.ansi }}), z. B. fastfetch
+        return ";".join(map(str, self._rgb_vals[:-1]))
+
 
 def get_dynamic_colours(colours: dict[str, str]) -> dict[str, Colour]:
     return {name: Colour(code) for name, code in colours.items()}

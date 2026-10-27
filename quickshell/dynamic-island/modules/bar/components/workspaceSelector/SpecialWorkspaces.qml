@@ -6,11 +6,9 @@ import Quickshell.Hyprland
 import qs
 import qs.modules.services.hypr
 
-// Special-Overlay im Selektor – dieselbe Idee wie
-// caelestia/modules/bar/components/workspaces/SpecialWorkspaces.qml, nur
-// horizontal und ohne Fenster-Icons:
+// Special-Overlay im Selektor – horizontal und ohne Fenster-Icons:
 //   - ein Icon pro EXISTIERENDEM Special-WS (special:<name>)
-//   - Icons wie in caelestias utils/Icons.qml (Fallback: Anfangsbuchstabe)
+//   - feste Icons je Special-Name (siehe iconName, Fallback: Anfangsbuchstabe)
 //   - der aktive bekommt eine tertiäre Pille hinter dem Icon – das Gegenstück
 //     zur aktiven Punktpille der Normalansicht
 //   - Klick toggelt das jeweilige Special
@@ -45,7 +43,7 @@ RowLayout {
 
             // "special:music" -> "music". Der generische Special heisst intern
             // "special:special" (Hyprland haengt IMMER das Prefix an), also
-            // bleibt der Key nie leer und bekommt den Star wie in caelestia.
+            // bleibt der Key nie leer und bekommt den Star.
             readonly property string key: ws.modelData.name.slice("special:".length)
             readonly property bool isActive: root.activeSpecial === ws.modelData.name
             readonly property bool hasWindows: HyprIpc.windowsOn(ws.modelData) > 0
@@ -97,7 +95,7 @@ RowLayout {
             }
 
             function iconName(key: string): string {
-                // Dieselben Defaults wie caelestia/utils/Icons.qml
+                // Material-Symbole fuer die ueblichen Special-Namen
                 const map = {
                     "special": "star",
                     "communication": "forum",

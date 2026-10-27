@@ -1,10 +1,12 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Effects
 import qs.modules.services.theme
 
 import qs
 import qs.modules.bar.components.notch
 import qs.modules.services.config
+import qs.modules.widgets
 
 // Theme-Auswahl der Notch: eigenes Suchfeld, darunter das Farb-Karussell und
 // ganz unten die Material-Varianten.
@@ -108,7 +110,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: search.text === ""
-                text: `Theme suchen…   ${Themes.entries.length} Schemata`
+                text: I18n.tr("Theme suchen…   %1 Schemata").arg(Themes.entries.length)
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: search.font
                 verticalAlignment: Text.AlignVCenter
@@ -185,6 +187,14 @@ Item {
             anchors.margins: 6
             active: panel.active
 
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: edgeMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1
+            }
+
             sourceComponent: ThemeList {
                 cardWidth: panel.cardWidth
                 query: search.text
@@ -192,24 +202,14 @@ Item {
             }
         }
 
-        // Vignette nach aussen, damit die Reihe an den Kartenraendern auslaeuft
-        EdgeFade {
-            anchors {
-                left: parent.left
-                top: parent.top
-                bottom: parent.bottom
-            }
-            implicitWidth: 56
-        }
+        // Vignette nach aussen: die Reihe blendet zu den Kartenraendern hin aus
+        // (Maske auf dem Inhalt, siehe EdgeMask – eine Flaeche in der
+        // Theme-Farbe darueber stand auf der schwarzen Notch als grauer Balken)
+        EdgeMask {
+            id: edgeMask
 
-        EdgeFade {
-            anchors {
-                right: parent.right
-                top: parent.top
-                bottom: parent.bottom
-            }
-            implicitWidth: 56
-            mirrored: true
+            anchors.fill: themes
+            fade: 200
         }
     }
 

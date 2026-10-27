@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
+import Quickshell.Widgets
 import qs.modules.services.notifications
 
 import qs
@@ -40,7 +41,13 @@ Item {
     readonly property real textHeight: row.compact ? 30 : 52
     readonly property real buttonsHeight: 32
 
-    implicitHeight: row.textHeight + (row.buttons.length > 0 ? row.buttonsHeight : 0)
+    // Grosse Bildvorschau (Screenshots der Shell setzen den Hint
+    // x-dynamic-island-preview, andere Apps behalten das kleine Icon)
+    readonly property bool hasPreview: !row.compact && (row.notif?.image ?? "") !== ""
+                                       && (row.notif?.hints?.["x-dynamic-island-preview"] ?? false) === true
+    readonly property real previewHeight: row.hasPreview ? preview.height + 8 : 0
+
+    implicitHeight: row.textHeight + row.previewHeight + (row.buttons.length > 0 ? row.buttonsHeight : 0)
 
     transform: Translate {
         x: row.slide
@@ -146,7 +153,7 @@ Item {
         height: row.textHeight
 
         // Bild/Icon dreistufig: mitgeschicktes Bild, sonst App-Icon aus dem
-        // Icon-Theme, sonst ein Material-Symbol (wie caelestia es macht).
+        // Icon-Theme, sonst ein Material-Symbol.
         Item {
             id: iconBox
 
@@ -165,7 +172,8 @@ Item {
                 anchors.fill: parent
                 source: {
                     const n = row.notif;
-                    if (!n)
+                    // Das Bild steht schon gross darunter
+                    if (!n || row.hasPreview)
                         return "";
                     if (n.image !== "")
                         return Qt.resolvedUrl(n.image);
@@ -184,7 +192,7 @@ Item {
                 anchors.centerIn: parent
                 visible: icon.status !== Image.Ready
 
-                text: row.critical ? "release_alert" : "chat"
+                text: row.critical ? "release_alert" : row.hasPreview ? "screenshot_region" : "chat"
                 color: row.critical ? Colors.error : Colors.fgSurfaceVariant
                 font.family: "Material Symbols Outlined"
                 font.pixelSize: row.iconSize - 4
@@ -281,12 +289,46 @@ Item {
         }
     }
 
+    // ---- Bildvorschau ----
+    ClippingRectangle {
+        id: preview
+
+        anchors {
+            left: parent.left
+            leftMargin: row.leftInset + (row.showIcon ? row.iconSize + 10 : 0)
+            top: head.bottom
+        }
+        visible: row.hasPreview
+        width: Math.min(parent.width - anchors.leftMargin, 360)
+        // Seitenverhaeltnis des Bilds, flache Streifen nicht unter 48 px
+        height: visible && shot.status === Image.Ready
+                ? Math.max(48, Math.min(180, width * shot.implicitHeight / Math.max(1, shot.implicitWidth)))
+                : (visible ? 120 : 0)
+        radius: 10
+        color: Colors.alpha(Colors.fgSurface, 0.06)
+
+        Image {
+            id: shot
+
+            anchors.fill: parent
+            source: row.hasPreview ? Qt.resolvedUrl(row.notif.image) : ""
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize.width: 720
+        }
+
+        TapHandler {
+            onTapped: row.defaultAction?.invoke()
+        }
+    }
+
     // ---- Aktionsknoepfe ----
     Row {
         anchors {
             left: parent.left
             leftMargin: row.leftInset + (row.showIcon ? row.iconSize + 10 : 0)
-            top: head.bottom
+            top: row.hasPreview ? preview.bottom : head.bottom
+            topMargin: row.hasPreview ? 6 : 0
         }
         height: row.buttonsHeight
         spacing: 6

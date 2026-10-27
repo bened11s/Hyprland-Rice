@@ -9,9 +9,12 @@ def get_score_for_image(image: Path | str, cache_base: Path):
 
     cache = cache_base / "score.json"
 
+    # Als Zahl lesen: frueher bekam from_int den Text, das warf einen TypeError,
+    # den das except schluckte - der Cache griff so nie, und jede neue
+    # Variante/Modus quantisierte das Bild erneut
     try:
-        return Hct.from_int(cache.read_text())
-    except (IOError, TypeError):
+        return Hct.from_int(int(cache.read_text()))
+    except (IOError, ValueError):
         pass
 
     from dynamic_island.utils.material.score import score

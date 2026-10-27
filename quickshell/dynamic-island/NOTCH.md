@@ -386,7 +386,7 @@ Medien mehr (SUPER+M gehoert dem Music-Workspace).
 **Stand 2026-10-12 spaet:** Alle Blaetter-Seiten haben dieselbe Breite (`pageWidth` 548 = Steuerung), nichts verschiebt sich
 seitlich. Kopfzeile auf allen Seiten gleich: links die Workspace-Staebchen (`NotchWorkspaces`, bleiben beim Aufklappen
 stehen und sind klickbar), Mitte Uhr bzw. Titel, rechts Seiten-Punkte + Glocke. `WorkspaceStrip.qml` ist wieder weg.
-Specials wie bei Caelestia: ist einer offen, legt sich ueber die Staebchen eine kleine Pille mit allen Specials (aktiver
+Specials: ist einer offen, legt sich ueber die Staebchen eine kleine Pille mit allen Specials (aktiver
 tertiaer, Klick toggelt). Blaettern: Schwelle halbe Rastung (60) bzw. 50 px, feste Sperre 350 ms (`flipCooldown`), Zaehler
 verfaellt nach 500 ms Pause (`accumDecay`). Medien-Untermenue: `MediaPanel` in fester 320-px-Spalte.
 
@@ -486,3 +486,40 @@ Gemessen mit laufender Musik, zwei Monitore, Notch-Layout: qs-CPU 12,7 % → 6 %
 - Messskripte: CPU/Kindprozesse über `/proc/<pid>/stat` (utime/stime, cutime/cstime) und
   `/proc/<pid>/task/*/children`, Startzeit = Neustart bis „Configuration Loaded“.
 
+
+## 8. Plugins (seit 2026-10-22)
+
+Erweiterungen ohne Eingriff in den Kern: Ordner `plugins/<id>/` mit
+`plugin.json` (+ optional `Main.qml`, Kachel-QML). Format, API, Austausch-
+formate und CLI stehen in `plugins/README.md`.
+
+- Kern: `modules/services/plugins/Plugins.qml` (Singleton; findet Ordner per
+  FolderListModel, haelt `plugins.json`, IPC `plugins`) und `PluginHost.qml`
+  (je Plugin: Manifest pruefen, `main` asynchron per `Qt.createComponent`
+  laden/zerstoeren, Kontext `plugin`). `shell.qml` haelt den Singleton am Leben.
+- Plugin-QML liegt im Shell-Ordner und kann deshalb alle `qs.*`-Module
+  importieren, die die Shell selbst schon importiert.
+- Beitraege: Einstellungs-Gruppe `plugin:<id>` (Menue liest/schreibt ueber
+  `Plugins.get/set/reset/isDefault/satisfied`, die normale Gruppen an Config
+  weiterreichen), Launcher-Aktionen (`actions` des Main-Objekts →
+  `LauncherActions.all`), Schnellkacheln (`Plugins.tiles` →
+  `QuickLayout.extraTiles`; die Abhaengigkeit laeuft nur plugins → config).
+- Zustand pro Rechner: `~/.config/dynamic-island/plugins.json` (nicht im Git).
+- Erstes Plugin: `plugins/terminal/` (vorher `services/system/TerminalTheme.qml`
+  + Config-Gruppe `terminal`; Werte per `migrateFrom` einmalig uebernommen).
+- Austausch: `dynamic-island plugin export|import` (`.dip` = tar.gz mit
+  `dip.json`, SHA-256 je Datei; Einstellungen allein als JSON).
+- Desktop-Widgets sind seit 2026-10-23 das Plugin `plugins/desktop/`
+  (`builtin`, Einstellungen pause/fps aus der alten Config-Gruppe `desktop`
+  uebernommen). Sein `Main.qml` startet die Ebene aus `modules/desktop`
+  (bleibt im Kern: die Dateien brauchen sich gegenseitig als Typen, deshalb
+  importiert `shell.qml` das Modul nur noch). Uhr/Visualiser/Songtext liegen
+  in `plugins/desktop/widgets/`. Bonsai, Matrix und Terminal-Widget sind
+  Komponenten (`"parent": "desktop"`): laufen nur mit dem Plugin und stehen in
+  der Verwaltung in dessen Untermenue „Widgets“, mit eigenem Import.
+- Tastenkuerzel (seit 2026-10-23): Manifest `keybinds` → `Plugins.keybinds` →
+  `Keybinds.pluginBinds` (Binding, wieder nur plugins → hypr). `Keybinds.qml`
+  haelt auch die Aenderungen aus der Uebersicht (SUPER+K, Bearbeiten) in
+  `keybinds.json`, erzeugt `~/.local/state/dynamic-island/keybinds.lua` und
+  ruft `hyprctl eval 'sync_keybinds()'` (hypr/hyprland.lua). IPC `keybinds`
+  (list/set/disable/enable/reset/add/remove).

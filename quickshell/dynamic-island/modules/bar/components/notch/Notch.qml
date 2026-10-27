@@ -2,11 +2,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell
-import Quickshell.Hyprland
 
 import qs.modules.services.config
 import qs.modules.services.auth
-import qs.modules.services.audio
 import qs.modules.services.record
 import qs.modules.services.system
 import qs.modules.services.media
@@ -91,7 +89,8 @@ Item {
     // Blaettern: Inhalt gleitet in Scrollrichtung herein (siehe flipWheel)
     property real slide: 0
     // Song-Wechsel per Wischen: die Jetzt-laeuft-Karte folgt dem Zeiger 1:1,
-    // daneben kommt eine Dummy-Karte (NowPlayingRow) mit herein. songPull =
+    // daneben kommt eine zweite Karte mit dem naechsten/vorigen Titel
+    // (NowPlayingRow, Queue aus MediaQueue) mit herein. songPull =
     // Fortschritt bis zur Schwelle, -1..1 (negativ = nach links = naechster
     // Titel), aus songSlide abgeleitet, damit Zurueckschnappen und Einblenden
     // dieselbe Animation nutzen.
@@ -115,17 +114,24 @@ Item {
         }
     }
 
-    // Song vor (dir = +1) oder zurueck (-1). Die Dummy-Karte faehrt ganz
+    // Song vor (dir = +1) oder zurueck (-1). Die zweite Karte faehrt ganz
     // herein (songFlip), der Player wechselt derweil; am Ende springt der
     // Versatz auf 0 und die echte Karte zeigt den neuen Titel an derselben
-    // Stelle. Geht es nicht, schnappt die Karte nur zurueck.
+    // Stelle (NowPlayingRow.commit friert dafuer alten und neuen Titel ein,
+    // bis MPRIS nachgezogen hat). Geht es nicht, schnappt die Karte nur zurueck.
     function skipSong(dir: int): void {
         const can = dir > 0 ? Media.canNext : Media.canPrevious;
         if (can) {
-            if (dir > 0)
+            nowPlaying.commit();
+            if (dir > 0) {
                 Media.next();
-            else
+            } else {
+                // Spotifys "Zurueck" startet den laufenden Titel neu, wenn er
+                // schon ein paar Sekunden laeuft – erst an den Anfang, dann
+                // springt es wirklich zum vorigen (wie im Medien-Untermenue)
+                Media.seek(0);
                 Media.previous();
+            }
             songFlip.to = -dir * nowPlaying.flipDistance;
             songFlip.restart();
         } else {
@@ -169,23 +175,25 @@ Item {
     // Datums-Ansicht (per Hover) und Launcher (per Zug nach unten) teilen sich
     // dieselbe Karte – der Launcher hat Vorrang.
     property bool expanded: false
-    // Der Bildschirm, auf dem diese Notch liegt. Bar.qml setzt ihn aus
-    // `modelData` – `QsWindow.window?.screen` war bei drei von vier Panels
-    // null und damit unbrauchbar (u.a. fuer den Fokus-Abgleich).
-    required property var hostScreen
+    readonly property var hostScreen: notch.QsWindow.window?.screen ?? null
     readonly property bool launcherOpen: LauncherState.open && LauncherState.screen === hostScreen
     // Die Karte hat im Launcher-Modus drei Ansichten (siehe LauncherState.mode)
     readonly property bool wallpaperOpen: launcherOpen && LauncherState.mode === "wallpaper"
     readonly property bool themeOpen: launcherOpen && LauncherState.mode === "theme"
     readonly property bool powerOpen: launcherOpen && LauncherState.mode === "power"
     readonly property bool keysOpen: launcherOpen && LauncherState.mode === "keys"
+    readonly property bool clipboardOpen: launcherOpen && LauncherState.mode === "clipboard"
     // Untermenues (siehe oben)
     readonly property bool mediaOpen: launcherOpen && LauncherState.mode === "media"
     readonly property bool controlOpen: launcherOpen && LauncherState.mode === "control"
     readonly property bool notificationsOpen: launcherOpen && LauncherState.mode === "notifications"
     readonly property bool systemOpen: launcherOpen && LauncherState.mode === "system"
     readonly property bool viewOpen: mediaOpen || controlOpen || notificationsOpen || systemOpen
-    readonly property bool appsOpen: launcherOpen && !wallpaperOpen && !themeOpen && !powerOpen && !keysOpen && !viewOpen
+    // Direkt am Modus, nicht als "keine der anderen": die abgeleiteten
+    // Flags oben werden nach `launcherOpen` neu ausgewertet, waren also kurz
+    // noch false – dann war appsOpen fuer einen Moment wahr und jedes andere
+    // Menue baute beim Oeffnen den App-Launcher mit (~25 ms) und warf ihn weg.
+    readonly property bool appsOpen: launcherOpen && LauncherState.mode === "apps"
     readonly property bool authOpen: Auth.active && Auth.screen === hostScreen
     readonly property bool open: expanded || launcherOpen || authOpen
 
@@ -230,6 +238,7 @@ Item {
                                         : themeOpen ? themes.outerWidth
                                         : powerOpen ? powerMenu.outerWidth
                                         : keysOpen ? keysView.outerWidth
+                                        : clipboardOpen ? clipboardView.outerWidth
                                         : mediaOpen ? mediaView.outerWidth
                                         : controlOpen ? controlLoader.outerWidth
                                         : notificationsOpen ? notificationsView.outerWidth
@@ -239,6 +248,7 @@ Item {
                                          : themeOpen ? themes.outerHeight
                                          : powerOpen ? powerMenu.outerHeight
                                          : keysOpen ? keysView.outerHeight
+                                         : clipboardOpen ? clipboardView.outerHeight
                                          : mediaOpen ? mediaView.outerHeight
                                          : controlOpen ? controlLoader.outerHeight
                                          : notificationsOpen ? notificationsView.outerHeight
@@ -259,7 +269,7 @@ Item {
     // Angedockt mit Kontur: die obere Randlinie liegt ausserhalb des Bildes
     y: docked ? -pill.borderWidth : verticalMargin / 2
     width: open ? expandedWidth : collapsedWidth + 2 * growth
-    height: open ? expandedHeight : notch.bandHeight
+    height: open ? expandedHeight : collapsedHeight + growth
 
     // Die Insel reagiert sofort auf den Zeiger – noch bevor sie aufklappt.
     // Angedockt waechst sie stattdessen (growth): eine skalierte Notch
@@ -386,7 +396,7 @@ Item {
             readonly property real threshold: 60
             readonly property real follow: 0.4     // Daempfung beim Blaettern
             readonly property real followMax: 48
-            // Beim Song folgt die Karte 1:1, hoechstens bis die Dummy-Karte steht
+            // Beim Song folgt die Karte 1:1, hoechstens bis die zweite Karte steht
             readonly property real songFollowMax: nowPlaying.flipDistance
             // "song", "tabs" oder "" (nichts zu tun)
             property string kind: ""
@@ -475,31 +485,6 @@ Item {
             }
         }
 
-        // Mikrofon stumm (End-Taste, systemweit): kleines durchgestrichenes
-        // Mikro links neben der Uhr, gleiche Optik wie der Aufnahme-Punkt.
-        Text {
-            id: micMutedIcon
-
-            anchors {
-                right: clock.left
-                rightMargin: 6
-                verticalCenter: clock.verticalCenter
-            }
-            font.family: "Material Symbols Outlined"
-            font.pixelSize: 15
-            text: "mic_off"
-            color: notch.open ? Colors.primary : Colors.fgBackground
-            opacity: Audio.allSourcesMuted && !notch.docked && !notch.launcherOpen && !notch.authOpen ? 0.85 : 0
-            visible: opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
-            }
-            Behavior on color {
-                ColorAnimation { duration: Appearance.fadeDuration }
-            }
-        }
-
         // Der Aufnahme-Punkt. Er pulst langsam, damit er als Zustand lesbar
         // ist und nicht als Deko; im Launcher-Modus geht er mit der Uhr.
         Item {
@@ -570,7 +555,6 @@ Item {
         // ihre Breite an dieser Gruppe (compactSide), die Uhr bleibt mittig.
         Row {
             id: compactRight
-            objectName: "notchCompactActions"
 
             anchors {
                 right: parent.right
@@ -579,18 +563,9 @@ Item {
             }
             spacing: 8
             opacity: notch.docked && !notch.open ? 1 : 0
-            // Beim Oeffnen sofort aus dem Layout nehmen: die kompakte
-            // Aktionsgruppe darf nicht hinter der offenen Kopfzeile ausfaden.
-            visible: notch.docked && !notch.open && opacity > 0
-            enabled: visible
+            visible: opacity > 0
 
             Fade on opacity {}
-
-            AiAgentButton {
-                id: compactAiButton
-                objectName: "notchCompactAiButton"
-                anchors.verticalCenter: parent.verticalCenter
-            }
 
             // Aufnahme-Punkt, pulst langsam wie sein Gegenstueck im Insel-Layout
             Rectangle {
@@ -672,7 +647,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: Config.notch.date && !notch.showVisualizer
-                text: Qt.formatDate(clock.date, "ddd d")
+                text: clock.date.toLocaleDateString(I18n.locale, "ddd d")
                 color: Colors.alpha(Colors.fgBackground, 0.55)
                 font.family: Config.font
                 font.pixelSize: 12
@@ -689,15 +664,6 @@ Item {
                 count: 5
                 barWidth: 3
                 active: Media.playing
-                // Nur der Monitor im Fokus laeuft die Pegel nach. Die Balken
-                // der anderen Monitore stehen still, sparen aber Frames: jeder
-                // Frame der Shell wird ueber PCIe zur dGPU kopiert und
-                // Hyprland rendert pro Layer-Frame den ganzen Output neu.
-                //
-                // Ist die Insel offen, zeigt die Medienzeile ihre eigenen
-                // Balken – die kleinen neben der Uhr duerfen dann stehen
-                // bleiben, sonst laeuft der Visualizer doppelt.
-                live: Hyprland.focusedMonitor?.name === notch.hostScreen?.name && !notch.open
             }
         }
 
@@ -803,27 +769,11 @@ Item {
         }
 
         // ---- Glocke oben rechts ----
-        AiAgentButton {
-            id: headerAiButton
-            objectName: "notchHeaderAi"
-
-            anchors {
-                right: bell.left
-                rightMargin: 10
-                verticalCenter: clock.verticalCenter
-            }
-            // Im Insel-Layout sitzt hier der Power-Knopf. Beim Aufklappen
-            // erst einblenden, sobald die breite Kopfzeile Platz bietet.
-            visible: notch.docked && (notch.overviewShown || notch.viewOpen)
-                     && notch.width >= notch.pageWidth - 1
-        }
-
         // Glocke mit Zaehler. Ein Klick oeffnet das Untermenue
         // "Benachrichtigungen" (wie SUPER+N), steht man schon darin, geht es
         // zurueck zur Uebersicht.
         Item {
             id: bell
-            objectName: "notchHeaderBell"
 
             anchors {
                 right: parent.right
@@ -936,11 +886,9 @@ Item {
         // haengen oben fest, also steht er immer an derselben Stelle.
         Row {
             id: pager
-            objectName: "notchHeaderPager"
 
             anchors {
-                // Eigener Platz links vom KI-Knopf statt derselben Flaeche.
-                right: headerAiButton.left
+                right: bell.left
                 rightMargin: 12
             }
             y: notch.headerCenter - height / 2
@@ -1031,13 +979,10 @@ Item {
                     || Math.abs(event.pixelDelta.x) > Math.abs(event.pixelDelta.y);
                 const angle = horizontal ? event.angleDelta.x : event.angleDelta.y;
                 const pixels = horizontal ? event.pixelDelta.x : event.pixelDelta.y;
-                // Eine Seite je echter Rastung (120) – Winkel VOR Pixeln.
-                // Die2,4G-Dongle-Mausen liefern BEIDES pro Rastung
-                // (angle 120 + pixel 15); wer pixel bevorzugt, braeuchte
-                // 4 Rastungen je Seite. Pixel bleiben nur Fallback fuer
-                // G502-Hi-Res (8x15 Winkel, wird aufsummiert) und Touchpad
-                // (nur pixelDelta, 60 px Zug je Seite).
-                const delta = angle !== 0 ? angle / 120 : pixels / 60;
+                // Eine Seite je echter Rastung (120). Das Hi-Res-Rad der G502
+                // liefert die in ~8 Teilen zu 15 – die werden aufsummiert.
+                // Touchpad: 60 px Zug je Seite.
+                const delta = pixels !== 0 ? pixels / 60 : angle / 120;
 
                 // Richtungswechsel verwirft den Rest der alten Richtung
                 if (flipWheel.accum !== 0 && Math.sign(delta) !== Math.sign(flipWheel.accum))
@@ -1082,7 +1027,7 @@ Item {
             easing.type: Easing.OutCubic
         }
 
-        // Wechsel: Dummy-Karte ganz herein, dann ohne Animation zurueck auf 0
+        // Wechsel: zweite Karte ganz herein, dann ohne Animation zurueck auf 0
         NumberAnimation {
             id: songFlip
 
@@ -1096,7 +1041,6 @@ Item {
         // ---- Live-Activity: Cover links ----
         Item {
             id: mediaArt
-            objectName: "notchMusicCover"
             transform: Translate { x: notch.songSlide }
 
             anchors {
@@ -1239,7 +1183,9 @@ Item {
                 + (batteryRing.toLength - batteryRing.fromLength) * chargeProgress
             readonly property real pathLength: Math.max(0, batteryRing.toLength - pathStart)
             readonly property real distance: pathStart + pathLength * travel
-            readonly property var point: batteryRing.pointAt(distance)
+            // Nur waehrend des Impulses: sonst rechnete der Punkt jede
+            // Groessenaenderung der Pille mit (~1000x/s waehrend eines Morphs)
+            readonly property var point: running ? batteryRing.pointAt(distance) : Qt.point(0, 0)
             readonly property int travelDuration: Math.round(750 - rateFactor * 400)
             readonly property int pulseInterval: Math.round(1800 - rateFactor * 1200)
 
@@ -1375,6 +1321,18 @@ Item {
             }
         }
 
+        LazyPanel {
+            id: clipboardView
+
+            open: notch.clipboardOpen
+
+            sourceComponent: ClipboardPanel {
+                topOffset: notch.launcherTop
+                cardRadius: notch.cardRadius
+                active: true
+            }
+        }
+
         // ---- Untermenues (Notch-Layout und Insel) ----
         LazyPanel {
             id: mediaView
@@ -1452,7 +1410,7 @@ Item {
         x: -width
         y: 0
         size: notch.shoulder
-        color: Colors.alpha(Appearance.notchColor, Appearance.surfaceOpacity)
+        color: Appearance.notchColor
         strokeWidth: pill.borderWidth
         strokeColor: Appearance.notchBorderColor
         visible: notch.docked
@@ -1464,7 +1422,7 @@ Item {
         x: notch.width
         y: 0
         size: notch.shoulder
-        color: Colors.alpha(Appearance.notchColor, Appearance.surfaceOpacity)
+        color: Appearance.notchColor
         strokeWidth: pill.borderWidth
         strokeColor: Appearance.notchBorderColor
         mirrored: true

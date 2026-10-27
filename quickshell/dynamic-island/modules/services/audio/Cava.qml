@@ -17,6 +17,10 @@ import qs.modules.services.core
 //
 // Die Config kommt ueber stdin statt aus einer Datei – so gibt es keine
 // zweite Stelle, die zur Balkenzahl passen muss.
+//
+// Mono: values[0] = Bass, aufsteigend zu den Hoehen. Im cava-Standard
+// (Stereo) laege der linke Kanal gespiegelt vorn (Hoehen zuerst, Bass in der
+// Mitte) – alle Visualiser hier rechnen aber mit "Bass zuerst".
 Singleton {
     id: root
 
@@ -84,6 +88,8 @@ Singleton {
 framerate=${root.framerate}
 bars=${root.bars}
 [output]
+channels=mono
+mono_option=average
 method=raw
 raw_target=/dev/stdout
 data_format=ascii

@@ -45,30 +45,25 @@ Singleton {
     // Jeder Lauf kostet zwei ddcutil-Aufrufe ueber I2C (~0,1 s CPU).
     readonly property Demand demand: Demand {}
     readonly property bool watching: root.demand.active
+    // Letzter abgeschlossener Lauf. Ist er frisch (< 15 s), liest das Oeffnen
+    // nicht sofort nach – OSD-Hover und Kacheln oeffnen oft kurz hintereinander,
+    // der 8-s-Timer unten holt Monitor-Tasten-Aenderungen trotzdem.
+    property real lastQuery: 0
 
-    onWatchingChanged: if (root.watching && !writeProcess.running && !writeTimer.running && !settleTimer.running)
+    onWatchingChanged: if (root.watching && Date.now() - root.lastQuery > 15000
+                           && !writeProcess.running && !writeTimer.running && !settleTimer.running)
         root.startQuery()
 
     // ---- je Monitor ----
     function valueFor(name: string): real {
-        if (root.backend === "backlight" && !root.isInternal(name))
-            return 0;
         return root.monitors[name]?.value ?? root.value;
     }
 
-    function isInternal(name: string): bool {
-        return name.startsWith("eDP-") || name.startsWith("LVDS-") || name.startsWith("DSI-");
-    }
-
     function readyFor(name: string): bool {
-        if (root.backend === "backlight")
-            return root.isInternal(name) && root.ready;
-        return root.monitors[name]?.ready ?? false;
+        return root.monitors[name]?.ready ?? root.ready;
     }
 
     function setValueFor(name: string, newValue: real): void {
-        if (!root.readyFor(name))
-            return;
         const clamped = Math.max(0, Math.min(1, newValue));
         if (root.backend !== "ddc" || !root.monitors[name]) {
             root.setValue(clamped);
@@ -119,8 +114,7 @@ Singleton {
     }
 
     function startQuery(): void {
-        if (queryProcess.running || root.backend === "" || writeProcess.running
-                || writeTimer.running || settleTimer.running)
+        if (queryProcess.running || root.backend === "")
             return;
         if (root.backend === "backlight") {
             queryProcess.command = ["brightnessctl", "--device", root.backlightDevice,
@@ -143,7 +137,7 @@ Singleton {
                 return;
             root.backlightActive = root.backlightPending;
             writeProcess.command = ["brightnessctl", "--device", root.backlightDevice,
-                                    "--min-value=1", "set", root.backlightActive + "%"];
+                                    "set", root.backlightActive + "%"];
             writeProcess.running = true;
             return;
         }
@@ -231,11 +225,8 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.lastQuery = Date.now();
                 if (root.backend === "backlight") {
-                    // Ein aelterer Leselauf darf den gerade gezogenen Wert
-                    // und insbesondere backlightPending nicht zuruecksetzen.
-                    if (writeProcess.running || writeTimer.running || settleTimer.running)
-                        return;
                     const fields = this.text.trim().split(",");
                     const percentField = fields.find(field => field.endsWith("%"));
                     const current = percentField ? parseInt(percentField) : -1;

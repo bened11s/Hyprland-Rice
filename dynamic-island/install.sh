@@ -109,7 +109,6 @@ ki_warnung() {
       ~/Pictures/{Wallpapers,Screenshots})
     - kopiert die Wallpaper aus dem Repo nach ~/Pictures/Wallpapers
       (vorhandene Dateien bleiben)
-    - kopiert vorhandenen Caelestia-Status (Caelestia bleibt unberuehrt)
     - erzeugt ein Farbschema, falls keines da ist — das schreibt auch
       Farben nach Hyprland, GTK, Qt, btop, cava und Discord
     - legt ~/.config/hypr/profile an, falls es fehlt
@@ -403,26 +402,6 @@ make_dirs() {
     done
 }
 
-# -------------------------------------------------------- 4. Migration ---
-migrate_state() {
-    local old="$STATE_DIR/caelestia" new="$STATE_DIR/$SHELL_NAME"
-    [ -d "$old" ] || return 0
-    step "Uebernahme aus dem Caelestia-Status (wird nur kopiert, nie verschoben)"
-    for f in scheme.json sequences.txt wallpaper/path.txt; do
-        if [ -e "$new/$f" ]; then
-            skip "$f vorhanden"
-        elif [ -e "$old/$f" ]; then
-            run mkdir -p "$(dirname "$new/$f")"
-            run cp "$old/$f" "$new/$f"
-            ok "$f uebernommen"
-        fi
-    done
-    if [ -e "$new/wallpaper/path.txt" ] && [ ! -e "$new/wallpaper/current" ]; then
-        run ln -sfn "$(cat "$new/wallpaper/path.txt")" "$new/wallpaper/current"
-        ok "wallpaper/current gesetzt"
-    fi
-}
-
 # ---------------------------------------------------- 4b. Wallpaper ---
 # Die Bilder aus dem Repo nach ~/Pictures/Wallpapers legen. Kopiert statt
 # verlinkt: der Ordner ist eine Sammlung, in die man weitere Bilder wirft –
@@ -591,7 +570,6 @@ if [ "$CHECK_ONLY" = 1 ]; then check_deploy; else deploy; fi
 if [ "$CHECK_ONLY" = 1 ]; then check_links; else link_files; fi
 make_dirs
 seed_wallpapers
-migrate_state
 seed_scheme
 hypr_profile
 fish_hook

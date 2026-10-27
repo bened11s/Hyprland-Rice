@@ -14,7 +14,8 @@ import qs.modules.services.config
 // aufpoppt: eine Flaeche, keine Naht.
 //
 // Von oben nach unten: Quellenwahl (eigene, abgesetzte Karte), grosses Cover
-// mit Visualiser-Ring, Titel, Fortschritt mit den beiden Zeiten, Transport.
+// mit Visualiser-Ring, Titel, Fortschritt mit den beiden Zeiten, Transport,
+// darunter – nur bei Spotify – voriger und naechster Titel (QueueRow).
 Item {
     id: panel
 
@@ -111,7 +112,7 @@ Item {
                         }
                         width: parent.width - 32
 
-                        text: Media.source || "Keine Quelle"
+                        text: Media.source || I18n.tr("Keine Quelle")
                         color: Colors.fgBackground
                         font.pixelSize: 10
                         font.weight: Font.DemiBold
@@ -251,63 +252,86 @@ Item {
             }
 
             // ---- Cover ----
+            // Je nach Config.media.cover das runde Bild oder die
+            // Schallplatte (VinylCover) – ein Loader, damit nur eines von
+            // beiden das Bild decodiert.
+            Loader {
+                anchors.centerIn: parent
+                sourceComponent: Config.media.cover === "vinyl" ? vinylCover : roundCover
+            }
+
+            Component {
+                id: vinylCover
+
+                VinylCover {
+                    size: panel.coverSize
+                    tint: panel.tint
+                    source: Media.art
+                    decode: panel.coverDecode
+                    // Dreht nur, solange etwas laeuft und man es sieht
+                    spinning: Media.playing && panel.visible
+                }
+            }
+
             // Rund, passend zum Ring. `clip: true` reicht dafuer nicht –
             // das schneidet nur am Rechteck. Deshalb eine Kreis-Maske.
-            Rectangle {
-                anchors.centerIn: parent
+            Component {
+                id: roundCover
 
-                width: panel.coverSize
-                height: panel.coverSize
-                radius: width / 2
-                color: Colors.shade(panel.tint, 0.08)
+                Rectangle {
+                    width: panel.coverSize
+                    height: panel.coverSize
+                    radius: width / 2
+                    color: Colors.shade(panel.tint, 0.08)
 
-                Image {
-                    id: cover
+                    Image {
+                        id: cover
 
-                    anchors.fill: parent
-                    source: Media.art
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    // Feste Decodiergroesse: haengt sie an coverSize (= an der
-                    // Kartenbreite), decodiert jede Morph-Animation das Cover
-                    // pro Frame neu
-                    sourceSize.width: panel.coverDecode
-                    sourceSize.height: panel.coverDecode
-                    // Wird nur als Quelle fuer den Effekt gebraucht
-                    visible: false
-                }
-
-                Item {
-                    id: coverMask
-
-                    anchors.fill: parent
-                    layer.enabled: true
-                    visible: false
-
-                    Rectangle {
                         anchors.fill: parent
-                        radius: width / 2
-                        color: "black"
+                        source: Media.art
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        // Feste Decodiergroesse: haengt sie an coverSize (= an der
+                        // Kartenbreite), decodiert jede Morph-Animation das Cover
+                        // pro Frame neu
+                        sourceSize.width: panel.coverDecode
+                        sourceSize.height: panel.coverDecode
+                        // Wird nur als Quelle fuer den Effekt gebraucht
+                        visible: false
                     }
-                }
 
-                MultiEffect {
-                    anchors.fill: parent
-                    visible: cover.status === Image.Ready
+                    Item {
+                        id: coverMask
 
-                    source: cover
-                    maskEnabled: true
-                    maskSource: coverMask
-                }
+                        anchors.fill: parent
+                        layer.enabled: true
+                        visible: false
 
-                Text {
-                    anchors.centerIn: parent
-                    visible: cover.status !== Image.Ready
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: "black"
+                        }
+                    }
 
-                    text: "music_note"
-                    color: Colors.fgSurfaceVariant
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 22
+                    MultiEffect {
+                        anchors.fill: parent
+                        visible: cover.status === Image.Ready
+
+                        source: cover
+                        maskEnabled: true
+                        maskSource: coverMask
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: cover.status !== Image.Ready
+
+                        text: "music_note"
+                        color: Colors.fgSurfaceVariant
+                        font.family: "Material Symbols Outlined"
+                        font.pixelSize: 22
+                    }
                 }
             }
         }
@@ -317,7 +341,7 @@ Item {
             font.family: Config.font
             Layout.fillWidth: true
 
-            text: Media.title || "Nichts"
+            text: Media.title || I18n.tr("Nichts")
             color: Colors.fgBackground
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -446,5 +470,221 @@ Item {
             }
         }
 
+        // ---- Songtext ----
+        // Nur mit Config.media.lyrics. Derselbe Bauplan wie die Warteschlange
+        // darunter: Haarlinie, Block mit animierter Wunschhoehe, der auf Null
+        // faehrt, wenn es nichts zu zeigen gibt. Ob der Text aufgeklappt ist,
+        // weiss nur LyricsView (lokal, nicht in der Config).
+        Item {
+            id: lyricsBlock
+
+            readonly property bool shown: Config.media.lyrics && Media.available
+            readonly property real gap: layout.spacing
+
+            Layout.fillWidth: true
+            Layout.topMargin: -lyricsBlock.gap
+            Layout.preferredHeight: lyricsBlock.shown ? lyricsCol.implicitHeight + lyricsBlock.gap : 0
+
+            clip: true
+            opacity: lyricsBlock.shown ? 1 : 0
+            visible: Layout.preferredHeight > 0
+
+            Behavior on Layout.preferredHeight {
+                NumberAnimation { duration: Appearance.morphDuration; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+            }
+
+            ColumnLayout {
+                id: lyricsCol
+
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                    topMargin: lyricsBlock.gap
+                }
+                spacing: 2
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    Layout.bottomMargin: 4
+                    color: Colors.alpha(Colors.outline, 0.35)
+                }
+
+                LyricsView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: implicitHeight
+                    tint: panel.tint
+                    shown: panel.visible && lyricsBlock.shown
+                }
+            }
+        }
+
+        // ---- Warteschlange ----
+        // Voriger und naechster Titel aus der Spotify-Queue (MediaQueue), als
+        // zwei ruhige Zeilen unter einer Haarlinie. Gibt es keine Queue
+        // (anderer Player, Extension nicht verbunden), faehrt der Block auf
+        // Null zusammen – der obere Teil sieht dann aus wie ohne ihn. Der
+        // Abstand zur Transportreihe steckt mit im Block (topMargin hebt den
+        // Layout-Abstand auf), damit zusammengeklappt auch die Luft weg ist.
+        //
+        // Darunter ein Umschalter "Warteschlange · N weitere", der die
+        // restlichen Titel als kompakte, scrollbare Liste aufklappt
+        // (Config.media.queueOpen, bleibt ueber Neustarts).
+        Item {
+            id: queue
+
+            readonly property bool shown: MediaQueue.valid
+                                          && (!!MediaQueue.previous || !!MediaQueue.upcoming)
+            // Weitere Titel nach "Als Naechstes"
+            readonly property int more: Math.max(0, MediaQueue.next.length - 1)
+            readonly property bool open: Config.media.queueOpen && queue.more > 0
+            // Luft ueber der Haarlinie, gehoert zum Block
+            readonly property real gap: layout.spacing
+
+            Layout.fillWidth: true
+            Layout.topMargin: -queue.gap
+            // Die Liste liegt ausserhalb von queueRows und zaehlt nur
+            // aufgeklappt mit: so hat die Hoehe ein festes Ziel und eine
+            // einzige Animation, die Liste wird beim Zuklappen vom Rand
+            // abgeschnitten statt vorher zu verschwinden
+            Layout.preferredHeight: queue.shown
+                ? queueRows.implicitHeight + queue.gap + (queue.open ? queueList.height + queueList.anchors.topMargin : 0)
+                : 0
+
+            clip: true
+            opacity: queue.shown ? 1 : 0
+            // Unsichtbare Elemente ueberspringt das Layout ganz (auch ihre
+            // Raender) – deshalb an der animierten Wunschhoehe festmachen,
+            // nicht an `height`, das vom Layout erst gesetzt wird
+            visible: Layout.preferredHeight > 0
+
+            Behavior on Layout.preferredHeight {
+                NumberAnimation { duration: Appearance.morphDuration; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+            }
+
+            ColumnLayout {
+                id: queueRows
+
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                    topMargin: queue.gap
+                }
+                spacing: 2
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    Layout.bottomMargin: 4
+                    color: Colors.alpha(Colors.outline, 0.35)
+                }
+
+                QueueRow {
+                    visible: !!MediaQueue.previous
+                    track: MediaQueue.previous
+                    caption: I18n.tr("Zuvor")
+                    tint: panel.tint
+                    // Spotifys "Zurueck" startet den laufenden Titel neu, wenn
+                    // er schon ein paar Sekunden laeuft – erst an den Anfang,
+                    // dann springt es wirklich zum vorigen
+                    onTriggered: {
+                        Media.seek(0);
+                        Media.previous();
+                    }
+                }
+
+                QueueRow {
+                    visible: !!MediaQueue.upcoming
+                    track: MediaQueue.upcoming
+                    caption: I18n.tr("Als Nächstes")
+                    tint: panel.tint
+                    onTriggered: Media.next()
+                }
+
+                // Umschalter: nur, wenn es ueberhaupt mehr gibt
+                Item {
+                    id: queueToggle
+
+                    visible: queue.more > 0
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 20
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 6
+                        color: toggleHover.hovered ? Colors.shade(panel.tint, 0.11) : "transparent"
+
+                        Behavior on color {
+                            ColorAnimation { duration: Appearance.fadeDuration }
+                        }
+                    }
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            leftMargin: 8
+                            verticalCenter: parent.verticalCenter
+                        }
+                        font.family: Config.font
+                        text: I18n.tr(queue.more === 1 ? "Warteschlange · %1 weiterer" : "Warteschlange · %1 weitere").arg(queue.more)
+                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.75)
+                        font.pixelSize: 9
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        anchors {
+                            right: parent.right
+                            rightMargin: 6
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: "expand_more"
+                        color: Colors.fgSurfaceVariant
+                        font.family: "Material Symbols Outlined"
+                        font.pixelSize: 14
+                        rotation: queue.open ? 180 : 0
+
+                        Behavior on rotation {
+                            NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    HoverHandler {
+                        id: toggleHover
+
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: Config.set("media", "queueOpen", !Config.media.queueOpen)
+                    }
+                }
+            }
+
+            // Die Liste haengt unter den Zeilen; ihre Hoehe ist immer die
+            // volle Wunschhoehe, ob sie zu sehen ist, entscheidet der
+            // Block drueber (siehe Layout.preferredHeight)
+            QueueList {
+                id: queueList
+
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: queueRows.bottom
+                    topMargin: 2
+                }
+                height: wantedHeight
+                visible: queue.more > 0
+                tint: panel.tint
+            }
+        }
     }
 }

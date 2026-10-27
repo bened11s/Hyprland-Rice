@@ -21,16 +21,16 @@ Item {
 
     readonly property var actions: [
         { label: "Sperren", icon: "lock", hue: Colors.primary,
-          command: ["hyprlock"] },
+          command: [Quickshell.env("HOME") + "/.config/hypr/scripts/lock.sh"] },
         { label: "Abmelden", icon: "logout", hue: Colors.secondary,
-          command: ["hyprctl", "dispatch", "exit"] },
+          command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "logout"] },
         { label: "Standby", icon: "bedtime", hue: Colors.tertiary,
           command: ["systemctl", "suspend"] },
         { label: "Neustart", icon: "restart_alt",
           hue: Colors.mix(Colors.tertiary, Colors.error, 0.42),
-          command: ["systemctl", "reboot"] },
+          command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "reboot"] },
         { label: "Ausschalten", icon: "power_settings_new", hue: Colors.error,
-          command: ["systemctl", "poweroff"] }
+          command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "poweroff"] }
     ]
 
     implicitWidth: 760
@@ -146,7 +146,7 @@ Item {
                         Text {
                             font.family: Config.font
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: action.modelData.label
+                            text: I18n.tr(action.modelData.label)
                             color: action.hovered ? action.modelData.hue : Colors.fgSurfaceVariant
                             font.pixelSize: 11
                             font.weight: action.hovered ? Font.DemiBold : Font.Normal

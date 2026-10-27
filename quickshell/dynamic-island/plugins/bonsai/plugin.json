@@ -1,0 +1,28 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "bonsai",
+    "name": "Bonsai",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "park",
+    "description": "ASCII-Bonsai nach cbonsai.",
+    "author": "gamecat",
+    "defaultEnabled": true,
+    "widgets": {
+        "bonsai": {
+            "title": "Bonsai",
+            "desc": "ASCII-Bonsai, wächst einmal sichtbar und steht dann still",
+            "icon": "park",
+            "component": "BonsaiWidget.qml",
+            "size": [26, 22],
+            "options": {
+                "life": { "title": "Baum", "values": ["klein", "mittel", "groß"], "default": "mittel" },
+                "leaves": { "title": "Blätter", "values": ["&", "*", "♣", "❀", "@"], "default": "&" },
+                "pot": { "title": "Topf", "values": ["schale", "klein", "ohne"], "default": "schale" },
+                "regrow": { "title": "Neu wachsen", "values": ["nie", "stündlich", "täglich"], "default": "täglich" },
+                "grow": { "title": "Wachsen zeigen", "bool": true, "default": true }
+            }
+        }
+    }
+}

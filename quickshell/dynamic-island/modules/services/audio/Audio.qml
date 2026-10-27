@@ -4,6 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Pipewire
 
+import qs
+
 // Zentrale PipeWire-Quelle fuer Lautstaerke und Geraeteauswahl.
 Singleton {
     id: root
@@ -21,10 +23,6 @@ Singleton {
     // Eingang (Mikrofon) – das Gegenstueck zu volume/muted
     readonly property real sourceVolume: source?.audio?.volume ?? 0
     readonly property bool sourceMuted: source?.audio?.muted ?? false
-    // true, wenn ALLE angeschlossenen Mikrofone stumm sind (End-Taste
-    // schaltet systemweit). Ohne Mikro -> false, sonst loggt das Icon
-    // "stumm", obwohl gar kein Geraet da waere.
-    readonly property bool allSourcesMuted: sources.length > 0 && sources.every(n => n.audio?.muted ?? false)
 
     function setVolume(value: real): void {
         if (sink?.audio)
@@ -82,14 +80,14 @@ Singleton {
 
     function deviceLabel(node: PwNode): string {
         if (!node)
-            return "Unbekanntes Gerät";
+            return I18n.tr("Unbekanntes Gerät");
         return node.properties["node.description"]
             || node.properties["device.description"]
             || node.properties["node.nick"]
             || node.description
             || node.nickname
             || node.name
-            || "Unbekanntes Gerät";
+            || I18n.tr("Unbekanntes Gerät");
     }
 
     function isSinkSelected(node: PwNode): bool {

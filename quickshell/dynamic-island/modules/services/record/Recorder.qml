@@ -29,9 +29,8 @@ Singleton {
     property bool sound: true
 
     // Nur einen Ausschnitt aufnehmen statt des ganzen Monitors. Den Rahmen
-    // zieht slurp auf, sobald die Aufnahme startet – dieselben zwei Modi, die
-    // caelestia auf seiner Recorder-Karte anbietet (Vollbild / Bereich, je
-    // mit und ohne Ton). Gilt wie `sound` erst ab der nächsten Aufnahme.
+    // zieht slurp auf, sobald die Aufnahme startet – zwei Modi (Vollbild /
+    // Bereich, je mit und ohne Ton). Gilt wie `sound` erst ab der nächsten Aufnahme.
     property bool region: false
 
     property bool active: false
@@ -60,6 +59,18 @@ Singleton {
             if (root.sound)
                 args.push("--sound");
         }
+        Quickshell.execDetached(args);
+        settle.restart();
+    }
+
+    // Aufnahme eines fertigen Ausschnitts (aus dem Screenshot-Overlay),
+    // geometry = "BxH+X+Y" in globalen logischen Koordinaten
+    function startRegion(geometry: string): void {
+        if (root.active)
+            return;
+        const args = [root.cli, "record", "--region", geometry];
+        if (root.sound)
+            args.push("--sound");
         Quickshell.execDetached(args);
         settle.restart();
     }
@@ -94,9 +105,10 @@ Singleton {
 
     // Ruhiger Grundtakt – nur noch Rückfallebene für Recorder, die ganz an
     // der CLI vorbei gestartet wurden, und für einen abgestürzten Recorder.
-    // Vorher alle 2 s: ~30 pidof-Starts pro Minute, dauerhaft.
+    // Vorher alle 2 s: ~30 pidof-Starts pro Minute, dauerhaft; dann 10 s.
+    // Starts ueber die CLI meldet ohnehin der FolderListModel oben.
     Timer {
-        interval: 10000
+        interval: 30000
         running: true
         repeat: true
         triggeredOnStart: true

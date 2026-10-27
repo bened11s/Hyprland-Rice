@@ -32,6 +32,7 @@ class Scheme:
         self.notify = False
         self._batch_depth = 0
         self._dirty = False
+        self._colours_stale = False
 
     @property
     def name(self) -> str:
@@ -55,8 +56,7 @@ class Scheme:
         self._name = name
         self._check_flavour()
         self._check_mode()
-        self._update_colours()
-        self.save()
+        self.update_colours()
 
     @property
     def flavour(self) -> str:
@@ -130,13 +130,24 @@ class Scheme:
         Jeder Setter speichert sonst fuer sich. `scheme set --name x --mode y`
         schrieb die Datei so bis zu dreimal hintereinander, und die Shell
         faerbte sich durch jeden Zwischenstand einmal um.
+
+        Auch die Farben entstehen erst am Ende, einmal fuer den fertigen Stand:
+        beim dynamischen Schema rechnete sonst jeder Setter (Modus, Variante)
+        eine ganze Palette, die der naechste gleich wieder verwarf (~90 ms je
+        Durchgang ohne Cache). Scheitert etwas im Block, bleibt scheme.json
+        unangetastet.
         """
         self._batch_depth += 1
         try:
             yield self
         finally:
             self._batch_depth -= 1
-            if self._batch_depth == 0 and self._dirty:
+        if self._batch_depth == 0:
+            if self._colours_stale:
+                self._colours_stale = False
+                self._update_colours()
+                self._dirty = True
+            if self._dirty:
                 self._dirty = False
                 self.save()
 
@@ -164,6 +175,9 @@ class Scheme:
         self.update_colours()
 
     def update_colours(self) -> None:
+        if self._batch_depth > 0:
+            self._colours_stale = True
+            return
         self._update_colours()
         self.save()
 

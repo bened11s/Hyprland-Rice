@@ -193,8 +193,7 @@ Singleton {
         running: root.trackPosition && root.playing && (root.active?.positionSupported ?? false)
         repeat: true
         interval: 1000
-        // Kein Setter: das Signal ist der Anstoss zum Neulesen (so macht es
-        // auch caelestia).
+        // Kein Setter: das Signal ist der Anstoss zum Neulesen.
         onTriggered: root.active?.positionChanged()
     }
 

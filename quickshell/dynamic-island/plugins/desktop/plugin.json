@@ -1,0 +1,88 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "desktop",
+    "name": "Desktop-Widgets",
+    "version": "1.0.0",
+    "api": 1,
+    "icon": "widgets",
+    "author": "gamecat",
+    "description": "Widgets auf dem Hintergrund, je Wallpaper angeordnet (SUPER+ALT+D).",
+    "builtin": true,
+    "defaultEnabled": true,
+    "main": "Main.qml",
+    "migrateFrom": "desktop",
+    "components": {
+        "title": "Widgets",
+        "icon": "widgets",
+        "desc": "Zusätzliche Widgets, jedes als eigenes Paket (.dip)."
+    },
+    "tiles": {
+        "toggle": { "label": "Desktop-Widgets", "icon": "widgets", "kind": "pill", "component": "Tile.qml" }
+    },
+    "keybinds": {
+        "arrange": { "keys": "SUPER + ALT + D", "title": "Desktop-Widgets anordnen", "group": "Werkzeuge", "exec": "qs -c dynamic-island ipc call desktop toggle" }
+    },
+    "settings": {
+        "scenes": {
+            "default": "",
+            "title": "Szene",
+            "desc": "Anordnung je Wallpaper in ~/.config/dynamic-island/scenes.json",
+            "editor": "desktop"
+        },
+        "hidden": {
+            "default": false,
+            "title": "Nur im Editor",
+            "desc": "Alle Widgets nur beim Anordnen (Kachel Desktop-Widgets); einzeln im Optionsfeld des Editors",
+            "hidden": true
+        },
+        "pause": {
+            "default": "fenster",
+            "title": "Pausieren bei",
+            "desc": "Fenster: sobald der Workspace Fenster hat. Vollbild: nur bei Vollbild und Game-Mode",
+            "options": ["fenster", "vollbild"]
+        },
+        "fps": {
+            "default": 30,
+            "title": "Bildrate",
+            "desc": "Obergrenze für animierte Widgets (Matrix, Bonsai-Wachstum)",
+            "min": 10, "max": 60, "step": 5, "unit": "fps"
+        }
+    },
+    "widgets": {
+        "clock": {
+            "title": "Uhr",
+            "desc": "Große Uhr mit Datum – sechs Stile von Sperrbildschirm bis Wörter",
+            "icon": "schedule",
+            "component": "widgets/ClockWidget.qml",
+            "size": [10, 6],
+            "options": {
+                "style": { "title": "Stil", "values": ["sperrbildschirm", "insel", "kontrast", "gestapelt", "analog", "worte"], "default": "sperrbildschirm" },
+                "date": { "title": "Datum", "bool": true, "default": true }
+            }
+        },
+        "visualizer": {
+            "title": "Visualiser",
+            "desc": "Pegel der laufenden Musik, auch als Band am unteren Rand",
+            "icon": "graphic_eq",
+            "component": "widgets/VisualizerWidget.qml",
+            "size": [26, 7],
+            "options": {
+                "style": { "title": "Stil", "values": ["kapseln", "unten", "welle", "insel"], "default": "kapseln" },
+                "bars": { "title": "Balken", "values": [16, 24, 32, 48, 64, 96], "default": 32 },
+                "order": { "title": "Bass", "values": ["mitte", "links"], "default": "mitte" },
+                "idle": { "title": "Ohne Musik", "values": ["ausblenden", "ruhig"], "default": "ausblenden" }
+            }
+        },
+        "lyrics": {
+            "title": "Songtext",
+            "desc": "Synchroner Songtext zum laufenden Titel",
+            "icon": "lyrics",
+            "component": "widgets/LyricsWidget.qml",
+            "size": [28, 6],
+            "options": {
+                "lines": { "title": "Zeilen", "values": [1, 3], "default": 3 },
+                "align": { "title": "Ausrichtung", "values": ["links", "mitte", "rechts"], "default": "mitte" }
+            }
+        }
+    }
+}

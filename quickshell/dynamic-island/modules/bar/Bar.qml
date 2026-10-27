@@ -24,7 +24,7 @@ import qs
 
 // Leiste oben – enthält selbst die Pro-Monitor-Logik.
 // Die `required property modelData` im Delegaten wird von `Variants`
-// automatisch mit dem jeweiligen Screen befüllt (Caelestia-Stil).
+// automatisch mit dem jeweiligen Screen befüllt.
 Variants {
     model: Quickshell.screens
 
@@ -129,7 +129,7 @@ Variants {
         // wird in der Steuerung ein WLAN-Passwort oder eine PIN getippt.
         WlrLayershell.keyboardFocus: notch.authOpen
                                      || notch.appsOpen || notch.wallpaperOpen || notch.themeOpen || notch.powerOpen
-                                     || notch.keysOpen
+                                     || notch.keysOpen || notch.clipboardOpen
                                      || notch.controlTyping
                                      || (bar.pillSettings?.typingPassword ?? false)
                                      || (bar.pillSettings?.typingPin ?? false)
@@ -318,7 +318,6 @@ Variants {
                 borderWidth: bar.borderWidth   // `this` gibt es in QML-Bindings nicht
                 borderColor: bar.borderColor   // Quelle: eine Ebene weiter oben definiert
                 cardRadius: bar.cardRadius     // dito – teilt sich den Wert mit dem Selektor
-                hostScreen: bar.modelData      // der Bildschirm dieser Leiste
             }
 
             // Beide Nachbarn hängen an der Bildschirmmitte plus der halben

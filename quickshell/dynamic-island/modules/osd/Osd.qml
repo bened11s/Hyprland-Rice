@@ -13,7 +13,7 @@ import qs.modules.widgets
 import qs
 
 // OSD am rechten Bildschirmrand, mittig: senkrechte Regler fuer Lautstaerke
-// und Helligkeit (Vorlage: caelestias OSD).
+// und Helligkeit.
 //
 // Zwei Wege, es zu sehen:
 //   Hover    Maus an den rechten Rand in der Bildschirmmitte – das Fenster

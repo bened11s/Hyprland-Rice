@@ -56,8 +56,7 @@ Singleton {
             root.hyprEval('hl.config({ decoration = { shadow = { enabled = false } } })');
             root.hyprEval('hl.config({ decoration = { blur = { enabled = false } } })');
         } else {
-            // Reload setzt alles aus dem Profil zurueck (caelestia macht es
-            // genauso wie "message reload")
+            // Reload setzt alles aus dem Profil zurueck
             Quickshell.execDetached(["hyprctl", "reload"]);
         }
     }

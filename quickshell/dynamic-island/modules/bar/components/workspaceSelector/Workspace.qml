@@ -10,10 +10,9 @@ import qs.modules.widgets
 //
 // Den Zustand bekommt die Komponente komplett durchgereicht (activeWsId,
 // occupied, groupOffset) statt Hyprland selbst zu fragen – sonst würde jeder
-// der zehn Punkte dieselbe Abfrage nochmal machen. Genauso macht es
-// caelestia/modules/bar/components/workspaces/Workspace.qml.
+// der zehn Punkte dieselbe Abfrage nochmal machen.
 //
-// Bewusst OHNE die Fenster-Icons, die caelestia darunter hängt: ein Punkt
+// Bewusst OHNE Fenster-Icons darunter: ein Punkt
 // pro Workspace, mehr nicht.
 Item {
     id: root
@@ -105,11 +104,13 @@ Item {
             // "dynamic-island toggle specialws" CLI-Aufruf - den gibt es
             // nicht, der Klick tat deshalb sichtbar nichts.
             if (root.isActive) {
+                Hyprland.dispatch(Hyprland.usingLua
+                    ? 'hl.dsp.workspace.toggle_special("special")'
+                    : "togglespecialworkspace special");
                 return;
             }
 
-            // Lua-Config versteht nur Lua – dieselbe Weiche wie in
-            // caelestia/services/Hypr.qml
+            // Lua-Config versteht nur Lua – darum die Weiche
             Hyprland.dispatch(Hyprland.usingLua
                 ? `hl.dsp.focus({ workspace = ${root.ws} })`
                 : `workspace ${root.ws}`);

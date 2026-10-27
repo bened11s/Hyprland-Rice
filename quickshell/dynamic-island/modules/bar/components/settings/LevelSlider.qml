@@ -40,8 +40,7 @@ Rectangle {
     clip: true
 
     function adjustAt(x: real): void {
-        // x ist lokal zur Eingabeflaeche, ohne Symbol-/Detail-Schaltflaechen.
-        root.adjusted(Math.max(0, Math.min(1, x / Math.max(1, inputArea.width))));
+        root.adjusted(Math.max(0, Math.min(1, x / root.width)));
     }
 
     // ---- Fuellung ----

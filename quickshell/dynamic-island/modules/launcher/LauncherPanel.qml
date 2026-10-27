@@ -69,7 +69,11 @@ Item {
 
     // Per LazyPanel entsteht die Ansicht bereits aktiv – dann gibt es kein
     // Wechsel-Signal, die Startarbeit (Fokus, Suchfeld) wird nachgeholt
-    Component.onCompleted: if (panel.active) Qt.callLater(panel.activeChanged)
+    Component.onCompleted: {
+        LauncherState.warmApps();
+        if (panel.active)
+            Qt.callLater(panel.activeChanged);
+    }
 
     onActiveChanged: {
         if (active) {
@@ -100,7 +104,7 @@ Item {
 
     function appResults(needle: string): var {
         const scored = [];
-        for (const entry of DesktopEntries.applications.values) {
+        for (const entry of LauncherState.apps) {
             if (entry.noDisplay)
                 continue;
 
@@ -129,8 +133,8 @@ Item {
     function actionResults(): var {
         const hits = LauncherActions.search(panel.actionQuery).map(action => ({
             kind: "action",
-            name: action.name,
-            desc: action.desc,
+            name: I18n.tr(action.name),
+            desc: I18n.tr(action.desc),
             icon: action.icon,
             action
         }));
@@ -141,7 +145,7 @@ Item {
             hits.push({
                 kind: "command",
                 name: raw,
-                desc: "Als Befehl ausführen",
+                desc: I18n.tr("Als Befehl ausführen"),
                 icon: "terminal",
                 command: raw
             });
@@ -253,7 +257,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: search.text === ""
-                text: panel.favoritesOnly ? "Favoriten durchsuchen…" : "Suchen…   >  für Aktionen"
+                text: panel.favoritesOnly ? I18n.tr("Favoriten durchsuchen…") : I18n.tr("Suchen…   >  für Aktionen")
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: search.font
                 verticalAlignment: Text.AlignVCenter
@@ -343,7 +347,11 @@ Item {
             spacing: 2
             model: panel.results
             boundsBehavior: Flickable.StopAtBounds
-            highlightMoveDuration: 0
+            // Ohne Highlight-Item trotzdem aus: sonst fuehrt die ListView ein
+            // unsichtbares Highlight dem aktuellen Eintrag nach (400 px/s, auch
+            // highlightMoveDuration: 0 zaehlt als "nicht gesetzt") – bei ~600 px
+            // Zeilenbreite zeichnete das Fenster nach jedem Oeffnen 1,5 s mit 180 Hz.
+            highlightFollowsCurrentItem: false
 
             // Mausrad: weich animiert, drei Zeilen pro Rastung. Hi-Res-Räder
             // liefern Bruchteile davon, das ergibt hier von selbst ein
@@ -399,14 +407,15 @@ Item {
             font.family: Config.font
 
             anchors.centerIn: parent
-            opacity: panel.results.length === 0 ? 1 : 0
+            // Leere Favoritenliste bleibt leer
+            opacity: panel.results.length === 0 && !panel.favoritesOnly ? 1 : 0
             visible: opacity > 0
 
             Behavior on opacity {
                 NumberAnimation { duration: 140 }
             }
 
-            text: panel.favoritesOnly ? "Noch keine Favoriten" : "Keine Treffer"
+            text: I18n.tr("Keine Treffer")
             color: Colors.fgSurfaceVariant
             font.pixelSize: 12
         }

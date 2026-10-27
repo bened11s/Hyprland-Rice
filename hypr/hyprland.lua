@@ -17,32 +17,32 @@
 local home            = os.getenv("HOME")
 local hypr            = home .. "/.config/hypr"
 local profileFile     = hypr .. "/profile"
-local defaultProfile  = "simple"
+local defaultProfile  = "caelestia"
 local switchBind      = "CTRL + SUPER + SHIFT + P"
 
 --------------------------------------------------------------------------------
 -- Monitore (gelten fuer beide Profile)
 --------------------------------------------------------------------------------
 hl.monitor({
-    output   = "eDP-1",
-    mode     = "1920x1080@60",
+    output   = "HDMI-A-1",
+    mode     = "2560x1440@60",
     position = "0x0",
     scale    = 1,
     vrr      = false,
 })
 
 hl.monitor({
-    output   = "HDMI-A-1",
-    mode     = "highres",
-    position = "auto-right",
+    output   = "DP-2",
+    mode     = "2560x1440@180",
+    position = "2560x0",
     scale    = 1,
 })
 
 hl.monitor({
-    output   = "",
+    output   = "eDP-1",
     mode     = "preferred",
     position = "auto",
-    scale    = 1,
+    scale    = 1.25,
 })
 
 --------------------------------------------------------------------------------
@@ -115,11 +115,118 @@ end)
 -- Bei jedem Reload neu angelegt, damit keine Aktionen alter Binds bleiben.
 keybind_actions = {}
 
+-- Aenderungen aus der Uebersicht (Taste neu belegt, abgeschaltet) und Binds,
+-- die die Shell selbst mitbringt (Plugins, eigene Kuerzel), schreibt die
+-- Shell nach keybindFile (modules/services/hypr/Keybinds.qml). sync_keybinds()
+-- wendet die Datei an – beim Laden der Config und live per
+--   hyprctl eval 'sync_keybinds()'
+-- Nur Profile, die `keybinds_from_shell = true` setzen (simple), nehmen sie.
+local keybindFile = home .. "/.local/state/dynamic-island/keybinds.lua"
+keybinds_from_shell = nil
+idle_from_shell = nil
+-- Beschriebene Binds der Config: { ref, keys, action, opts, handle, current }
+-- ref = "Gruppe|Text@<modmask>:<taste>" der urspruenglichen Belegung
+described_binds = {}
+-- Was sync_keybinds() selbst gebunden hat (wird bei jedem Sync ersetzt)
+shell_binds = {}
+
+local function bind_ref(description, handle)
+    if handle.key == "" then
+        return description .. "@" .. handle.modmask .. ":code:" .. handle.keycode
+    end
+    return description .. "@" .. handle.modmask .. ":" .. string.lower(handle.key)
+end
+
 function bind_described(keys, action, opts)
+    local handle = hl.bind(keys, action, opts)
     if opts and opts.description then
         keybind_actions[opts.description] = action
+        if handle then
+            described_binds[#described_binds + 1] = {
+                ref = bind_ref(opts.description, handle),
+                keys = keys, action = action, opts = opts,
+                handle = handle, current = keys,
+            }
+        end
     end
-    return hl.bind(keys, action, opts)
+    return handle
+end
+
+function sync_keybinds()
+    if not keybinds_from_shell then
+        return
+    end
+    local ok, data = pcall(dofile, keybindFile)
+    if not ok or type(data) ~= "table" then
+        data = {}
+    end
+    local overrides = data.overrides or {}
+
+    -- Binds der Config: neu belegen bzw. an/aus
+    for _, b in ipairs(described_binds) do
+        local o = overrides[b.ref] or {}
+        local keys = o.keys or b.keys
+        if keys ~= b.current then
+            b.handle:remove()
+            local okBind, handle = pcall(hl.bind, keys, b.action, b.opts)
+            if not okBind or not handle then
+                -- Unbrauchbare Taste: bei der alten bleiben
+                keys = b.keys
+                handle = hl.bind(keys, b.action, b.opts)
+            end
+            b.handle, b.current = handle, keys
+        end
+        b.handle:set_enabled(not o.disabled)
+    end
+
+    -- Binds der Shell: alle weg, dann neu aus der Datei
+    for _, s in ipairs(shell_binds) do
+        pcall(s.handle.remove, s.handle)
+        keybind_actions[s.description] = nil
+    end
+    shell_binds = {}
+    for _, s in ipairs(data.binds or {}) do
+        local action = hl.dsp.exec_cmd(s.exec)
+        local opts = {
+            description = s.description,
+            release = s.release or nil,
+            repeating = s.repeating or nil,
+            locked = s.locked or nil,
+        }
+        local okBind, handle = pcall(hl.bind, s.keys, action, opts)
+        if okBind and handle then
+            if s.disabled then
+                handle:set_enabled(false)
+            end
+            keybind_actions[s.description] = action
+            shell_binds[#shell_binds + 1] = { handle = handle, description = s.description }
+        end
+    end
+end
+
+-- Taste aufnehmen: solange die Uebersicht eine neue Kombination abfragt,
+-- steht Hyprland in einer Submap ohne eigene Binds – sonst loeste SUPER+Q
+-- das Terminal aus, statt bei der Shell anzukommen. Notbremse falls die
+-- Shell haengt: CTRL+SUPER+ALT+Escape oder nach 20 s von selbst zurueck.
+hl.define_submap("keybind-capture", function()
+    hl.bind("CTRL + SUPER + ALT + Escape", hl.dsp.submap("reset"))
+end)
+
+local captureGeneration = 0
+
+function keybind_capture(on)
+    captureGeneration = captureGeneration + 1
+    local generation = captureGeneration
+    if on then
+        hl.dispatch(hl.dsp.submap("keybind-capture"))
+        hl.timer(function()
+            if generation == captureGeneration and hl.get_current_submap() == "keybind-capture" then
+                hl.dispatch(hl.dsp.submap("reset"))
+            end
+        end, { timeout = 20000, type = "oneshot" })
+    elseif hl.get_current_submap() == "keybind-capture" then
+        hl.dispatch(hl.dsp.submap("reset"))
+    end
 end
 
 function run_keybind(id)
@@ -156,25 +263,15 @@ end
 bind_described(switchBind, hl.dsp.exec_cmd(home .. "/.local/bin/hypr-profile toggle"),
     { release = true, description = "Shell|Hypr-Profil wechseln" })
 
--- Bildschirm-Regeln aus dem Bildschirmmanager (dynamic-island, Kachel
--- "Bildschirm"). Steht ganz am Ende, damit diese Regeln die festen
--- Monitore oben UND die Profile ueberschreiben – in Hyprland gewinnt die
--- letzte passende Regel. Fehlt die Datei (noch nie gespeichert), ist das
--- still: dann gelten weiter die Regeln oben.
-local monitorsLua = hypr .. "/monitors.lua"
-if io.open(monitorsLua) then
-    local okMon, errMon = pcall(dofile, monitorsLua)
-    if not okMon then
-        io.stderr:write("monitors.lua fehlerhaft: " .. tostring(errMon) .. "\n")
-    end
-end
+-- Aenderungen aus der Tastenkuerzel-Uebersicht + Plugin-Binds (nach allen
+-- Binds, damit auch der Profil-Umschalter neu belegt werden kann)
+sync_keybinds()
 
--- Profiluebergreifendes Idle-Management; nur einmal beim Sessionstart starten.
--- Die Shell dynamic-island ebenfalls beim Sessionstart – AUF DER IGPU (wenn
--- vorhanden): die Env schaltet NVIDIA-EGL fuer qs ab, nur Mesa bleibt, und auf
--- diesem Rechner kann nur die iGPU (AMD, renderD129) ueber Mesa rendern.
--- Ohne das wuerde die Shell die dGPU belegen, die Spiele brauchen.
+-- Idle-Management per hypridle, nur einmal beim Sessionstart. Profile mit
+-- `idle_from_shell = true` (simple) lassen die Shell sperren; den Wechsel
+-- zur Laufzeit erledigt hypr-profile (sync_idle).
 hl.on("hyprland.start", function()
-    hl.exec_cmd("hypridle")
-    hl.exec_cmd("env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json qs -c dynamic-island")
+    if not idle_from_shell then
+        hl.exec_cmd("hypridle")
+    end
 end)

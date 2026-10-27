@@ -22,6 +22,10 @@ Carousel {
     // Wird gesetzt, wenn ein Bild uebernommen wurde (der Launcher schliesst dann)
     signal applied
 
+    // Hat diese Reihe die Tastatur? Sonst (Plugin-Sektion aktiv) ist der
+    // Rahmen der markierten Kachel gedimmt.
+    property bool focused: true
+
     // Von aussen setzbar: das Panel entscheidet, wie breit die Kacheln sind
     property real imageWidth: 160
     readonly property real imageHeight: Math.round(imageWidth / 16 * 9)
@@ -126,10 +130,13 @@ Carousel {
             radius: 12
             color: Colors.surfaceContainer
             border.width: item.isCurrent ? 2 : 0
-            border.color: Colors.primary
+            border.color: view.focused ? Colors.primary : Colors.alpha(Colors.primary, 0.4)
 
             Behavior on border.width {
                 NumberAnimation { duration: 140 }
+            }
+            Behavior on border.color {
+                ColorAnimation { duration: 140 }
             }
 
             Text {

@@ -10,7 +10,7 @@ import Quickshell.Io
 // 1. DYNAMISCH (Standard): ~/.local/state/dynamic-island/scheme.json – die dynamic-island-CLI
 //    erzeugt daraus eine Material-You-Palette direkt aus dem Wallpaper und
 //    schreibt die Datei bei jedem Wallpaper-Wechsel neu. Diese Shell watcht sie
-//    und färbt sich live um (gleicher Mechanismus wie Caelestias Colours.qml).
+//    und färbt sich live um.
 // 2. STATISCH (Fallback): themes/<name>.json – aktiver Name in themes/current.
 //    Wird genutzt, wenn useDynamic = false ist oder scheme.json (noch) fehlt /
 //    einen Key nicht enthält.

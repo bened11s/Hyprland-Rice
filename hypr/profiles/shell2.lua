@@ -502,7 +502,7 @@ hl.bind("SUPER + Period", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island emoji 
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("dynamic-island wallpaper -r"))
 hl.bind("CTRL + SUPER + SHIFT + T", hl.dsp.exec_cmd("dynamic-island scheme set -r"))
 
--- Shell dieses Profils neu starten / beenden (wie im Caelestia-Profil belegt)
+-- Shell dieses Profils neu starten / beenden
 hl.bind("CTRL + SUPER + ALT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-restart"), { release = true })
 hl.bind("CTRL + SUPER + SHIFT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-kill"), { release = true })
 

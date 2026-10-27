@@ -13,15 +13,8 @@ SHELL_NAME: str = get_config().get("shell", {}).get("name", "dynamic-island")
 # der dynamischen Schwelle blieben sie im Heap und der RSS auf dem Hoechststand.
 # Weniger Arenen, weil Quickshell ~45 Threads hat, die kaum parallel allozieren.
 SHELL_ENV: dict[str, str] = {
-    "QT_QPA_PLATFORMTHEME": "kde",
     "MALLOC_ARENA_MAX": "2",
     "MALLOC_MMAP_THRESHOLD_": "1048576",
-    # Die Shell soll auf der iGPU rendern (Mesa), der Compositor laeuft auf
-    # der NVIDIA - so wie beim Autostart in hyprland.lua. Heute greift das
-    # ohnehin, weil auf diesem Rechner nur Mesa zur Verfuegung steht; die
-    # Variable ist die Absicherung, falls jemand doch NVIDIA-EGL aktiviert
-    # und die Shell sonst die dGPU belegt, die die Spiele brauchen.
-    "__EGL_VENDOR_LIBRARY_FILENAMES": "/usr/share/glvnd/egl_vendor.d/50_mesa.json",
 }
 
 
@@ -51,8 +44,17 @@ class Command:
                 args.extend(["--log-rules", self.args.log_rules])
             env = os.environ | SHELL_ENV
             if self.args.daemon:
-                args.append("-d")
-                subprocess.run(args, env=env)
+                # Selbst abkoppeln statt `qs -d`: im Daemon-Modus kommen
+                # zusaetzliche Variablen (SHELL_ENV) beim gestarteten qs nicht
+                # an – nachgemessen 2026-10-21
+                subprocess.Popen(
+                    args,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
             else:
                 shell = subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True, env=env)
 

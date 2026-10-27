@@ -4,9 +4,11 @@
 !/quickshell/
 !/dynamic-island/
 !/README.md
+!/screenshots/
 # Die eigenen Wallpaper (die Sammlung aus dem fremden Repo bleibt draussen)
 !/wallpapers/
 !/hyprlock/
+!/nvim/
 
 # innerhalb von quickshell nur die eigene Shell
 /quickshell/*
@@ -15,12 +17,15 @@
 # Shell-Einstellungen: pro Rechner, die Vorgaben stehen im Code
 # (quickshell/dynamic-island/modules/services/config/Config.qml)
 /dynamic-island/shell.json
+# Plugins an/aus + Einstellungswerte: ebenfalls pro Rechner
+/dynamic-island/plugins.json
+# Neu belegte/abgeschaltete und eigene Tastenkuerzel (SUPER+K, Bearbeiten)
+/dynamic-island/keybinds.json
 
 # lokale/privates
 .claude/
 .qmlls.ini
 __pycache__/
-*.bak-*
 *.pyc
 
 # hyprlock: die Bildersammlung aus dem fremden Repo bleibt draussen,
@@ -33,7 +38,6 @@ __pycache__/
 # dynamic-island/src/dynamic_island/data/templates/hyprlock.conf.
 # install.sh (seed_scheme) legt beide nach einem frischen Clone wieder an.
 /hypr/scheme/current.lua
-/hypr/scheme/current.conf
 /hypr/scheme/hyprlock.conf
 
 # Zustand, keine Konfiguration: welches Profil und welches Theme gerade laufen.
@@ -48,3 +52,24 @@ __pycache__/
 *.orig
 *.rej
 *.tmp
+
+# Spicetify: nur das eigene Theme "Island" + die Queue-Extension. color.ini ist
+# ein Symlink auf Themes/dynamic-island/color.ini (schreibt die dynamic-island-CLI
+# bei jedem Schemawechsel, enableSpicetify in cli.json).
+!/spicetify/
+/spicetify/*
+!/spicetify/Themes/
+/spicetify/Themes/*
+!/spicetify/Themes/Island/
+!/spicetify/config-xpui.ini
+!/spicetify/Extensions/
+/spicetify/Extensions/*
+!/spicetify/Extensions/islandQueue.js
+
+# Spotify-Lag-Fix: GPU-Prozess darf WAYLAND_DISPLAY nicht sehen (sonst Crash ->
+# Software-Rendering). Gilt fuer spotify-launcher bzw. den caelestia-Musik-Toggle
+# (startet ueber `spicetify watch -s`, darum dort `env WAYLAND_DISPLAY=`).
+!/spotify-launcher.conf
+!/caelestia/
+/caelestia/*
+!/caelestia/cli.json

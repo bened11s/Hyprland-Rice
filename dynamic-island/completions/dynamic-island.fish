@@ -1,7 +1,7 @@
 set -l seen '__fish_seen_subcommand_from'
 set -l has_opt '__fish_contains_opt'
 
-set -l commands shell toggle scheme screenshot record clipboard emoji wallpaper resizer
+set -l commands shell toggle scheme screenshot record clipboard emoji wallpaper resizer plugin
 set -l not_seen "not $seen $commands"
 
 # Disable file completions
@@ -20,6 +20,7 @@ complete -c dynamic-island -n $not_seen -a 'clipboard' -d 'Open clipboard histor
 complete -c dynamic-island -n $not_seen -a 'emoji' -d 'Emoji/glyph utilities'
 complete -c dynamic-island -n $not_seen -a 'wallpaper' -d 'Manage the wallpaper'
 complete -c dynamic-island -n $not_seen -a 'resizer' -d 'Window resizer'
+complete -c dynamic-island -n $not_seen -a 'plugin' -d 'Manage shell plugins'
 
 # Shell
 set -l commands mpris drawers wallpaper notifs
@@ -116,6 +117,8 @@ complete -c dynamic-island -n "$seen wallpaper" -s 'p' -l 'print' -d 'Print the 
 complete -c dynamic-island -n "$seen wallpaper" -s 'r' -l 'random' -d 'Switch to a random wallpaper' -rF
 complete -c dynamic-island -n "$seen wallpaper" -s 'f' -l 'file' -d 'The file to switch to' -rF
 complete -c dynamic-island -n "$seen wallpaper" -s 'n' -l 'no-filter' -d 'Do not filter by size'
+complete -c dynamic-island -n "$seen wallpaper" -s 'v' -l 'variant' -d 'Pin the scheme variant for a wallpaper' -xa 'auto tonalspot vibrant expressive fidelity fruitsalad monochrome neutral rainbow content'
+complete -c dynamic-island -n "$seen wallpaper" -l 'for' -d 'Wallpaper the variant applies to' -rF
 complete -c dynamic-island -n "$seen wallpaper" -s 't' -l 'threshold' -d 'The threshold to filter by' -r
 complete -c dynamic-island -n "$seen wallpaper" -s 'N' -l 'no-smart' -d 'Disable smart mode switching'
 
@@ -129,3 +132,36 @@ complete -c dynamic-island -n "$seen resizer" -a 'pip' -d 'Quick pip mode'
 complete -c dynamic-island -n "$seen resizer" -a 'active' -d 'Select the active window'
 
 
+
+# Plugin
+set -l plugin_actions list info enable disable validate export import remove new
+set -l plugin_ids "(path basename ~/.config/quickshell/dynamic-island/plugins/*/ | string match -rv '^[_.]')"
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'list' -d 'List plugins'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'info' -d 'Show a plugin'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'enable' -d 'Turn a plugin on'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'disable' -d 'Turn a plugin off'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'validate' -d 'Check a folder or .dip'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'export' -d 'Export as .dip'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'import' -d 'Import .dip or settings JSON'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'remove' -d 'Remove a plugin'
+complete -c dynamic-island -n "$seen plugin && not $seen $plugin_actions" -a 'new' -d 'Create from template'
+complete -c dynamic-island -n "$seen plugin && $seen info enable disable export remove" -a "$plugin_ids"
+complete -c dynamic-island -n "$seen plugin && $seen import validate" -F
+complete -c dynamic-island -n "$seen plugin" -l 'json' -d 'JSON output'
+complete -c dynamic-island -n "$seen plugin && $seen export" -s 'o' -l 'output' -d 'Target file or folder' -rF
+complete -c dynamic-island -n "$seen plugin && $seen export" -l 'no-settings' -d 'Leave settings out'
+complete -c dynamic-island -n "$seen plugin && $seen export" -l 'no-files' -d 'Leave external files out'
+complete -c dynamic-island -n "$seen plugin && $seen export" -l 'skip-optional' -d 'Leave optional files out'
+complete -c dynamic-island -n "$seen plugin && $seen export" -l 'settings-only' -d 'Only the settings as JSON'
+complete -c dynamic-island -n "$seen plugin && $seen import remove" -s 'y' -l 'yes' -d 'Do not ask'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'enable' -d 'Turn on after import'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'files' -d 'Install bundled files'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'settings' -d 'Overwrite settings'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'no-settings' -d 'Ignore bundled settings'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'force' -d 'Replace same/newer version'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'overwrite-files' -d 'Replace differing files'
+complete -c dynamic-island -n "$seen plugin && $seen import" -l 'parent' -x -d 'Only components of this plugin'
+complete -c dynamic-island -n "$seen plugin && $seen remove" -l 'force' -d 'Also remove builtin plugin'
+complete -c dynamic-island -n "$seen plugin && $seen remove" -l 'keep-settings' -d 'Keep settings'
+complete -c dynamic-island -n "$seen plugin && $seen new" -l 'name' -d 'Display name' -r
+complete -c dynamic-island -n "$seen plugin && $seen new" -l 'author' -d 'Author' -r

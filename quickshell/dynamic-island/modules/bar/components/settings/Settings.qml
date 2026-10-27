@@ -258,8 +258,55 @@ Surface {
         }
 
         StatusIcon {
-            text: tiles.btOn ? "bluetooth" : "bluetooth_disabled"
+            text: BluetoothService.primaryDevice ? "bluetooth_connected"
+                : tiles.btOn ? "bluetooth" : "bluetooth_disabled"
             active: tiles.btOn
+        }
+
+        // Verbundenes BT-Geraet: Name (samt Akku-Prozent aus `summary`) und
+        // Akkusymbol direkt hinter dem Bluetooth-Zeichen. Ohne Verbindung ist
+        // die Gruppe null breit und damit ganz weg – wie der Akku unten.
+        Row {
+            id: btSummary
+
+            readonly property bool shown: settings.peek && BluetoothService.summary !== ""
+            readonly property int battery: BluetoothService.batteryLevel(BluetoothService.primaryDevice)
+
+            anchors.verticalCenter: parent.verticalCenter
+            width: btSummary.shown ? implicitWidth + 6 : 0
+            visible: width > 0
+            opacity: btSummary.shown ? 1 : 0
+            spacing: 3
+            clip: true
+
+            Behavior on width {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: 160 }
+            }
+
+            Text {
+                font.family: Config.font
+                anchors.verticalCenter: parent.verticalCenter
+
+                width: Math.min(implicitWidth, 150)
+                text: BluetoothService.summary
+                color: Colors.fgBackground
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+
+                visible: btSummary.battery >= 0
+                text: BluetoothService.batteryIcon(btSummary.battery)
+                color: btSummary.battery <= 10 ? Colors.error : Colors.secondary
+                font.family: "Material Symbols Outlined"
+                font.pixelSize: 15
+            }
         }
 
         StatusIcon {
@@ -468,7 +515,7 @@ Surface {
 
         interval: 700
         // Waehrend eines Passworts darf die Maus rausrutschen
-        onTriggered: if (!settings.embedded && !settings.typingPassword && !BluetoothService.pairingActive)
+        onTriggered: if (!settings.embedded && !settings.typingPassword && !settings.typingPin && !BluetoothService.pairingActive)
             settings.expanded = false
     }
 
@@ -483,7 +530,7 @@ Surface {
         target: Brightness
 
         function onValueChanged(): void {
-            if (Brightness.readyFor(settings.QsWindow.window?.screen?.name ?? "") && !settings.expanded && !settings.wifiOpen
+            if (Brightness.ready && !settings.expanded && !settings.wifiOpen
                     && !settings.bluetoothOpen && !settings.audioOpen) {
                 settings.showBrightness = true;
                 brightnessDisplayTimer.restart();

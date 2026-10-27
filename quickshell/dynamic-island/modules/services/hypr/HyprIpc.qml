@@ -8,8 +8,8 @@ import Quickshell.Hyprland
 //
 // Quickshell zieht `lastIpcObject` nicht bei jedem Event nach –
 // specialWorkspace an den Monitoren und die Fensterzahlen der Workspaces
-// bleiben sonst ewig stehen. Caelestia loest es identisch: bei den relevanten
-// Events die Listen neu ziehen.
+// bleiben sonst ewig stehen. Darum: bei den relevanten Events die Listen
+// neu ziehen.
 //
 // Singleton, weil das frueher in WorkspaceSelector.qml hing: der wird im
 // Notch-Layout nicht gebaut (Loader in Bar.qml), und die Specials in der
@@ -18,13 +18,6 @@ import Quickshell.Hyprland
 // Singleton hoch, und die Bindings haengen trotzdem an lastIpcObject.
 Singleton {
     id: root
-
-    // Feste 10er-Gruppen wie in simple.lua und workspace.py, unabhaengig
-    // davon, wie viele Punkte der Benutzer einblendet.
-    function workspaceOffset(monitor: HyprlandMonitor): int {
-        const offsets = { "eDP-1": 0, "HDMI-A-1": 10, "DVI-I-1": 20, "DVI-I-2": 30 };
-        return offsets[monitor?.name] ?? 0;
-    }
 
     // Offener Special-Workspace auf `monitor` ("" = keiner)
     function specialOn(monitor: HyprlandMonitor): string {
@@ -48,6 +41,9 @@ Singleton {
                 Hyprland.refreshWorkspaces();
             // Fenster oeffnen/schliessen/umziehen -> Belegung frisch halten
             } else if (n === "openwindow" || n === "closewindow" || n === "movewindow") {
+                Hyprland.refreshWorkspaces();
+            // Vollbild an/aus -> hasfullscreen (Desktop-Widgets pausieren)
+            } else if (n === "fullscreen") {
                 Hyprland.refreshWorkspaces();
             }
         }

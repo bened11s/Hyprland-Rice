@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from dynamic_island.utils.colour import get_dynamic_colours
+from dynamic_island.utils.hypr import is_lua_config
 from dynamic_island.utils.io import log_exception
 from dynamic_island.utils.paths import (
     atomic_write,
@@ -144,11 +145,9 @@ def apply_terms(sequences: str) -> None:
 
 
 @log_exception
-def apply_hypr(colours: dict[str, str]) -> None:
-    # Laufende hyprlang-Sitzung und naechster Lua-Login muessen dieselbe
-    # Palette bekommen, nicht die alte Palette des jeweils anderen Parsers.
-    atomic_write(config_dir / "hypr/scheme/current.conf", gen_conf(colours))
-    atomic_write(config_dir / "hypr/scheme/current.lua", gen_lua(colours))
+def apply_hypr(conf: str) -> None:
+    ext = "lua" if is_lua_config() else "conf"
+    atomic_write(config_dir / f"hypr/scheme/current.{ext}", conf)
 
 
 @log_exception
@@ -327,16 +326,12 @@ def apply_gtk(colours: dict[str, str], mode: str, icon_theme: str | None = None)
         atomic_write(gtk_config_dir / "gtk.css", gtk_template)
         atomic_write(gtk_config_dir / "thunar.css", thunar_template)
 
-    gtk_theme = get_config().get("theme", {}).get(
-        "gtkThemeDark" if mode == "dark" else "gtkThemeLight", "adw-gtk3-dark" if mode == "dark" else "adw-gtk3"
-    )
-    subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/gtk-theme", repr(gtk_theme)])
+    subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/gtk-theme", "'adw-gtk3-dark'"])
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/color-scheme", f"'prefer-{mode}'"])
     gtk_icon_theme = icon_theme if icon_theme is not None else f"Papirus-{mode.capitalize()}"
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'{gtk_icon_theme}'"])
 
-    if gtk_icon_theme.lower().startswith("papirus"):
-        sync_papirus_colors(colours["primary"])
+    sync_papirus_colors(colours["primary"])
 
 
 @log_exception
@@ -459,7 +454,7 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
         if check("enableTerm"):
             apply_terms(gen_sequences(colours))
         if check("enableHypr"):
-            apply_hypr(colours)
+            apply_hypr(gen_lua(colours) if is_lua_config() else gen_conf(colours))
         if check("enableHyprlock"):
             apply_hyprlock(colours)
         if check("enableDiscord"):

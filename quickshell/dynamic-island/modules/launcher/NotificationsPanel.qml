@@ -23,7 +23,7 @@ ViewPanel {
     readonly property real listHeight: Notifications.count === 0 ? 0
         : Math.min(root.maxListHeight, Math.max(54, list.contentHeight))
 
-    title: "Benachrichtigungen"
+    title: I18n.tr("Benachrichtigungen")
     icon: "notifications"
     contentWidth: 380
     contentHeight: root.toolbarHeight + root.listHeight
@@ -91,9 +91,9 @@ ViewPanel {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             x: 2
-            text: Notifications.count === 0 ? "Keine Nachrichten"
-                : Notifications.count === 1 ? "1 Nachricht"
-                : `${Notifications.count} Nachrichten`
+            text: Notifications.count === 0 ? I18n.tr("Keine Nachrichten")
+                : Notifications.count === 1 ? I18n.tr("1 Nachricht")
+                : I18n.tr("%1 Nachrichten").arg(Notifications.count)
             color: Colors.fgSurfaceVariant
             font.family: Config.font
             font.pixelSize: 11
@@ -108,7 +108,7 @@ ViewPanel {
 
             ToolChip {
                 icon: Notifications.dnd ? "notifications_off" : "notifications_active"
-                label: "Nicht stören"
+                label: I18n.tr("Nicht stören")
                 on: Notifications.dnd
                 onClicked: Notifications.toggleDnd()
             }
@@ -116,7 +116,7 @@ ViewPanel {
             ToolChip {
                 visible: Notifications.count > 0
                 icon: "clear_all"
-                label: "Alle löschen"
+                label: I18n.tr("Alle löschen")
                 onClicked: Notifications.clear()
             }
         }
@@ -137,6 +137,8 @@ ViewPanel {
         model: ScriptModel {
             values: Notifications.groups
         }
+        // Kein Highlight-Nachfuehren (siehe LauncherPanel.qml)
+        highlightFollowsCurrentItem: false
         boundsBehavior: Flickable.StopAtBounds
 
         // Nur senkrecht scrollen – waagerecht gehoert der Notch. Das Rad
@@ -166,22 +168,19 @@ ViewPanel {
                 event.accepted = true;
                 const max = Math.max(0, list.contentHeight - list.height);
 
-                // Winkel vor Pixeln: die2,4G-Maus liefert pro Rastung angle 120
-                // UND pixel 15 – mit pixel-Vorrang scrollte die Liste 4x zu langsam.
-                if (angle !== 0) {
-                    if (!scrollAnim.running)
-                        list.targetY = list.contentY;
-                    list.targetY = Math.max(0, Math.min(max, list.targetY - angle / 120 * 60));
-                    scrollAnim.to = list.targetY;
-                    scrollAnim.restart();
-                    return;
-                }
-
                 if (pixels !== 0) {
                     scrollAnim.stop();
                     list.contentY = Math.max(0, Math.min(max, list.contentY - pixels));
                     list.targetY = list.contentY;
+                    return;
                 }
+
+                // Laeuft gerade keine Animation, vom aktuellen Stand ausgehen
+                if (!scrollAnim.running)
+                    list.targetY = list.contentY;
+                list.targetY = Math.max(0, Math.min(max, list.targetY - angle / 120 * 60));
+                scrollAnim.to = list.targetY;
+                scrollAnim.restart();
             }
         }
 
@@ -192,7 +191,7 @@ ViewPanel {
         Text {
             anchors.centerIn: parent
             visible: Notifications.count === 0
-            text: Notifications.dnd ? "Nicht stören ist an" : "Nichts Neues"
+            text: Notifications.dnd ? I18n.tr("Nicht stören ist an") : I18n.tr("Nichts Neues")
             color: Colors.fgSurfaceVariant
             font.family: Config.font
             font.pixelSize: 12

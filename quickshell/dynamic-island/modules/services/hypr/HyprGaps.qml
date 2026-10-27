@@ -46,8 +46,7 @@ Singleton {
                 // in CSS-Reihenfolge: oben rechts unten links.
                 let v;
                 try {
-                    const data = JSON.parse(collector.text);
-                    v = (data.css ?? data.custom ?? "").trim().split(/\s+/).map(Number);
+                    v = JSON.parse(collector.text).css.trim().split(/\s+/).map(Number);
                 } catch (e) {
                     console.warn("HyprGaps: gaps_out nicht lesbar:", e);
                     return;

@@ -124,7 +124,7 @@ Item {
                 LevelRow {
                     width: devices.width
                     node: Audio.sink
-                    label: "Lautstärke"
+                    label: I18n.tr("Lautstärke")
                     icon: "volume_up"
                     mutedIcon: "volume_off"
                     accent: Colors.primary
@@ -146,7 +146,7 @@ Item {
                     width: devices.width
                     height: Audio.sinks.length === 0 ? 36 : 0
                     visible: height > 0
-                    text: "Kein Ausgabegerät gefunden"
+                    text: I18n.tr("Kein Ausgabegerät gefunden")
                     color: Colors.fgSurfaceVariant
                     font.pixelSize: 11
                     leftPadding: 10
@@ -168,7 +168,7 @@ Item {
                 LevelRow {
                     width: devices.width
                     node: Audio.source
-                    label: "Mikrofon"
+                    label: I18n.tr("Mikrofon")
                     icon: "mic"
                     mutedIcon: "mic_off"
                     accent: Colors.secondary
@@ -190,7 +190,7 @@ Item {
                     width: devices.width
                     height: Audio.sources.length === 0 ? 36 : 0
                     visible: height > 0
-                    text: "Kein Eingabegerät gefunden"
+                    text: I18n.tr("Kein Eingabegerät gefunden")
                     color: Colors.fgSurfaceVariant
                     font.pixelSize: 11
                     leftPadding: 10

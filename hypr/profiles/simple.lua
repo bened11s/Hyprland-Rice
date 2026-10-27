@@ -48,24 +48,22 @@ end
 local cfg = {
 	-- Apps
 	terminal = "kitty",
-	browser = "opera-gx",
-	editor = "kate",
+	browser = "zen-browser",
+	editor = "codium",
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
-	-- Sperrbildschirm (SUPER + L): die eigene Config, ~/.config/hypr/hyprlock.conf.
-	-- Layout 12 aus Hyprlock-Dots liegt weiterhin unter ~/.config/hyprlock.
-	-- Wieder darauf umstellen:
-	--   lockCmd = "hyprlock -c " .. home .. "/.config/hyprlock/layout12.conf"
-	-- oder mit vorher gebautem Hintergrund (unscharfe Spalte links):
-	--   lockCmd = home .. "/.config/hyprlock/scripts/lock.sh"
-	lockCmd = "hyprlock",
+	-- Sperrbildschirm (SUPER + L): der Lockscreen der dynamic-island-Shell
+	-- (quickshell/dynamic-island/modules/lock); laeuft die Shell nicht, nimmt
+	-- das Skript hyprlock mit ~/.config/hypr/hyprlock.conf.
+	-- Nur hyprlock:  lockCmd = "hyprlock"
+	lockCmd = home .. "/.config/hypr/scripts/lock.sh",
 
 	-- Tastatur / Maus
 	kbLayout = "de",
 	repeatDelay = 250,
 	repeatRate = 35,
-	cursorTheme = "WhiteSur-cursors",
+	cursorTheme = "breeze_cursors",
 	cursorSize = 24,
 
 	-- Layout / Abstaende
@@ -83,8 +81,8 @@ local cfg = {
 	windowRounding = 15,
 
 	-- Optik
-	activeWindowOpacity = 0.96,
-	inActiveWindowOpacity = 0.90,
+	activeWindowOpacity = 0.85,
+	inActiveWindowOpacity = 0.60,
 	blurEnabled = true,
 	blurSize = 4,
 	blurPasses = 2,
@@ -97,14 +95,12 @@ local cfg = {
 	brightnessStep = 5,
 
 	-- Energie
-	sleepCmd = "systemctl suspend",
+	sleepCmd = "systemctl suspend-then-hibernate",
 
-	-- Fuenf Workspaces je Monitor; stabile IDs in 10er-Bloecken.
+	-- Workspaces: jeder Monitor hat seine eigene 10er-Gruppe (Anzeige jeweils 1-10)
 	wsMonitorOffset = {
-		["eDP-1"] = 0,
-		["HDMI-A-1"] = 10,
-		["DVI-I-1"] = 20,
-		["DVI-I-2"] = 30,
+		["HDMI-A-1"] = 0, -- links:  Workspaces 1-10
+		["DP-2"] = 10, -- rechts: Workspaces 11-20
 	},
 }
 
@@ -132,10 +128,6 @@ hl.env("_JAVA_AWT_WM_NONREPARENTING", "1")
 -- Basis-Config
 --------------------------------------------------------------------------------
 hl.config({
-	-- AMD rendert, HDMI haengt an NVIDIA: Hardware-Cursor-Blits schlagen fehl.
-	cursor = {
-		no_hardware_cursors = true,
-	},
 	general = {
 		layout = cfg.layout,
 		gaps_in = cfg.windowGapsIn,
@@ -231,7 +223,7 @@ hl.window_rule({
 -- Terminals, Bild-/Grafik-Apps und Spiele bleiben deckend
 hl.window_rule({
 	match = {
-		class = "imv|swappy|krita|gimp|inkscape|blender|kdenlive|zen|firefox|"
+		class = "kitty|foot|imv|swappy|krita|gimp|inkscape|blender|kdenlive|zen|firefox|"
 			.. "(steam_app_(default|[0-9]+))|gamescope",
 	},
 	opaque = true,
@@ -251,6 +243,19 @@ hl.window_rule({
 	float = true,
 })
 
+-- Einstellungs-Fenster der Shell: schwebt mittig, Rand/Schatten/Rundung
+-- zeichnet die Karte selbst (das Fenster ist rundum 28 px transparent)
+hl.window_rule({
+	match = { class = "org.quickshell", title = "dynamic-island-settings" },
+	float = true,
+	center = true,
+	opaque = true,
+	no_blur = true,
+	no_shadow = true,
+	border_size = 0,
+	rounding = 0,
+})
+
 -- Spiele: kein Tearing-Limit, kein Idle
 hl.window_rule({
 	match = { class = "(steam_app_(default|[0-9]+))|gamescope" },
@@ -268,7 +273,6 @@ hl.window_rule({
 })
 
 -- Feste Plaetze auf den Special-Workspaces (Binds siehe unten)
-hl.window_rule({ match = { class = "steam", title = "Steam" }, workspace = "special:steam" })
 hl.window_rule({ match = { class = "btop" }, workspace = "special:sysmon" })
 hl.window_rule({
 	match = { class = "feishin|Spotify|Supersonic|Cider|com.github.th_ch.youtube_music|Plexamp" },
@@ -296,9 +300,9 @@ hl.workspace_rule({
 	},
 })
 
--- Je Monitor nur die ersten fuenf IDs des Blocks verwenden
+-- Jede 10er-Gruppe fest an ihren Monitor binden
 for monitor, offset in pairs(cfg.wsMonitorOffset) do
-	for i = 1, 5 do
+	for i = 1, 10 do
 		hl.workspace_rule({
 			workspace = tostring(offset + i),
 			monitor = monitor,
@@ -322,14 +326,14 @@ hl.on("hyprland.start", function()
 
 	-- Cursor
 	hl.exec_cmd("hyprctl setcursor " .. cfg.cursorTheme .. " " .. cfg.cursorSize)
-	-- Keine globalen GTK-/KDE-Einstellungen veraendern.
+	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme " .. cfg.cursorTheme)
+	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-size " .. cfg.cursorSize)
 
 	-- Bluetooth-Medientasten an MPRIS weiterreichen
 	hl.exec_cmd("mpris-proxy")
 
-	-- Passwortdialoge und KDE-Schluesselbund auch unter Hyprland.
-	hl.exec_cmd("pgrep -f '^/usr/lib/polkit-kde-authentication-agent-1$' >/dev/null || /usr/lib/polkit-kde-authentication-agent-1")
-	hl.exec_cmd("kwalletd6")
+	-- Papierkorb aufraeumen
+	hl.exec_cmd("trash-empty -f 30")
 
 	-- Shell dieses Profils starten (Zuordnung steht in hypr-profile):
 	-- beendet eine noch laufende Caelestia-Shell und faehrt dynamic-island hoch.
@@ -351,7 +355,7 @@ local function wsaction(action, i)
 	return function()
 		local target = monitor_offset() + i
 		if action == "move" then
-			return hl.dispatch(hl.dsp.window.move({ workspace = target, follow = false }))
+			return hl.dispatch(hl.dsp.window.move({ workspace = target }))
 		end
 		return hl.dispatch(hl.dsp.focus({ workspace = target }))
 	end
@@ -368,6 +372,12 @@ end
 -- Gruppe wird zu einer Zeile mit mehreren Kuerzeln zusammengefasst.
 -- bind() merkt sich die Aktion beschriebener Binds, damit die Uebersicht sie
 -- per Klick ausloesen kann (bind_described/run_keybind in ../hyprland.lua).
+-- Neu belegte/abgeschaltete Binds und die Binds der Plugins kommen aus der
+-- Shell (keybinds_from_shell, sync_keybinds() in ../hyprland.lua).
+keybinds_from_shell = true
+-- Sperren/Displays aus/ScreenSaver-Inhibit macht die Shell (services/idle),
+-- hypridle laeuft hier nicht (hyprland.lua, hypr-profile sync_idle)
+idle_from_shell = true
 local bind = bind_described
 local group = ""
 local function desc(text, opts, label)
@@ -379,7 +389,6 @@ end
 -- Apps
 group = "Apps"
 bind("SUPER + Q", hl.dsp.exec_cmd(cfg.terminal), desc("Terminal"))
-bind("SUPER + Return", hl.dsp.exec_cmd(cfg.terminal), desc("Terminal"))
 bind("SUPER + W", hl.dsp.exec_cmd(cfg.browser), desc("Browser"))
 bind("SUPER + P", hl.dsp.exec_cmd(cfg.editor), desc("Editor"))
 bind("SUPER + E", hl.dsp.exec_cmd(cfg.fileExplorer), desc("Dateimanager"))
@@ -403,16 +412,14 @@ bind("SUPER + I", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher system
 bind("SUPER + X", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher power"), desc("Power-Menü"))
 bind("SUPER + K", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher keys"), desc("Tastenkürzel"))
 bind("SUPER + L", hl.dsp.exec_cmd(cfg.lockCmd), desc("Sperren"))
+-- Stuerzt die Shell bei gesperrter Sitzung ab, bleibt Hyprland gesperrt ohne
+-- Oberflaeche zurueck – hyprlock uebernimmt dann (allow_session_lock_restore)
+bind("SUPER + ALT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), desc("Sperre retten (hyprlock)", { locked = true }))
 bind("SUPER + SHIFT + L", hl.dsp.exec_cmd(cfg.sleepCmd), desc("Standby", { locked = true }))
 
 -- Fenster
 group = "Fenster"
--- SUPER + C: ist das Einstellungs-Fenster der Shell offen, schliesst es das
--- (die Shell meldet "true"), sonst wie gewohnt das aktive Fenster.
-bind("SUPER + C", hl.dsp.exec_cmd(
-	"sh -c '[ \"$(qs -c dynamic-island ipc call settings dismiss 2>/dev/null)\" = true ] "
-	.. "|| hyprctl dispatch \"hl.dsp.window.close()\"'"
-), desc("Schließen"))
+bind("SUPER + C", hl.dsp.window.close(), desc("Schließen"))
 bind("SUPER + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), desc("Vollbild"))
 bind("SUPER + ALT + F", hl.dsp.window.fullscreen({ mode = "maximized" }), desc("Maximieren"))
 bind("SUPER + ALT + space", hl.dsp.window.float(), desc("Schwebend an/aus"))
@@ -441,11 +448,11 @@ bind("SHIFT + ALT + TAB", hl.dsp.window.cycle_next({ next = false }), desc("Vorh
 
 -- Workspaces des fokussierten Monitors
 group = "Workspaces"
-for i = 1, 5 do
-	local key = i
-	bind("SUPER + " .. key, wsaction("focus", i), i == 1 and desc("Workspace 1–5", nil, "1 … 5") or {})
-	bind("SUPER + ALT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–5", nil, "1 … 5") or {})
-	bind("SUPER + SHIFT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–5", nil, "1 … 5") or {})
+for i = 1, 10 do
+	local key = i % 10 -- 10 liegt auf der Taste 0
+	-- in der Uebersicht eine Zeile fuer alle zehn
+	bind("SUPER + " .. key, wsaction("focus", i), i == 1 and desc("Workspace 1–10", nil, "1 … 0") or {})
+	bind("SUPER + ALT + " .. key, wsaction("move", i), i == 1 and desc("Fenster auf Workspace 1–10", nil, "1 … 0") or {})
 end
 bind("CTRL + SUPER + Left", hl.dsp.focus({ workspace = "m-1" }), desc("Vorheriger Workspace", { repeating = true }))
 bind("CTRL + SUPER + Right", hl.dsp.focus({ workspace = "m+1" }), desc("Nächster Workspace", { repeating = true }))
@@ -456,7 +463,6 @@ bind("CTRL + SUPER + SHIFT + Right", hl.dsp.window.move({ workspace = "m+1" }), 
 
 -- Special-Workspaces (Scratchpads)
 group = "Scratchpads"
-bind("SUPER + G", hl.dsp.exec_cmd("dynamic-island toggle steam"), desc("Steam"))
 -- ueber die CLI: startet die zugehoerige App gleich mit, wenn der Workspace leer ist
 -- (Zuordnung in ~/.config/dynamic-island/cli.json unter "toggles")
 bind("SUPER + S", hl.dsp.exec_cmd("dynamic-island toggle specialws"), desc("Scratchpad"))
@@ -488,11 +494,6 @@ group = "Audio & Medien"
 bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), desc("Ton stumm", { locked = true }))
 bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), desc("Ton stumm", { locked = true }))
 bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), desc("Mikrofon stumm", { locked = true }))
--- Alle angeschlossenen Mikrofone auf einmal (nicht nur die Standardquelle):
--- Taste End schaltet alles stumm bzw. wieder an. Skript prueft selbst, dass
--- Monitore (Systemton) unberuehrt bleiben; liegt auch als klassische
--- Bindung in hypr/binds.conf fuer den Alt-Einstieg hyprland.conf.
-bind("End", hl.dsp.exec_cmd(home .. "/.local/bin/mic-mute"), desc("Alle Mikrofone stumm/an", { locked = true }))
 bind(
 	"XF86AudioRaiseVolume",
 	hl.dsp.exec_cmd(
@@ -526,20 +527,23 @@ bind("XF86AudioNext", hl.dsp.global("dynamic-island:mediaNext"), desc("Nächster
 bind("XF86AudioPrev", hl.dsp.global("dynamic-island:mediaPrev"), desc("Vorheriger Titel", { locked = true }))
 
 group = "Aufnahme"
--- Screenshots  (dynamic-island uebernimmt Zwischenablage,
--- Benachrichtigung mit Open/Save und den Cache unter ~/.cache/dynamic-island)
+-- Screenshots: Print direkt (grim), Bereich/Text/Code ueber das Overlay der
+-- Shell (Standbild, Fenster einrasten); ohne Shell faellt die CLI auf slurp
+-- zurueck. Kopiert wird immer, die Nachricht bietet Speichern/Bearbeiten.
 bind("Print", hl.dsp.exec_cmd("dynamic-island screenshot"), desc("Screenshot ganzer Bildschirm", { locked = true }))
-bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("dynamic-island screenshot -r -f"), desc("Screenshot Bereich"))
+bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("dynamic-island screenshot -r"), desc("Screenshot Bereich"))
 bind("SUPER + SHIFT + ALT + S", hl.dsp.exec_cmd("dynamic-island screenshot -r -e"), desc("Screenshot bearbeiten"))
+bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("dynamic-island screenshot --ocr"), desc("Text vom Bildschirm kopieren"))
+bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("dynamic-island screenshot --qr"), desc("QR-Code lesen"))
 
 -- Bildschirmaufnahme (gpu-screen-recorder; derselbe Bind stoppt wieder)
 bind("CTRL + ALT + R", hl.dsp.exec_cmd("dynamic-island record"), desc("Aufnahme an/aus"))
 bind("SUPER + ALT + R", hl.dsp.exec_cmd("dynamic-island record -s"), desc("Aufnahme mit Ton"))
 bind("SUPER + SHIFT + ALT + R", hl.dsp.exec_cmd("dynamic-island record -r"), desc("Aufnahme Bereich"))
 
--- Zwischenablage-Verlauf (cliphist via fuzzel)
+-- Zwischenablage-Verlauf: Launcher-Modus der Shell (cliphist), ohne Shell fuzzel
 group = "Werkzeuge"
-bind("SUPER + V", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island clipboard"), desc("Zwischenablage"))
+bind("SUPER + V", hl.dsp.exec_cmd("pkill fuzzel || qs -c dynamic-island ipc call launcher clipboard || dynamic-island clipboard"), desc("Zwischenablage"))
 bind("SUPER + ALT + V", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island clipboard -d"), desc("Aus Zwischenablage löschen"))
 
 -- Farbpipette
@@ -550,9 +554,11 @@ bind("SUPER + Period", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island emoji -p"
 
 -- Wallpaper und Farbschema
 bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("dynamic-island wallpaper -r"), desc("Zufälliges Wallpaper"))
+-- Wallhaven-Suche (SUPER + ALT + W) und Desktop-Widgets anordnen (SUPER + ALT + D)
+-- bringen die Plugins `wallhaven`/`desktop` selbst mit (Manifest `keybinds`)
 bind("CTRL + SUPER + SHIFT + T", hl.dsp.exec_cmd("dynamic-island scheme set -r"), desc("Zufälliges Farbschema"))
 
--- Shell dieses Profils neu starten / beenden (wie im Caelestia-Profil belegt)
+-- Shell dieses Profils neu starten / beenden
 group = "Shell"
 bind("CTRL + SUPER + ALT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-restart"), desc("Shell neu starten", { release = true }))
 bind("CTRL + SUPER + SHIFT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-kill"), desc("Shell beenden", { release = true }))

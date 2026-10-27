@@ -49,8 +49,7 @@ Item {
     readonly property string activeSpecialWs: HyprIpc.specialOn(root.hyprMonitor)
 
     // Blur der Punkte, solange ein Special offen ist. Eigene Property, weil
-    // der Layer-Effekt am Wrapper haengt und beide animiert mitgehen sollen
-    // (caelestia loest das identisch).
+    // der Layer-Effekt am Wrapper haengt und beide animiert mitgehen sollen.
     property real dotBlur: root.onSpecial ? 1 : 0
 
     Behavior on dotBlur {
@@ -58,7 +57,7 @@ Item {
     }
 
     // Welche 10er-Gruppe gehört zu diesem Monitor: 0 bei ws 1-10, 10 bei 11-20
-    readonly property int groupOffset: HyprIpc.workspaceOffset(root.hyprMonitor)
+    readonly property int groupOffset: Math.floor((root.activeWsId - 1) / root.workspacesPerMonitor) * root.workspacesPerMonitor
 
     // { wsId: hatFenster } – einmal gebaut statt zehnmal pro Punkt gefiltert
     readonly property var occupied: {
@@ -108,15 +107,13 @@ Item {
 
                 const dir = wheel.acc > 0 ? "m-1" : "m+1";
                 wheel.acc = 0;
-                Hyprland.dispatch(Hyprland.usingLua
-                    ? `hl.dsp.focus({ workspace = "${dir}" })`
-                    : `workspace ${dir}`);
+                Hyprland.dispatch(`hl.dsp.focus({ workspace = "${dir}" })`);
             }
         }
 
         // Die Punkte hängen in einem eigenen Wrapper, damit sie sich als
         // Ganzes zurücknehmen lassen: Beim Special-Eintritt schrumpfen sie,
-        // verblassen und werden unscharf (caelestia-Prinzip) – das Overlay
+        // verblassen und werden unscharf – das Overlay
         // legt sich darüber. Der Blur hängt am Layer des Wrappers; der harte
         // layer.enabled-Umschprung fällt nicht auf, weil dotBlur bei 0 startet.
         Item {
@@ -174,7 +171,7 @@ Item {
 
         // Special-Overlay, solange auf diesem Monitor ein Special offen ist
         // (siehe SpecialWorkspaces.qml). Liegt ZENTRIERT über den verwischten
-        // Punkten – dieselbe Optik wie caelestia, nur horizontal. Die Punkte
+        // Punkten. Die Punkte
         // sind im Special-Modus über `enabled` abgeschaltet (siehe dotsWrap),
         // weil Handler ihren Input sonst mit dem Overlay teilen würden.
         SpecialWorkspaces {

@@ -1,0 +1,25 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "tui",
+    "name": "Terminal-Widget",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "terminal",
+    "description": "Ein Terminal-Programm (cmatrix, cava, btop …) im durchsichtigen kitty-Panel. Braucht ~60 MB je Widget.",
+    "author": "gamecat",
+    "defaultEnabled": true,
+    "widgets": {
+        "terminal": {
+            "title": "Terminal",
+            "desc": "Terminal-Programm (cmatrix, cava, btop) im durchsichtigen kitty-Panel",
+            "icon": "terminal",
+            "component": "TerminalWidget.qml",
+            "size": [36, 20],
+            "options": {
+                "program": { "title": "Programm", "values": ["cmatrix", "cava", "btop", "cbonsai"], "default": "cmatrix" },
+                "form": { "title": "Form", "values": ["quer", "hoch", "breit"], "default": "quer" }
+            }
+        }
+    }
+}

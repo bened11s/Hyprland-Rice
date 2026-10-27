@@ -4,8 +4,7 @@ import QtQuick
 import qs
 import qs.modules.services.config
 
-// Senkrechter Regler fuer das OSD am rechten Rand (Vorlage: caelestias
-// FilledSlider). Eine Spur, die sich von unten fuellt, darauf ein runder
+// Senkrechter Regler fuer das OSD am rechten Rand. Eine Spur, die sich von unten fuellt, darauf ein runder
 // Griff mit dem Symbol – waehrend man zieht oder der Wert sich gerade
 // geaendert hat, steht statt des Symbols die Prozentzahl.
 //

@@ -1,0 +1,13 @@
+{
+  "extras": [
+    "lazyvim.plugins.extras.ui.smear-cursor",
+    "lazyvim.plugins.extras.ui.treesitter-context",
+    "lazyvim.plugins.extras.util.mini-hipatterns",
+    "lazyvim.plugins.extras.lang.markdown"
+  ],
+  "install_version": 8,
+  "news": {
+    "NEWS.md": "11866"
+  },
+  "version": 8
+}

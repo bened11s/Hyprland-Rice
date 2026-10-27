@@ -1,0 +1,159 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "dynamic-island Plugin-Manifest (plugin.json)",
+    "type": "object",
+    "required": ["id", "name", "api"],
+    "properties": {
+        "$schema": { "type": "string" },
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$", "description": "Gleich dem Ordnernamen" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "api": { "type": "integer", "minimum": 1, "description": "Benoetigte Plugin-API" },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "homepage": { "type": "string" },
+        "icon": { "type": "string", "description": "Material-Symbols-Name" },
+        "defaultEnabled": { "type": "boolean" },
+        "main": { "type": "string", "pattern": "^[^/].*\\.qml$" },
+        "migrateFrom": { "type": "string", "description": "Gruppe in shell.json, deren Werte einmalig uebernommen werden" },
+        "parent": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$", "description": "Komponente dieses Plugins: laeuft nur mit ihm, steht in der Verwaltung in seinem Untermenue" },
+        "builtin": { "type": "boolean", "description": "Gehoert zur Shell: in der Verwaltung weder exportier- noch entfernbar" },
+        "components": {
+            "type": "object",
+            "description": "Untermenue fuer Komponenten (Plugins mit parent = diese id)",
+            "properties": {
+                "title": { "type": "string" },
+                "icon": { "type": "string" },
+                "desc": { "type": "string" }
+            }
+        },
+        "settings": {
+            "type": "object",
+            "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["default"],
+                "properties": {
+                    "default": {},
+                    "title": { "type": "string" },
+                    "desc": { "type": "string" },
+                    "options": { "type": "array", "items": { "type": "string" } },
+                    "min": { "type": "number" },
+                    "max": { "type": "number" },
+                    "step": { "type": "number" },
+                    "unit": { "type": "string" },
+                    "editor": { "type": "string", "description": "Eingebauter Editor statt Bedienelement (quick, desktop)" },
+                    "hidden": { "type": "boolean", "description": "Nicht im Einstellungsmenue (wird anderswo bedient)" },
+                    "requires": {
+                        "oneOf": [
+                            { "type": "string" },
+                            { "type": "object" }
+                        ]
+                    }
+                }
+            }
+        },
+        "tiles": {
+            "type": "object",
+            "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["component"],
+                "properties": {
+                    "label": { "type": "string" },
+                    "icon": { "type": "string" },
+                    "kind": { "enum": ["pill", "circle", "wide"] },
+                    "component": { "type": "string", "pattern": "^[^/].*\\.qml$" }
+                }
+            }
+        },
+        "keybinds": {
+            "type": "object",
+            "description": "Tastenkuerzel in Hyprland, solange das Plugin an ist (in der Uebersicht SUPER+K neu belegbar)",
+            "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["keys", "title"],
+                "oneOf": [{ "required": ["ipc"] }, { "required": ["exec"] }],
+                "properties": {
+                    "keys": { "type": "string", "minLength": 1, "description": "Vorgabe wie in Hyprland, z.B. \"SUPER + ALT + W\"" },
+                    "title": { "type": "string", "pattern": "^[^|]+$" },
+                    "group": { "type": "string", "pattern": "^[^|]+$", "description": "Gruppe in der Uebersicht (Vorgabe: Plugin-Name)" },
+                    "ipc": { "type": "string", "description": "Kommando an ipc(cmd, arg) im Main-Objekt" },
+                    "arg": { "type": "string", "description": "Argument fuer ipc (Vorgabe \"_\")" },
+                    "exec": { "type": "string", "description": "Shell-Befehl" },
+                    "release": { "type": "boolean" },
+                    "repeating": { "type": "boolean" },
+                    "locked": { "type": "boolean" }
+                }
+            }
+        },
+        "panels": {
+            "type": "object",
+            "description": "Sektionen in Ansichten der Shell, je Ansicht eine (bisher nur \"wallpaper\")",
+            "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["component"],
+                "properties": {
+                    "icon": { "type": "string" },
+                    "component": { "type": "string", "pattern": "^[^/].*\\.qml$" }
+                }
+            }
+        },
+        "pages": {
+            "type": "object",
+            "description": "Eigene Seiten im Einstellungs-Fenster, als Unterpunkte der Plugin-Gruppe (Vertrag in README.md)",
+            "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["component"],
+                "properties": {
+                    "title": { "type": "string" },
+                    "icon": { "type": "string" },
+                    "component": { "type": "string", "pattern": "^[^/].*\\.qml$" }
+                }
+            }
+        },
+        "widgets": {
+            "type": "object",
+            "description": "Desktop-Widgets fuer die Szenen je Wallpaper (Vertrag in README.md)",
+            "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["component"],
+                "properties": {
+                    "title": { "type": "string" },
+                    "desc": { "type": "string", "description": "Eine Zeile fuer die Widget-Auswahl" },
+                    "icon": { "type": "string" },
+                    "component": { "type": "string", "pattern": "^[^/].*\\.qml$" },
+                    "size": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+                    "options": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "title": { "type": "string" },
+                                "values": { "type": "array" },
+                                "bool": { "type": "boolean" },
+                                "default": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "files": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": { "type": "string", "pattern": "^~/" },
+                    "optional": { "type": "boolean" },
+                    "note": { "type": "string" }
+                }
+            }
+        }
+    }
+}

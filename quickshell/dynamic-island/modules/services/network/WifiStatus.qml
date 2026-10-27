@@ -30,13 +30,42 @@ Singleton {
     property string ssid: ""
     property int signal: 0
 
+    // Verbindungsaufbau: entweder aus der Netzliste angestossen (das weiss
+    // Network sofort) oder vom NetworkManager selbst (Autoconnect, meldet
+    // `nmcli monitor`) – Geraetezustand "connecting (...)"
+    property bool deviceConnecting: false
+    property string deviceConnection: ""
+    readonly property bool connecting: root.radioOn && (Network.connectingSsid !== "" || root.deviceConnecting)
+    readonly property string connectingSsid: Network.connectingSsid !== "" ? Network.connectingSsid
+                                                                           : root.deviceConnection
+
     // Gleiche Stufen wie frueher im Leisten-Symbol
-    readonly property string icon: !root.radioOn || !root.connected ? "wifi_off"
+    readonly property string signalIcon: !root.radioOn || !root.connected ? "wifi_off"
         : root.signal >= 80 ? "network_wifi"
         : root.signal >= 60 ? "network_wifi_3_bar"
         : root.signal >= 40 ? "network_wifi_2_bar"
         : root.signal >= 20 ? "network_wifi_1_bar"
         : "signal_wifi_0_bar"
+
+    // Beim Verbinden laufen die Balken durch, wie beim Telefon – so sieht man
+    // in der Leiste, dass etwas passiert
+    readonly property var connectingIcons: ["signal_wifi_0_bar", "network_wifi_1_bar",
+        "network_wifi_2_bar", "network_wifi_3_bar", "network_wifi"]
+    property int connectingStep: 0
+    readonly property string icon: root.connecting ? root.connectingIcons[root.connectingStep]
+                                                   : root.signalIcon
+
+    Timer {
+        interval: 260
+        running: root.connecting
+        repeat: true
+        onRunningChanged: root.connectingStep = 0
+        onTriggered: root.connectingStep = (root.connectingStep + 1) % root.connectingIcons.length
+    }
+
+    // Ende eines Aufbaus aus der Liste: sofort nachlesen statt auf das
+    // naechste Ereignis zu warten
+    onConnectingChanged: if (!root.connecting && root.watching) root.refresh()
 
     function refresh(): void {
         if (poll.running)
@@ -64,6 +93,7 @@ Singleton {
 
         command: ["sh", "-c",
             "export LC_ALL=C; if nmcli -t radio wifi | grep -q enabled; then " +
+            "nmcli -t -f TYPE,STATE,CONNECTION device | sed -n 's/^wifi:/STATE /p'; " +
             "nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi list --rescan no; " +
             "else echo OFF; fi"]
 
@@ -74,21 +104,35 @@ Singleton {
                 if (text === "OFF") {
                     root.radioOn = false;
                     root.connected = false;
+                    root.deviceConnecting = false;
                     root.signal = 0;
                     return;
                 }
                 root.radioOn = true;
+                let connecting = false;
+                let connection = "";
+                let found = false;
                 for (const line of text.split("\n")) {
+                    if (line.startsWith("STATE ")) {
+                        const f = Network.splitTerse(line.slice(6));
+                        if ((f[0] ?? "").startsWith("connecting")) {
+                            connecting = true;
+                            connection = f[1] ?? "";
+                        }
+                        continue;
+                    }
                     const f = Network.splitTerse(line);
-                    if (f[0] === "yes") {
-                        root.connected = true;
+                    if (!found && f[0] === "yes") {
+                        found = true;
                         root.ssid = f[1] ?? "";
                         root.signal = parseInt(f[2]) || 0;
-                        return;
                     }
                 }
-                root.connected = false;
-                root.signal = 0;
+                root.deviceConnecting = connecting;
+                root.deviceConnection = connection;
+                root.connected = found;
+                if (!found)
+                    root.signal = 0;
             }
         }
 

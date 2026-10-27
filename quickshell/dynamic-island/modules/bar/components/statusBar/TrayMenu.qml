@@ -258,7 +258,7 @@ Item {
                                 rightMargin: menuRoot.rowPad
                                 verticalCenter: parent.verticalCenter
                             }
-                            text: page.title || "Zurück"
+                            text: page.title || I18n.tr("Zurück")
                             color: Colors.primary
                             font.pixelSize: menuRoot.fontSize
                             font.weight: Font.Medium

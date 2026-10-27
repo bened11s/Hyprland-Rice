@@ -23,7 +23,6 @@ Rectangle {
     readonly property bool favoritable: modelData.kind === "app"
 
     implicitHeight: 44
-    clip: true
     radius: 10
 
     // Beim Tippen bauen sich die Treffer gestaffelt auf
@@ -106,18 +105,10 @@ Rectangle {
         // Typen, kein Vergleich). Dadurch galt der Eintrag stets als "hat ein
         // Icon" – die Zeile der Aktionen blieb links leer, weil die
         // Material-Symbols-Alternative darunter nie sichtbar wurde.
-        readonly property string iconPath: {
-            if (item.isCommand || !item.modelData.icon)
-                return "";
-            // Fallback vor dem Laden aufloesen: der Image-Provider dieser
-            // Quickshell-Version interpretiert ?fallback= sonst als Iconname.
-            return Quickshell.iconPath(item.modelData.icon, true)
-                || Quickshell.iconPath("application-x-executable", true);
-        }
+        readonly property string iconPath: item.isCommand || !item.modelData.icon
+            ? "" : Quickshell.iconPath(item.modelData.icon, "application-x-executable")
 
         implicitSize: 26
-        width: 26
-        height: 26
         source: icon.iconPath
         visible: icon.iconPath !== ""
     }
@@ -129,12 +120,7 @@ Rectangle {
             verticalCenter: parent.verticalCenter
         }
         visible: !icon.visible
-        width: 26
-        height: 26
-        clip: true
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        text: item.isCommand ? (item.modelData.icon || "bolt") : "apps"
+        text: item.modelData.icon || "bolt"
         font.family: "Material Symbols Outlined"
         font.pixelSize: 24
         color: Colors.primary

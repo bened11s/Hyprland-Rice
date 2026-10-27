@@ -4,6 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.UPower
 
+import qs
+
 // Akku und Energieprofile.
 //
 // Beides kommt fertig aus Quickshell (Quickshell.Services.UPower) – weder
@@ -54,8 +56,7 @@ Singleton {
             || s === UPowerDeviceState.PendingCharge;
     }
 
-    // Symbol fuer den Akkustand; geladen hat eine eigene Reihe (Muster aus
-    // caelestia/utils/Icons.qml)
+    // Symbol fuer den Akkustand; geladen hat eine eigene Reihe
     readonly property string batteryIcon: {
         if (!root.hasBattery)
             return "battery_unknown";
@@ -100,9 +101,9 @@ Singleton {
     readonly property string degradedReason: PerformanceDegradationReason.toString(PowerProfiles.degradationReason)
 
     readonly property var profiles: [
-        { value: PowerProfile.PowerSaver, icon: "energy_savings_leaf", label: "Sparen" },
-        { value: PowerProfile.Balanced, icon: "balance", label: "Ausgewogen" },
-        { value: PowerProfile.Performance, icon: "rocket_launch", label: "Leistung" }
+        { value: PowerProfile.PowerSaver, icon: "energy_savings_leaf", label: I18n.tr("Sparen") },
+        { value: PowerProfile.Balanced, icon: "balance", label: I18n.tr("Ausgewogen") },
+        { value: PowerProfile.Performance, icon: "rocket_launch", label: I18n.tr("Leistung") }
     ]
 
     function setProfile(value: int): void {

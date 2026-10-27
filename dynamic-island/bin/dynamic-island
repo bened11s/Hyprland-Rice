@@ -1,4 +1,4 @@
-#!/home/benedikt/.local/share/dynamic-island/venv/bin/python
+#!/usr/bin/env python
 """Startskript der dynamic-island-CLI.
 
 Liegt bewusst neben dem Paket statt in site-packages: so ist die CLI Teil des

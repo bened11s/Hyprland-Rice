@@ -2,47 +2,19 @@
     "shell": {
         "name": "dynamic-island"
     },
-    "toggles": {
-        "steam": {
-            "steam": {
-                "enable": true,
-                "match": [{"class": "steam", "title": "Steam"}],
-                "command": ["/home/benedikt/.local/bin/steam-clean", "steam://open/main"],
-                "move": true
-            }
-        },
-        "sysmon": {
-            "btop": {
-                "command": ["kitty", "--class", "btop", "--title", "btop", "btop"]
-            }
-        },
-        "specialws": {
-            "terminal": {
-                "enable": true,
-                "match": [{"class": "kitty"}],
-                "command": ["kitty"],
-                "move": true
-            }
-        }
-    },
     "theme": {
-        "enableTerm": false,
+        "enableTerm": true,
         "enableHypr": true,
         "enableHyprlock": true,
         "enableGtk": true,
         "enableQt": true,
-        "gtkThemeDark": "Breeze",
-        "gtkThemeLight": "Breeze",
-        "iconThemeDark": "breeze-dark",
-        "iconThemeLight": "breeze",
-        "postHook": "python $HOME/.config/dynamic-island/scripts/sync-desktop-theme.py",
-        "enableBtop": false,
+        "enableBtop": true,
         "enableCava": true,
-        "enableDiscord": false,
+        "enableDiscord": true,
 
-        "enableFuzzel": true,
+        "enableFuzzel": false,
         "enableChromium": false,
-        "enableSpicetify": false,
+        "enableSpicetify": true,
         "enableZed": false,
         "enableHtop": false,
         "enableNvtop": false,

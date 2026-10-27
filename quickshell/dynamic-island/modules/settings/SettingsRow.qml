@@ -1,12 +1,13 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.modules.services.config
+import qs.modules.services.plugins
 import qs.modules.widgets
 
 import qs
 
-// Eine Zeile im Einstellungs-Fenster, samt Gruppentitel darueber (wenn
-// `section` gesetzt ist). Was fuer ein Bedienelement erscheint, entscheidet
+// Eine Zeile im Einstellungs-Fenster (die Karte drumherum und ihren Titel
+// zeichnet SettingsCard). Was fuer ein Bedienelement erscheint, entscheidet
 // der Typ des Werts in der Datei plus die Angaben in Config.meta:
 //
 //   Wahrheitswert                 Schalter
@@ -16,13 +17,16 @@ import qs
 //
 // Dazu: ein Zuruecksetzen-Knopf, sobald der Wert von der Vorgabe abweicht,
 // und eine gedimmte Zeile, wenn ihre Voraussetzung (meta.requires) fehlt.
+//
+// Gelesen und geschrieben wird ueber die Plugins-Bruecke (get/set/reset/
+// isDefault/satisfied mit derselben Signatur wie Config): Gruppen von
+// Plugins ("plugin:<id>") landen in plugins.json, alle anderen reicht sie
+// an Config weiter – die Zeile muss den Unterschied nicht kennen.
 Item {
     id: row
 
     // { id, section, key, value, title, desc, options, min, max, step, unit, requires }
     required property var entry
-    // Nicht leer = Gruppentitel oberhalb dieser Zeile zeichnen
-    property string section: ""
 
     readonly property bool isBool: typeof row.entry?.value === "boolean"
     readonly property bool isNumber: typeof row.entry?.value === "number"
@@ -30,23 +34,36 @@ Item {
     readonly property bool isChoice: !row.isBool && !row.isNumber && Array.isArray(row.entry?.options)
     // Eigener Editor statt Bedienelement (meta.editor), z.B. der Kachel-Aufbau
     readonly property bool isEditor: (row.entry?.editor ?? "") !== ""
+    // Verweis auf eine Plugin-Seite (SettingsCard haengt sie als Zeile an):
+    // die ganze Zeile oeffnet die Seite
+    readonly property bool isLink: (row.entry?.link ?? "") !== ""
     // Schrift-Auswahl: jede Option in ihrer eigenen Schrift zeigen und nur
     // anbieten, was auch installiert ist
     readonly property bool isFont: row.isChoice && String(row.entry?.key ?? "").toLowerCase().includes("font")
-    readonly property bool interactive: row.isBool || row.isChoice || row.isNumber
+    readonly property bool interactive: row.isBool || row.isChoice || row.isNumber || row.isLink
 
     // Voraussetzung erfuellt? Sonst ist die Zeile gedimmt und gesperrt.
-    readonly property bool available: Config.satisfied(row.entry?.requires)
+    readonly property bool available: Plugins.satisfied(row.entry?.requires)
     readonly property string requirementLabel: {
         const req = row.entry?.requires;
         if (!req)
             return "";
         const id = typeof req === "string" ? req : Object.keys(req)[0];
-        const title = Config.meta[id]?.title ?? id;
-        return typeof req === "string" ? `Braucht „${title}“`
-                                       : `Braucht „${title}“ = ${req[id]}`;
+        const title = Plugins.metaFor(id)?.title ?? id;
+        return typeof req === "string" ? I18n.tr("Braucht „%1“").arg(I18n.tr(title))
+                                       : I18n.tr("Braucht „%1“ = %2").arg(I18n.tr(title)).arg(row.optionLabel(req[id]));
     }
-    readonly property bool changed: !Config.isDefault(row.entry?.section ?? "", row.entry?.key ?? "")
+
+    // Anzeigename einer Option: meta.labels, sonst der Wert selbst –
+    // uebersetzt, Schriftnamen bleiben wie sie sind
+    function optionLabel(value: var): string {
+        const v = String(value ?? "");
+        const label = row.entry?.labels?.[v];
+        if (label !== undefined)
+            return label;
+        return row.isChoice && !row.isFont ? I18n.tr(v) : v;
+    }
+    readonly property bool changed: !row.isLink && !Plugins.isDefault(row.entry?.section ?? "", row.entry?.key ?? "")
 
     readonly property var choices: {
         if (!row.isChoice)
@@ -60,7 +77,6 @@ Item {
         return list;
     }
     property bool expanded: false
-    readonly property real headerHeight: 26
 
     // ---- Zahlen ----
     readonly property real min: Number(row.entry?.min ?? 0)
@@ -86,10 +102,23 @@ Item {
     function setNumber(v: real): void {
         const next = row.snap(v);
         if (next !== Number(row.entry.value))
-            Config.set(row.entry.section, row.entry.key, next);
+            Plugins.set(row.entry.section, row.entry.key, next);
     }
 
-    implicitHeight: (row.section !== "" ? row.headerHeight : 0) + 52
+    // Zweite Zeile unter dem Titel: Beschreibung aus Config.meta oder die
+    // fehlende Voraussetzung; ohne sie ist die Zeile niedriger
+    readonly property string subtitle: !row.available && row.requirementLabel !== ""
+                                       ? row.requirementLabel
+                                       : (row.entry?.desc ?? "")
+    readonly property real lineHeight: row.subtitle !== "" ? 52 : 44
+
+    // Breite des Bedienelements je nach Zeilenbreite: der Schieberegler
+    // waechst von 110 auf 220 px mit, ein Auswahlwert wird abgeschnitten,
+    // bevor er dem Titel seine 160 px nimmt
+    readonly property real sliderWidth: Math.max(110, Math.min(220, row.width - 300))
+    readonly property real valueCap: Math.max(72, row.width - 28 - 160 - 10 - 26 - 24)
+
+    implicitHeight: row.lineHeight
                     + (row.expanded ? choiceFlow.implicitHeight + 12 : 0)
                     + (row.isEditor ? editorLoader.implicitHeight + 14 : 0)
 
@@ -97,32 +126,11 @@ Item {
         NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
     }
 
-    Text {
-        id: sectionLabel
-        font.family: Config.font
-
-        anchors {
-            left: parent.left
-            leftMargin: 14
-            top: parent.top
-        }
-        height: row.section !== "" ? row.headerHeight : 0
-        visible: row.section !== ""
-        verticalAlignment: Text.AlignBottom
-
-        text: (Config.sectionMeta[row.section] ?? row.section).toUpperCase()
-        color: Colors.fgSurfaceVariant
-        font.pixelSize: 9
-        font.weight: Font.Medium
-        font.letterSpacing: 0.8
-        bottomPadding: 5
-    }
-
     Rectangle {
         anchors {
             left: parent.left
             right: parent.right
-            top: sectionLabel.bottom
+            top: parent.top
             bottom: parent.bottom
         }
         radius: 12
@@ -152,13 +160,15 @@ Item {
                 right: parent.right
                 top: parent.top
             }
-            height: 52
+            height: row.lineHeight
 
             TapHandler {
-                enabled: (row.isBool || row.isChoice) && row.available
+                enabled: (row.isBool || row.isChoice || row.isLink) && row.available
                 onTapped: {
-                    if (row.isBool)
-                        Config.set(row.entry.section, row.entry.key, !row.entry.value);
+                    if (row.isLink)
+                        SettingsState.openPage(row.entry.link, {});
+                    else if (row.isBool)
+                        Plugins.set(row.entry.section, row.entry.key, !row.entry.value);
                     else
                         row.expanded = !row.expanded;
                 }
@@ -192,10 +202,12 @@ Item {
                 spacing: 2
 
                 Row {
+                    width: parent.width
                     spacing: 6
 
                     Text {
                         font.family: Config.font
+                        width: Math.min(implicitWidth, parent.width - (row.changed ? 11 : 0))
                         text: row.entry?.title ?? ""
                         color: Colors.fgBackground
                         font.pixelSize: 12
@@ -217,9 +229,8 @@ Item {
                 Text {
                     font.family: Config.font
                     width: parent.width
-                    text: !row.available && row.requirementLabel !== ""
-                          ? row.requirementLabel
-                          : (row.entry?.desc ?? "")
+                    visible: text !== ""
+                    text: row.subtitle
                     color: !row.available ? Colors.secondary : Colors.fgSurfaceVariant
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -271,7 +282,7 @@ Item {
                 }
 
                 TapHandler {
-                    onTapped: Config.reset(row.entry.section, row.entry.key)
+                    onTapped: Plugins.reset(row.entry.section, row.entry.key)
                 }
             }
 
@@ -284,8 +295,17 @@ Item {
                     rightMargin: 14
                     verticalCenter: parent.verticalCenter
                 }
-                width: row.isBool ? 40 : row.isNumber ? numberControl.width : row.isEditor ? 0 : valueRow.width
+                width: row.isBool ? 40 : row.isNumber ? numberControl.width : row.isEditor ? 0 : row.isLink ? 20 : valueRow.width
                 height: 28
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: row.isLink
+                    text: "chevron_right"
+                    color: Colors.fgSurfaceVariant
+                    font.family: "Material Symbols Outlined"
+                    font.pixelSize: 20
+                }
 
                 // Schalter fuer Wahrheitswerte
                 Rectangle {
@@ -335,7 +355,7 @@ Item {
                         id: slider
 
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 150
+                        width: row.sliderWidth
                         height: 28
 
                         readonly property real handleSize: 14
@@ -418,15 +438,17 @@ Item {
 
                     anchors.verticalCenter: parent.verticalCenter
                     // Ein Editor zeigt den Rohwert nicht – der steht in ihm selbst
-                    visible: !row.isBool && !row.isNumber && !row.isEditor
+                    visible: !row.isBool && !row.isNumber && !row.isEditor && !row.isLink
                     spacing: 4
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: String(row.entry?.value ?? "")
+                        width: Math.min(implicitWidth, row.valueCap)
+                        text: row.optionLabel(row.entry?.value)
                         color: Colors.fgSurfaceVariant
                         font.family: row.isFont ? String(row.entry?.value ?? "") : Config.font
                         font.pixelSize: 11
+                        elide: Text.ElideRight
                     }
 
                     Text {
@@ -458,13 +480,35 @@ Item {
                 rightMargin: 14
             }
             active: row.isEditor
-            sourceComponent: row.entry?.editor === "quick" ? quickEditor : null
+            sourceComponent: row.entry?.editor === "quick" ? quickEditor
+                           : row.entry?.editor === "desktop" ? desktopEditor
+                           : row.entry?.editor === "lock" ? lockEditor
+                           : row.entry?.editor === "sounds" ? soundsEditor
+                           : null
         }
 
         Component {
             id: quickEditor
 
-            QuickLayoutEditor {}
+            QuickTilesEditor {}
+        }
+
+        Component {
+            id: lockEditor
+
+            LockLayoutEditor {}
+        }
+
+        Component {
+            id: soundsEditor
+
+            SoundsEditor {}
+        }
+
+        Component {
+            id: desktopEditor
+
+            DesktopSceneEditor {}
         }
 
         // Die Optionen einer Auswahl als Chips
@@ -495,9 +539,11 @@ Item {
                     required property string modelData
                     readonly property bool selected: chip.modelData === String(row.entry?.value ?? "")
 
-                    width: chipLabel.implicitWidth + 24
-                    height: 28
-                    radius: height / 2
+                    readonly property bool previewed: (row.entry?.preview ?? "") !== ""
+
+                    width: chip.previewed ? Math.max(76, chipLabel.implicitWidth + 16) : chipLabel.implicitWidth + 24
+                    height: chip.previewed ? 58 : 28
+                    radius: chip.previewed ? 12 : height / 2
                     color: chip.selected ? Colors.primary
                          : chipHover.hovered ? Colors.alpha(Colors.fgSurface, 0.12)
                          : Colors.alpha(Colors.fgSurface, 0.06)
@@ -506,14 +552,32 @@ Item {
                         ColorAnimation { duration: 120 }
                     }
 
+                    // Vorschau der Variante (Uhr, Visualiser, Workspaces)
+                    Loader {
+                        active: chip.previewed
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 6
+
+                        sourceComponent: StylePreview {
+                            kind: row.entry.preview
+                            style: chip.modelData
+                            color: chip.selected ? Colors.fgPrimary : Colors.fgSurface
+                            accent: chip.selected ? Colors.fgPrimary : Colors.primary
+                        }
+                    }
+
                     Text {
                         id: chipLabel
 
-                        anchors.centerIn: parent
-                        text: chip.modelData
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: chip.previewed ? undefined : parent.verticalCenter
+                        anchors.bottom: chip.previewed ? parent.bottom : undefined
+                        anchors.bottomMargin: 5
+                        font.pixelSize: chip.previewed ? 9 : 11
+                        text: row.optionLabel(chip.modelData)
                         color: chip.selected ? Colors.fgPrimary : Colors.fgSurface
                         font.family: row.isFont ? chip.modelData : Config.font
-                        font.pixelSize: 11
                     }
 
                     HoverHandler {
@@ -524,7 +588,7 @@ Item {
 
                     TapHandler {
                         enabled: row.available
-                        onTapped: Config.set(row.entry.section, row.entry.key, chip.modelData)
+                        onTapped: Plugins.set(row.entry.section, row.entry.key, chip.modelData)
                     }
                 }
             }

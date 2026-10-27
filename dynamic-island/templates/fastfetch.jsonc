@@ -1,0 +1,109 @@
+// fastfetch in den Farben des aktuellen Schemas (gross, ab 100x25).
+//
+// Vorlage:  ~/.config/dynamic-island/templates/fastfetch*.jsonc  <- diese Dateien
+// Erzeugt:  ~/.local/state/dynamic-island/theme/fastfetch*.jsonc <- nicht bearbeiten
+// Genutzt:  ~/.config/fish/functions/fastfetch.fish, wenn __terminal_look
+//           "scheme" sagt (Wallpaper-Ordner ohne eigenen Look oder
+//           Einstellungen > Terminal). Platzhalter siehe templates/kitty.conf;
+//           {{ x.ansi }} ist "r;g;b" fuer 38;2;...-Sequenzen.
+//
+// Logo: in Kitty eine Karte aus dem aktuellen Wallpaper (fish/functions/
+// __fastfetch_card.fish, per --logo uebergeben), sonst das CachyOS-Logo hier.
+//
+// Aufbau als Baum: Keys tragen ihre Linie (│/╰) selbst, die Farbe danach
+// wird neu gesetzt, sonst stuende das Symbol in der Linienfarbe.
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "source": "CachyOS_small",
+        "color": {
+            "1": "38;2;{{ primary.ansi }}",
+            "2": "38;2;{{ tertiary.ansi }}"
+        },
+        "padding": {
+            "top": 3,
+            "left": 2,
+            "right": 4
+        }
+    },
+    "display": {
+        "separator": "  ",
+        "color": {
+            "keys": "38;2;{{ primary.ansi }}",
+            "output": "default"
+        },
+        "bar": {
+            "width": 12,
+            "char": {
+                "elapsed": "━",
+                "total": "━"
+            },
+            "border": {
+                "left": "",
+                "right": ""
+            },
+            "color": {
+                "elapsed": "38;2;{{ primary.ansi }}",
+                "total": "38;2;{{ outlineVariant.ansi }}"
+            }
+        },
+        "percent": {
+            "type": ["bar", "num"],
+            "color": {
+                "green": "38;2;{{ onSurfaceVariant.ansi }}",
+                "yellow": "38;2;{{ tertiary.ansi }}",
+                "red": "38;2;{{ error.ansi }}"
+            }
+        }
+    },
+    "modules": [
+        "break",
+        {
+            "type": "title",
+            "key": "\u001b[38;2;{{ tertiary.ansi }}m",
+            "format": "\u001b[1;38;2;{{ primary.ansi }}m{user-name}\u001b[0m\u001b[38;2;{{ outline.ansi }}m @ \u001b[0m\u001b[1;38;2;{{ tertiary.ansi }}m{host-name}\u001b[0m"
+        },
+        {
+            "type": "custom",
+            "format": "\u001b[38;2;{{ outline.ansi }}m────────────────────────────────────────────\u001b[0m"
+        },
+
+        {
+            "type": "custom",
+            "format": "\u001b[38;2;{{ outline.ansi }}m╭─\u001b[0m \u001b[1;38;2;{{ tertiary.ansi }}mSystem\u001b[0m"
+        },
+        { "type": "os",       "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰣇  OS      ", "format": "{pretty-name}" },
+        { "type": "kernel",   "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰒋  Kernel  ", "format": "{release}" },
+        { "type": "uptime",   "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󱎫  Uptime  " },
+        { "type": "packages", "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰏗  Pakete  ", "format": "{all} \u001b[38;2;{{ outline.ansi }}m· {pacman} pacman · {flatpak-all} flatpak\u001b[0m" },
+
+        {
+            "type": "custom",
+            "format": "\u001b[38;2;{{ outline.ansi }}m├─\u001b[0m \u001b[1;38;2;{{ tertiary.ansi }}mHardware\u001b[0m"
+        },
+        { "type": "cpu",     "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰻠  CPU     ", "format": "{name} \u001b[38;2;{{ outline.ansi }}m· {cores-logical} Threads\u001b[0m" },
+        { "type": "gpu",     "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰍛  GPU     ", "format": "{name}", "hideType": "integrated" },
+        { "type": "memory",  "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰘚  RAM     ", "format": "{percentage-bar} {percentage}  \u001b[38;2;{{ outline.ansi }}m{used} / {total}\u001b[0m" },
+        { "type": "disk",    "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰋊  Disk    ", "format": "{size-percentage-bar} {size-percentage}  \u001b[38;2;{{ outline.ansi }}m{size-used} / {size-total}\u001b[0m", "folders": "/" },
+        { "type": "display", "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰍹  Display ", "format": "{width}×{height} \u001b[38;2;{{ outline.ansi }}m· {refresh-rate} Hz\u001b[0m" },
+
+        {
+            "type": "custom",
+            "format": "\u001b[38;2;{{ outline.ansi }}m├─\u001b[0m \u001b[1;38;2;{{ tertiary.ansi }}mDesktop\u001b[0m"
+        },
+        { "type": "wm",       "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰕮  WM      ", "format": "{pretty-name}" },
+        // Wallpaper-Ordner + Hell/Dunkel des Schemas – die Karte links ist das Wallpaper selbst
+        { "type": "command",  "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰸉  Theme   ", "text": "w=$(cat ~/.local/state/dynamic-island/wallpaper/path.txt); basename \"$(dirname \"$w\")\"", "format": "{result} \u001b[38;2;{{ outline.ansi }}m· {{ mode }}\u001b[0m" },
+        { "type": "shell",    "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰆍  Shell   ", "format": "{pretty-name} {version}" },
+        // Musik faellt weg, wenn nichts laeuft – darum schliesst das Terminal den Baum
+        { "type": "media",    "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰎈  Musik   ", "format": "{combined:-46}" },
+        { "type": "terminal", "key": "\u001b[38;2;{{ outline.ansi }}m╰\u001b[38;2;{{ primary.ansi }}m 󰄛  Terminal", "format": "{pretty-name}" },
+
+        "break",
+        {
+            "type": "colors",
+            "symbol": "circle",
+            "paddingLeft": 2
+        }
+    ]
+}

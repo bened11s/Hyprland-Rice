@@ -1,0 +1,23 @@
+# Starship-Palette aus dem aktuellen Schema.
+#
+# Vorlage:  ~/.config/dynamic-island/templates/starship-palette.toml  <- diese Datei
+# Erzeugt:  ~/.local/state/dynamic-island/theme/starship-palette.toml <- nicht bearbeiten
+#
+# Dieselben Namen wie [palettes.vocaloid] in ~/.config/starship.toml, nur mit
+# Schema-Rollen (wie die fastfetch-Templates: pink = primary, teal = tertiary,
+# gray = outline). fish (conf.d/terminal-theme.fish) haengt sie an eine Kopie
+# von starship.toml und stellt dort `palette = "scheme"` ein; der Prompt selbst
+# steht also nur an einer Stelle.
+
+[palettes.scheme]
+teal = "#{{ tertiary.hex }}"
+teal-ink = "#{{ onTertiary.hex }}"
+pink = "#{{ primary.hex }}"
+pink-ink = "#{{ onPrimary.hex }}"
+pink-soft = "#{{ secondary.hex }}"
+git = "#{{ primaryContainer.hex }}"
+git-ink = "#{{ onPrimaryContainer.hex }}"
+seg = "#{{ surfaceContainerHigh.hex }}"
+seg-ink = "#{{ onSurface.hex }}"
+seg-text = "#{{ onSurfaceVariant.hex }}"
+gray = "#{{ outline.hex }}"

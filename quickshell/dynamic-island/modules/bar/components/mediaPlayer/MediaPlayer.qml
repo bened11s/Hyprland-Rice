@@ -391,9 +391,13 @@ Item {
 
                     // Steht der Titel still, faengt er wieder links an
                     onScrollingChanged: if (!marquee.scrolling) strip.x = 0;
+                    readonly property bool playing: Media.playing
+                    onPlayingChanged: if (!marquee.playing) strip.x = 0;
 
                     SequentialAnimation {
-                        running: marquee.scrolling && marquee.visible
+                        // Pausiert steht der Titel: eine Endlos-Animation
+                        // zwingt das Leistenfenster sonst auf Monitorrate
+                        running: marquee.scrolling && marquee.visible && Media.playing
                         loops: Animation.Infinite
 
                         // Erst lesen lassen, dann losfahren

@@ -1,0 +1,27 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "system",
+    "name": "Systemmonitor",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "monitor_heart",
+    "description": "CPU, Grafik, Arbeitsspeicher, Platte und Temperaturen. Liest nur, solange das Widget sichtbar ist.",
+    "author": "gamecat",
+    "defaultEnabled": true,
+    "widgets": {
+        "system": {
+            "title": "System",
+            "desc": "CPU, Grafik, RAM und Temperaturen als Ringe, Balken oder Zahlen",
+            "icon": "monitor_heart",
+            "component": "SystemWidget.qml",
+            "size": [20, 9],
+            "options": {
+                "style": { "title": "Stil", "values": ["ringe", "balken", "zeilen"], "default": "ringe" },
+                "gpu": { "title": "Grafik", "bool": true, "default": true },
+                "temps": { "title": "Temperaturen", "bool": true, "default": true },
+                "disk": { "title": "Platte", "bool": true, "default": false }
+            }
+        }
+    }
+}

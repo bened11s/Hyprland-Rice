@@ -13,6 +13,10 @@ import Quickshell
 // Drop-Editor im Einstellungs-Menue braucht. SettingsTiles.qml rendert
 // `rows`.
 //
+// Lueckenstuecke: "_:n" haelt n Spalten frei, damit eine Kachel weiter
+// rechts stehen kann (Helligkeit | leer | Widget). Sie zaehlen nicht als
+// Kachel (nicht in `tiles`/`hidden`), Luecken am Reihenende fallen weg.
+//
 // Kachel-Arten (nur Vorgaben fuer die Breite):
 //   pill    2 Spalten, ab 1 Spalte nur das Symbol
 //   circle  1 Spalte  (Standard-Aufbau nutzt 2, wie im Android-Tray)
@@ -20,26 +24,29 @@ import Quickshell
 Singleton {
     id: root
 
-    readonly property var tiles: ({
+    readonly property var builtinTiles: ({
         "wifi":       { label: "Wi-Fi",         icon: "wifi",           kind: "pill" },
         "bluetooth":  { label: "Bluetooth",     icon: "bluetooth",      kind: "pill" },
         "vpn":        { label: "VPN",           icon: "vpn_key",        kind: "pill" },
         "nosleep":    { label: "No Sleep",      icon: "coffee",         kind: "pill" },
         "gamemode":   { label: "Game-Mode",     icon: "sports_esports", kind: "circle" },
-        "monitors":   { label: "Bildschirm",    icon: "monitor",        kind: "circle" },
+        "airplane":   { label: "Flugmodus",     icon: "flight",         kind: "circle" },
         "settings":   { label: "Einstellungen", icon: "tune",           kind: "circle" },
         "record":     { label: "Aufnahme",      icon: "screen_record",  kind: "wide" },
         "volume":     { label: "Lautstärke",    icon: "volume_up",      kind: "wide" },
         "mic":        { label: "Mikrofon",      icon: "mic",            kind: "wide" },
         "power":      { label: "Energie",       icon: "bolt",           kind: "pill" },
-        "brightness": { label: "Helligkeit",    icon: "brightness_6",   kind: "wide" },
-        "screenshot": { label: "Screenshot",    icon: "screenshot",     kind: "wide" },
-        "dnd":        { label: "Nicht stören",  icon: "notifications_off", kind: "pill" },
-        "lock":       { label: "Sperren",       icon: "lock",           kind: "circle" }
+        "brightness": { label: "Helligkeit",    icon: "brightness_6",   kind: "wide" }
     })
+    // Kacheln aktiver Plugins ("<plugin>.<kachel>" -> { label, icon, kind, url,
+    // plugin }), gesetzt von Plugins.qml – die Abhaengigkeit laeuft nur in
+    // diese Richtung (plugins importiert config, nicht umgekehrt)
+    property var extraTiles: ({})
+    readonly property var tiles: Object.assign({}, root.builtinTiles, root.extraTiles)
     readonly property var ids: Object.keys(root.tiles)
 
     readonly property int columns: Math.max(2, Math.min(6, Config.quick.columns))
+    readonly property string gap: "_"
 
     // Reihen als Arrays von { id, span } – bereinigt: Unbekanntes und
     // Doppeltes raus, Breiten auf [minSpan, columns] gedeckelt, Reihen, die
@@ -78,6 +85,10 @@ Singleton {
         }
     }
 
+    // Plugin-Kacheln kommen nach dem Start (oder beim Ein-/Ausschalten) dazu:
+    // neu einlesen, sonst fielen sie beim ersten Parsen als unbekannt raus
+    onExtraTilesChanged: root.reparse()
+
     // Reihen und Spalten aendern sich beim Laden oft zugleich – einmal
     // gesammelt neu aufbauen statt je Signal (jede Zuweisung baut alle
     // Kachel-Repeater neu)
@@ -114,6 +125,46 @@ Singleton {
         return row.reduce((sum, t) => sum + t.span, 0);
     }
 
+    // Belegt von echten Kacheln (Luecken geben ihren Platz her)
+    function tileUsed(row: var): int {
+        return row.reduce((sum, t) => sum + (t.id === root.gap ? 0 : t.span), 0);
+    }
+
+    // Luecken aufraeumen: benachbarte zusammenlegen, am Ende weg, und wenn die
+    // Reihe zu voll ist, Luecken von hinten her schrumpfen
+    function tidy(row: var): var {
+        const out = [];
+        for (const t of row) {
+            const last = out[out.length - 1];
+            if (t.id === root.gap && last && last.id === root.gap)
+                last.span += t.span;
+            else if (t.span > 0)
+                out.push({ id: t.id, span: t.span });
+        }
+        let over = root.used(out) - root.columns;
+        for (let i = out.length - 1; i >= 0 && over > 0; i--) {
+            if (out[i].id !== root.gap)
+                continue;
+            const cut = Math.min(over, out[i].span);
+            out[i].span -= cut;
+            over -= cut;
+        }
+        const kept = out.filter(t => t.span > 0);
+        while (kept.length && kept[kept.length - 1].id === root.gap)
+            kept.pop();
+        return kept;
+    }
+
+    // Startspalte jedes Eintrags einer Reihe
+    function columnsOf(row: var): var {
+        let c = 0;
+        return row.map(t => {
+            const at = c;
+            c += t.span;
+            return at;
+        });
+    }
+
     function parse(list: var): var {
         const seen = new Set();
         const out = [];
@@ -122,6 +173,13 @@ Singleton {
             for (const raw of String(line).split(",")) {
                 const [idRaw, spanRaw] = raw.split(":");
                 const id = (idRaw ?? "").trim();
+                if (id === root.gap) {
+                    const n = parseInt(spanRaw ?? "", 10);
+                    const free = root.columns - root.used(row);
+                    if (!isNaN(n) && n > 0 && free > 0)
+                        row.push({ id, span: Math.min(n, free) });
+                    continue;
+                }
                 if (id === "" || !root.tiles[id] || seen.has(id))
                     continue;
                 seen.add(id);
@@ -129,15 +187,14 @@ Singleton {
                 const span = root.clampSpan(id, isNaN(parsed) ? root.defaultSpan(id) : parsed);
                 // Passt nicht mehr in die Reihe: neue Reihe anfangen
                 if (root.used(row) + span > root.columns && row.length > 0) {
-                    out.push(row);
+                    out.push(root.tidy(row));
                     row = [];
                 }
                 row.push({ id, span });
             }
-            if (row.length)
-                out.push(row);
+            out.push(root.tidy(row));
         }
-        return out;
+        return out.filter(r => r.length > 0);
     }
 
     function serialise(rows: var): var {
@@ -145,7 +202,7 @@ Singleton {
     }
 
     function save(rows: var): void {
-        const clean = rows.filter(r => r.length > 0);
+        const clean = rows.map(r => root.tidy(r)).filter(r => r.length > 0);
         root.rows = clean;
         saveGuard.restart();
         Config.set("quick", "rows", root.serialise(clean));
@@ -182,7 +239,7 @@ Singleton {
 
         const inRange = rowIndex >= 0 && rowIndex < cur.length;
         const others = inRange ? cur[rowIndex] : [];
-        const free = root.columns - root.used(others);
+        const free = root.columns - root.tileUsed(others);
         const ownRow = newRow || !inRange || free < root.minSpan(id);
 
         if (ownRow) {
@@ -197,16 +254,100 @@ Singleton {
         root.save(cur);
     }
 
+    // Wie breit passt `id` ab Spalte `column` in Reihe `rowIndex`? Zaehlt
+    // freie Zellen (Luecken und Reihenende) bis zur naechsten Kachel; die
+    // eigenen Zellen von `id` gelten als frei. 0 = passt nicht.
+    function fitAt(id: string, rowIndex: int, column: int): int {
+        if (column < 0 || column >= root.columns)
+            return 0;
+        const row = root.rows[rowIndex] ?? [];
+        const cols = root.columnsOf(row);
+        let end = root.columns;
+        for (let i = 0; i < row.length; i++) {
+            const t = row[i];
+            if (t.id === root.gap || t.id === id)
+                continue;
+            if (cols[i] <= column && column < cols[i] + t.span)
+                return 0;
+            if (cols[i] > column)
+                end = Math.min(end, cols[i]);
+        }
+        const hit = root.find(root.rows, id);
+        const want = hit ? hit.tile.span : root.defaultSpan(id);
+        const span = Math.min(want, end - column);
+        return span >= root.minSpan(id) ? span : 0;
+    }
+
+    // `id` in Reihe `rowIndex` ab Spalte `column` legen (auf freie Zellen).
+    // Davor bleibt eine Luecke. In derselben Reihe wird der alte Platz zur
+    // Luecke (der Rest bleibt stehen), aus einer anderen Reihe rueckt die
+    // alte Reihe zusammen. Passt die Kachel nicht (fitAt = 0): nichts.
+    function placeAt(id: string, rowIndex: int, column: int): void {
+        const span = root.fitAt(id, rowIndex, column);
+        if (span === 0)
+            return;
+        const cur = root.copy();
+        const hit = root.find(cur, id);
+        if (hit && hit.row === rowIndex)
+            cur[hit.row][hit.index] = { id: root.gap, span: hit.tile.span };
+        else if (hit)
+            cur[hit.row].splice(hit.index, 1);
+
+        // Reihe als Kacheln mit Startspalte, die neue dazu, dann mit
+        // Luecken wieder zusammensetzen
+        const row = rowIndex < cur.length ? cur[rowIndex] : [];
+        const cols = root.columnsOf(row);
+        const placed = row.map((t, i) => ({ id: t.id, span: t.span, col: cols[i] }))
+                          .filter(t => t.id !== root.gap);
+        placed.push({ id, span, col: column });
+        placed.sort((a, b) => a.col - b.col);
+
+        const next = [];
+        let c = 0;
+        for (const t of placed) {
+            if (t.col > c)
+                next.push({ id: root.gap, span: t.col - c });
+            next.push({ id: t.id, span: t.span });
+            c = t.col + t.span;
+        }
+        if (rowIndex < cur.length)
+            cur[rowIndex] = next;
+        else
+            cur.push(next);
+        root.save(cur);
+    }
+
+    // Ganze Reihe verschieben (Layout-Modus der Steuerung): Reihe `from`
+    // landet an Position `to` (Index im Ergebnis)
+    function moveRow(from: int, to: int): void {
+        const cur = root.copy();
+        if (from < 0 || from >= cur.length)
+            return;
+        const target = Math.max(0, Math.min(to, cur.length - 1));
+        if (target === from)
+            return;
+        const row = cur.splice(from, 1)[0];
+        cur.splice(target, 0, row);
+        root.save(cur);
+    }
+
     // Breite aendern – hoechstens so weit, wie die Reihe noch Platz hat
     function resize(id: string, span: int): void {
         const cur = root.copy();
         const hit = root.find(cur, id);
         if (!hit)
             return;
-        const free = root.columns - root.used(cur[hit.row]) + hit.tile.span;
+        // Luecken in der Reihe darf die Kachel aufbrauchen (tidy schrumpft sie)
+        const free = root.columns - root.tileUsed(cur[hit.row]) + hit.tile.span;
         const next = Math.max(root.minSpan(id), Math.min(free, span));
         if (next === hit.tile.span)
             return;
+        // Breiter frisst zuerst die Luecke direkt dahinter, damit der Rest
+        // der Reihe stehen bleibt (sonst schrumpft tidy Luecken von hinten)
+        const after = cur[hit.row][hit.index + 1];
+        const delta = next - hit.tile.span;
+        if (delta > 0 && after && after.id === root.gap)
+            after.span -= Math.min(delta, after.span);
         hit.tile.span = next;
         root.save(cur);
     }
@@ -216,7 +357,7 @@ Singleton {
         const hit = root.find(root.rows, id);
         if (!hit)
             return root.columns;
-        return root.columns - root.used(root.rows[hit.row]) + hit.tile.span;
+        return root.columns - root.tileUsed(root.rows[hit.row]) + hit.tile.span;
     }
 
     function hide(id: string): void {

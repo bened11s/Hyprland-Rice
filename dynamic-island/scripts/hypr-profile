@@ -10,7 +10,7 @@ set -uo pipefail
 
 HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 PROFILE_FILE="$HYPR_DIR/profile"
-DEFAULT_PROFILE="simple"
+DEFAULT_PROFILE="caelestia"
 
 ################################################################################
 # Welche Quickshell-Config gehoert zu welchem Profil?
@@ -30,14 +30,23 @@ declare -A PROFILE_SHELL=(
 # Array hat keine feste Reihenfolge, darum hier noch einmal als Liste — und
 # sie entscheidet zugleich, welche Namen als Argument gelten. Ein neues Profil
 # braucht drei Dinge: profiles/<name>.lua, einen Eintrag oben und einen hier.
-PROFILE_ORDER=(simple)
+PROFILE_ORDER=(caelestia simple shell2)
 
-# Startbefehl je Shell. Ohne Eintrag wird `qs -c <name> -n -d` benutzt —
-# shell2 laeuft genau so, ohne eigenen CLI-Wrapper.
+# Startbefehl je Shell (Schluessel = Shell-Name aus PROFILE_SHELL, nicht der
+# Profilname). Ohne Eintrag wird `qs -c <name> -n -d` benutzt — shell2 laeuft
+# genau so, ohne eigenen CLI-Wrapper. dynamic-island muss ueber die CLI starten,
+# sonst fehlt die MALLOC-Env (shell.py SHELL_ENV).
 declare -A SHELL_START=(
     [caelestia]="caelestia shell -d"
-    [simple]="dynamic-island shell -d"
+    [dynamic-island]="dynamic-island shell -d"
 )
+
+# Profile, deren Shell Inaktivitaet selbst verwaltet (sperren, Displays aus,
+# ScreenSaver-Inhibit; dynamic-island: modules/services/idle). Dort laeuft
+# kein hypridle – sonst sperren beide. Startet die Shell nicht, bleibt
+# hypridle als Rueckfall an. Gegenstueck in profiles/<name>.lua:
+# `idle_from_shell = true` (hyprland.lua startet hypridle dann nicht).
+IDLE_FROM_SHELL=(simple)
 
 die() {
     echo "hypr-profile: $*" >&2
@@ -186,8 +195,29 @@ sync_shell() {
         fi
     done
 
-    [ -n "$desired" ] || return 0
+    if [ -z "$desired" ]; then
+        sync_idle "$profile" 1
+        return 0
+    fi
     start_shell "$desired"
+    local rc=$?
+    sync_idle "$profile" "$rc"
+    return "$rc"
+}
+
+# hypridle passend zum Profil: aus, wenn die Shell es uebernimmt (und laeuft),
+# sonst an
+sync_idle() {
+    local profile="$1" shell_failed="$2" own=0 p
+    for p in "${IDLE_FROM_SHELL[@]}"; do
+        [ "$p" = "$profile" ] && own=1
+    done
+    if [ "$own" = 1 ] && [ "$shell_failed" = 0 ]; then
+        pkill -x hypridle 2>/dev/null
+    elif ! pidof -q hypridle; then
+        command -v hypridle >/dev/null 2>&1 && setsid -f hypridle >/dev/null 2>&1
+    fi
+    return 0
 }
 
 apply() {

@@ -8,8 +8,8 @@ import qs.modules.services.core
 
 // Auslastung und Temperaturen aus /proc und /sys.
 //
-// Quickshell bringt dafuer nichts mit (caelestia loest es mit einem
-// kompilierten C++-Plugin), also wird gelesen. Ein einziger Aufruf pro Takt
+// Quickshell bringt dafuer nichts mit, also wird ohne kompiliertes Plugin
+// direkt gelesen. Ein einziger Aufruf pro Takt
 // holt alles und gibt Zeilen mit Praefix aus – dasselbe Muster wie der
 // WLAN-Scan in services/network/Network.qml.
 //
@@ -40,7 +40,6 @@ Singleton {
 
     // ---- Grafik ----
     property bool hasGpu: false
-    property string gpuName: ""
     property real gpuUsage: 0        // 0…1
     property real gpuTemp: 0
     property real vramUsed: 0
@@ -106,15 +105,19 @@ Singleton {
             + '   [ -n "$t" ] || continue;'
             + '   case "$n" in'
             + '     k10temp|coretemp|zenpower|acpitz) echo "T cpu $t";;'
+            + '     amdgpu|nouveau|radeon) echo "T gpu $t";;'
             + '     nvme) echo "T nvme $t";;'
             + '     kraken*|nzxt*|liquidctl*) echo "T water $t";;'
             + '   esac;'
             + ' done;'
             + ' echo "S $(head -1 /proc/stat)";'
             + ' awk \'/^MemTotal:|^MemAvailable:/ { print "M", $1, $2 }\' /proc/meminfo;'
-            + ' python "$1";'
-            + ' df -B1 --output=used,size,avail / 2>/dev/null | tail -1 | sed "s/^/D /"',
-            "sh", Quickshell.shellPath("modules/services/system/nvidia-stats.py")]
+            + ' for c in /sys/class/drm/card*/device; do'
+            + '   [ -f "$c/gpu_busy_percent" ] && echo "G busy $(cat "$c/gpu_busy_percent")";'
+            + '   [ -f "$c/mem_info_vram_used" ] &&'
+            + '     echo "G vram $(cat "$c/mem_info_vram_used") $(cat "$c/mem_info_vram_total")";'
+            + ' done;'
+            + ' df -B1 --output=used,size,avail / 2>/dev/null | tail -1 | sed "s/^/D /"']
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -130,9 +133,6 @@ Singleton {
                         continue;
 
                     switch (f[0]) {
-                    case "N":
-                        root.gpuName = f.slice(1).join(" ");
-                        break;
                     case "T": {
                         // millidegrees -> °C
                         const c = Number(f[2]) / 1000;
@@ -206,10 +206,6 @@ Singleton {
                 root.nvmeTemps = nvme;
                 root.waterTemp = water;
                 root.hasGpu = gpuSeen;
-                if (!gpuSeen) {
-                    root.gpuName = "";
-                    root.vramTotal = 0;
-                }
                 root.loaded = true;
             }
         }
@@ -221,15 +217,5 @@ Singleton {
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh()
-    }
-
-    // Nur lesende Diagnose fuer Funktionstests; aendert keine GPU-Auswahl.
-    IpcHandler {
-        target: "systemstats"
-        function snapshot(): string {
-            return JSON.stringify({ loaded: root.loaded, hasGpu: root.hasGpu,
-                gpuName: root.gpuName, gpuUsage: root.gpuUsage, gpuTemp: root.gpuTemp,
-                vramUsed: root.vramUsed, vramTotal: root.vramTotal });
-        }
     }
 }

@@ -12,6 +12,13 @@ import qs.modules.widgets
 // Steht links neben der Uhr – eingeklappt wie aufgeklappt (Kopfzeile der
 // Uebersicht und der Untermenues), ein Klick wechselt den Workspace.
 //
+// Drei Stile (Config.notch.workspaceStyle), gezeichnet vom Marker unten:
+//   "staebchen"  senkrechte Striche, der aktive hoeher
+//   "punkte"     waagerechte Punkte, der aktive als breite Pille
+//   "zahlen"     Ziffern 1..n, der aktive voll deckend
+// Klick, Hover, Mausrad und Specials sind in allen Stilen gleich; die Hoehe
+// des Elements bleibt activeHeight, damit die Kopfzeile nicht springt.
+//
 // Special-Workspaces: ist auf DIESEM Monitor einer offen, treten die
 // Workspace-Staebchen fast ganz zurueck und an ihrer Stelle stehen die
 // vorhandenen Specials – ebenfalls als Staebchen, jeder in seiner eigenen
@@ -30,10 +37,19 @@ Item {
     property real barWidth: 5
     property real activeHeight: 15
     property real idleHeight: 9
+    // Punkte-Stil: Durchmesser und Breite der aktiven Pille
+    property real dotSize: 6
+    property real pillWidth: 16
+    // Zahlen-Stil: Schriftgroesse
+    property real digitSize: 11
+
+    readonly property string style: Config.notch.workspaceStyle
+    // Abstand der Marker je Stil
+    readonly property real gap: root.style === "punkte" ? 5 : root.style === "zahlen" ? 6 : 4
 
     readonly property HyprlandMonitor hyprMonitor: Hyprland.monitorFor(root.QsWindow.window?.screen ?? null)
     readonly property int activeId: root.hyprMonitor?.activeWorkspace?.id ?? 1
-    readonly property int groupOffset: HyprIpc.workspaceOffset(root.hyprMonitor)
+    readonly property int groupOffset: Math.floor((root.activeId - 1) / root.perMonitor) * root.perMonitor
     // Offener Special-Workspace auf DIESEM Monitor ("" = keiner)
     readonly property string activeSpecial: HyprIpc.specialOn(root.hyprMonitor)
     readonly property bool onSpecial: root.activeSpecial !== ""
@@ -86,9 +102,7 @@ Item {
         onWheel: event => {
             const angle = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
             const pixels = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.pixelDelta.x;
-            // Winkel vor Pixeln (s. Notch.flipWheel): die2,4G-Maus liefert
-            // beides, sonst waeren 4 Rastungen noetig. Touchpad: nur pixel.
-            const delta = angle !== 0 ? angle / 120 : pixels / 60;
+            const delta = pixels !== 0 ? pixels / 60 : angle / 120;
             if (wheel.accum !== 0 && Math.sign(delta) !== Math.sign(wheel.accum))
                 wheel.accum = 0;
             wheel.accum += delta;
@@ -125,12 +139,93 @@ Item {
         return Qt.hsla(hue, 0.7, light, 1);
     }
 
-    // ---- Staebchen ----
+    // ---- Marker: ein Workspace in einem der drei Stile ----
+    // Wird fuer Workspaces und Specials benutzt (StylePreview baut ihn fuer
+    // die Vorschau im Menue mit festen Werten nach).
+    component Marker: Item {
+        id: marker
+
+        property string style: "staebchen"
+        property bool active: false
+        property bool occupied: false
+        property bool hovered: false
+        property color color: Colors.primary
+        // Beschriftung im Zahlen-Stil
+        property string label: ""
+        // Deckkraft unter dem Zeiger (Specials heben staerker an)
+        property real hoverOpacity: 0.5
+        property real barWidth: 5
+        property real activeHeight: 15
+        property real idleHeight: 9
+        property real dotSize: 6
+        property real pillWidth: 16
+        property real digitSize: 11
+
+        readonly property bool dots: marker.style === "punkte"
+        readonly property bool digits: marker.style === "zahlen"
+        // aktiv 1, belegt 0.6, leer 0.3 – Hover hebt an, senkt aber nie
+        readonly property real fade: marker.active ? 1
+            : marker.occupied ? Math.max(0.6, marker.hovered ? marker.hoverOpacity : 0)
+            : marker.hovered ? marker.hoverOpacity
+            : 0.3
+
+        implicitWidth: marker.digits ? digit.implicitWidth
+                     : marker.dots ? (marker.active ? marker.pillWidth : marker.dotSize)
+                     : marker.barWidth
+        implicitHeight: marker.activeHeight
+
+        Behavior on implicitWidth {
+            NumberAnimation { duration: Appearance.morphDuration * 0.6; easing.type: Easing.OutCubic }
+        }
+
+        // Staebchen bzw. Punkt/Pille
+        Rectangle {
+            anchors.centerIn: parent
+            visible: !marker.digits
+            width: marker.dots ? (marker.active ? marker.pillWidth : marker.dotSize) : marker.barWidth
+            height: marker.dots ? marker.dotSize
+                  : marker.active ? marker.activeHeight : marker.idleHeight
+            radius: Math.min(width, height) / 2
+            color: marker.color
+            opacity: marker.fade
+
+            Behavior on height {
+                NumberAnimation { duration: Appearance.morphDuration * 0.6; easing.type: Easing.OutBack; easing.overshoot: 2 }
+            }
+            Behavior on width {
+                NumberAnimation { duration: Appearance.morphDuration * 0.6; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+            }
+        }
+
+        // Ziffer
+        Text {
+            id: digit
+
+            anchors.centerIn: parent
+            visible: marker.digits
+            text: marker.label
+            color: marker.color
+            font.family: Config.font
+            font.pixelSize: marker.digitSize
+            font.weight: Font.DemiBold
+            // Ziffern sind feiner als Flaechen und brauchen etwas mehr Deckkraft
+            opacity: Math.min(1, marker.fade + (marker.active ? 0 : 0.08))
+
+            Behavior on opacity {
+                NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+            }
+        }
+    }
+
+    // ---- Workspaces ----
     Row {
         id: bars
 
         anchors.centerIn: parent
-        spacing: 4
+        spacing: root.gap
         height: root.activeHeight
         opacity: root.onSpecial ? 0.12 : 1
         scale: root.onSpecial ? 0.9 : 1
@@ -150,32 +245,31 @@ Item {
                 readonly property int ws: root.groupOffset + slot.index + 1
                 readonly property bool active: slot.ws === root.activeId
 
-                width: root.barWidth
+                width: slotMarker.implicitWidth
                 height: root.activeHeight
 
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: root.barWidth
-                    height: slot.active ? root.activeHeight : root.idleHeight
-                    radius: width / 2
-                    color: root.color
-                    opacity: slot.active ? 1
-                           : root.occupied[slot.ws] ? 0.6
-                           : slotHover.hovered ? 0.5
-                           : 0.3
+                Marker {
+                    id: slotMarker
 
-                    Behavior on height {
-                        NumberAnimation { duration: Appearance.morphDuration * 0.6; easing.type: Easing.OutBack; easing.overshoot: 2 }
-                    }
-                    Behavior on opacity {
-                        NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
-                    }
+                    anchors.centerIn: parent
+                    style: root.style
+                    active: slot.active
+                    occupied: root.occupied[slot.ws] ?? false
+                    hovered: slotHover.hovered
+                    color: root.color
+                    label: String(slot.index + 1)
+                    barWidth: root.barWidth
+                    activeHeight: root.activeHeight
+                    idleHeight: root.idleHeight
+                    dotSize: root.dotSize
+                    pillWidth: root.pillWidth
+                    digitSize: root.digitSize
                 }
 
-                // Trefferflaeche groesser als das 5-px-Staebchen
+                // Trefferflaeche groesser als der Marker
                 Item {
                     anchors.centerIn: parent
-                    width: root.barWidth + bars.spacing
+                    width: slot.width + bars.spacing
                     height: root.activeHeight + 10
 
                     HoverHandler {
@@ -188,7 +282,11 @@ Item {
                     // schliessen (wie der aktive Punkt der grossen Leiste)
                     TapHandler {
                         onTapped: {
-                            if (!slot.active)
+                            if (slot.active)
+                                Hyprland.dispatch(Hyprland.usingLua
+                                    ? 'hl.dsp.workspace.toggle_special("special")'
+                                    : "togglespecialworkspace special");
+                            else
                                 Hyprland.dispatch(Hyprland.usingLua
                                     ? `hl.dsp.focus({ workspace = ${slot.ws} })`
                                     : `workspace ${slot.ws}`);
@@ -199,8 +297,9 @@ Item {
         }
     }
 
-    // ---- Specials als farbige Staebchen ----
-    // Liegen mittig ueber der Workspace-Reihe, gleiche Masse und Bewegung.
+    // ---- Specials als farbige Marker ----
+    // Liegen mittig ueber der Workspace-Reihe, gleicher Stil und Bewegung;
+    // im Zahlen-Stil steht der Anfangsbuchstabe des Specials.
     Row {
         id: specialBars
 
@@ -225,28 +324,32 @@ Item {
                 readonly property string key: special.modelData.name.slice("special:".length)
                 readonly property bool active: root.activeSpecial === special.modelData.name
 
-                width: root.barWidth
+                width: specialMarker.implicitWidth
                 height: root.activeHeight
 
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: root.barWidth
-                    height: special.active ? root.activeHeight : root.idleHeight
-                    radius: width / 2
-                    color: root.specialColor(special.key, special.index)
-                    opacity: special.active ? 1 : specialHover.hovered ? 0.8 : 0.5
+                Marker {
+                    id: specialMarker
 
-                    Behavior on height {
-                        NumberAnimation { duration: Appearance.morphDuration * 0.6; easing.type: Easing.OutBack; easing.overshoot: 2 }
-                    }
-                    Behavior on opacity {
-                        NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
-                    }
+                    anchors.centerIn: parent
+                    style: root.style
+                    active: special.active
+                    // Specials gelten immer als belegt (sie liegen ja vor)
+                    occupied: true
+                    hovered: specialHover.hovered
+                    hoverOpacity: 0.8
+                    color: root.specialColor(special.key, special.index)
+                    label: special.key.charAt(0).toUpperCase()
+                    barWidth: root.barWidth
+                    activeHeight: root.activeHeight
+                    idleHeight: root.idleHeight
+                    dotSize: root.dotSize
+                    pillWidth: root.pillWidth
+                    digitSize: root.digitSize
                 }
 
                 Item {
                     anchors.centerIn: parent
-                    width: root.barWidth + specialBars.spacing
+                    width: special.width + specialBars.spacing
                     height: root.activeHeight + 10
 
                     HoverHandler {

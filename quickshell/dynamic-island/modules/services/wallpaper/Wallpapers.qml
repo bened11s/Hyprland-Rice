@@ -2,8 +2,10 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import qs.modules.services.config
+import qs.modules.services.system
 import qs.modules.services.theme
 
 import qs
@@ -11,9 +13,8 @@ import qs
 // Wallpaper-Dienst: kennt die Bilder im Wallpaper-Ordner, das aktuell
 // gesetzte und das gerade nur vorgeschaute.
 //
-// Vorbild ist caelestia/services/Wallpapers.qml – nur ohne dessen
-// Caelestia.Models-Plugin (FileSystemModel gibt es hier nicht). Die Liste
-// kommt stattdessen aus einem `find`; gescannt wird erst, wenn sie gebraucht
+// Kommt ohne kompiliertes Plugin aus (Quickshell hat kein FileSystemModel):
+// Die Liste kommt aus einem `find`; gescannt wird erst, wenn sie gebraucht
 // wird (`ensureLoaded`, bei jedem Oeffnen der Auswahl - neue Bilder tauchen so
 // ohne Neustart auf), damit der Start der Shell nichts davon merkt.
 //
@@ -59,19 +60,22 @@ Singleton {
     property bool showPreview: false
     readonly property string current: root.showPreview && root.previewPath !== "" ? root.previewPath
                                                                                   : root.actualCurrent
+    // Die Vorschau ist nur ein kleines Bild (previewThumb): der Hintergrund
+    // dekodiert es dann in seiner Groesse, statt es auf Bildschirmgroesse
+    // hochzurechnen. Als Funktion statt Bindung: WallpaperStage fragt beim
+    // Wechsel von `current`, und eine zweite Bindung waere in dem Moment
+    // womoeglich noch nicht nachgezogen (Reihenfolge der Benachrichtigung).
+    property bool previewSmall: false
+
+    function smallFor(path: string): bool {
+        return root.showPreview && root.previewSmall && path === root.previewPath;
+    }
 
     // ---- Uebergang ----
     // Welche Animation der Hintergrund beim Wechsel spielt (Config
     // wallpaper.transition). "zufall" wuerfelt – aber je Bild fest, damit
     // beide Monitore dieselbe zeigen, ohne sich abzusprechen.
     readonly property var transitions: ["blende", "wischen", "schieben", "kreis", "zoom"]
-
-    // Den Uebergang einmal auf dem aktuellen Bild vorfuehren (WallpaperStage)
-    signal replayRequested
-
-    function replay(): void {
-        root.replayRequested();
-    }
 
     function transitionFor(path: string): string {
         const chosen = Config.wallpaper.transition;
@@ -81,6 +85,69 @@ Singleton {
         for (let i = 0; i < path.length; i++)
             h = (h * 31 + path.charCodeAt(i)) | 0;
         return root.transitions[Math.abs(h) % root.transitions.length];
+    }
+
+    // ---- Stil je Bild ----
+    // Die Material-Variante, mit der aus einem Bild die Palette wird, haengt am
+    // Bild: die CLI merkt sich eine feste Wahl je Pfad (variants.json), Bilder
+    // ohne Eintrag bekommen den Stil, den sie aus der Farbigkeit ausrechnet
+    // ("auto"). Wirkt nur beim dynamischen Schema.
+    readonly property string variantsPath: Quickshell.env("HOME") + "/.local/state/dynamic-island/wallpaper/variants.json"
+    property var variants: ({})
+
+    // Was die Vorschau fuer das gerade markierte Bild ergeben hat – bei "auto"
+    // der ausgerechnete Stil
+    property string previewVariant: ""
+
+    // Feste Wahl fuer ein Bild, leer = auto
+    function variantFor(path: string): string {
+        return root.variants[path] ?? "";
+    }
+
+    // Stil fuer ein Bild festlegen ("auto" nimmt die Wahl zurueck). Ist es das
+    // aktuelle Bild, faerbt die CLI gleich um; sonst gilt er beim naechsten
+    // Setzen. Die Vorschau rechnet danach mit dem neuen Stil nach.
+    function setVariant(path: string, variant: string): void {
+        if (path === "")
+            return;
+        const next = Object.assign({}, root.variants);
+        if (variant === "auto")
+            delete next[path];
+        else
+            next[path] = variant;
+        root.variants = next;           // sofort, die Datei zieht gleich nach
+
+        variantProc.running = false;
+        variantProc.command = [root.cli, "wallpaper", "--variant", variant, "--for", path];
+        variantProc.path = path;
+        variantProc.running = true;
+    }
+
+    Process {
+        id: variantProc
+
+        property string path: ""
+
+        onExited: {
+            if (root.showPreview && root.previewPath === variantProc.path)
+                root.preview(variantProc.path);
+        }
+    }
+
+    FileView {
+        path: root.variantsPath
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const data = JSON.parse(text());
+                root.variants = typeof data === "object" && data ? data : {};
+            } catch (e) {
+                root.variants = {};
+            }
+        }
+        onLoadFailed: root.variants = {}
     }
 
     // ---- Liste ----
@@ -132,6 +199,107 @@ Singleton {
         Quickshell.execDetached([root.cli, "wallpaper", "-r"]);
     }
 
+    // ---- Zufallsmodus ----
+    // Config.wallpaper.random: "start" wuerfelt einmal je Login, "timer"
+    // ausserdem alle randomMinutes. Die Shell startet aber nicht nur beim
+    // Login (Hot-Reload, shell-restart, Neustart nach Crash) – darum merkt sich
+    // randomSessionPath, fuer welche Hyprland-Instanz schon gewuerfelt wurde.
+    readonly property string randomSessionPath: Quickshell.env("HOME")
+        + "/.local/state/dynamic-island/wallpaper/random-session"
+    readonly property string session: Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "ohne-hyprland"
+    readonly property bool randomOn: Config.wallpaper.random === "start" || Config.wallpaper.random === "timer"
+    property bool startChecked: false
+
+    // Nicht mitten ins Spiel wechseln: ein Wechsel faerbt Shell und Hyprland
+    // um (scheme.json, hyprctl reload). Ebenso nicht, waehrend man in der
+    // Auswahl blaettert.
+    readonly property bool randomBusy: SessionModes.gameMode || root.showPreview
+        || Hyprland.monitors.values.some(m => m.activeWorkspace?.hasFullscreen ?? false)
+
+    // Ordner fuer `wallpaper -r`: ganzer Wallpaper-Ordner oder nur der
+    // Unterordner des aktuellen Bilds
+    function randomDir(): string {
+        const prefix = root.wallsDir + "/";
+        if (Config.wallpaper.randomScope === "ordner" && root.actualCurrent.startsWith(prefix)) {
+            const dir = root.actualCurrent.slice(0, root.actualCurrent.lastIndexOf("/"));
+            if (dir.length >= prefix.length)
+                return dir;
+        }
+        return root.wallsDir;
+    }
+
+    function randomTick(): void {
+        if (root.randomBusy) {
+            root.randomPending = true;
+            return;
+        }
+        root.randomPending = false;
+        randomProc.only = "";
+        randomProc.running = true;
+    }
+
+    // Einmal je Hyprland-Instanz; der Abgleich mit der Merkdatei steckt im
+    // Skript, damit zwei Shell-Starts kurz nacheinander nicht doppelt wuerfeln
+    function randomAtStart(): void {
+        if (root.startChecked)
+            return;
+        root.startChecked = true;
+        if (!root.randomOn)
+            return;
+        randomProc.only = root.session;
+        randomProc.running = true;
+    }
+
+    // Verschobener Wechsel (Vollbild/Game-Mode/Auswahl offen): nachholen,
+    // sobald wieder frei ist
+    property bool randomPending: false
+
+    onRandomBusyChanged: {
+        if (!root.randomBusy && root.randomPending)
+            pendingDelay.restart();
+    }
+
+    Timer {
+        id: randomTimer
+
+        running: Config.wallpaper.random === "timer"
+        repeat: true
+        interval: Math.max(1, Config.wallpaper.randomMinutes) * 60000
+        onTriggered: root.randomTick()
+    }
+
+    // Kurz warten, bevor ein verschobener Wechsel kommt: nach dem Schliessen
+    // eines Spiels nicht gleich im ersten Moment
+    Timer {
+        id: pendingDelay
+
+        interval: 5000
+        onTriggered: {
+            if (Config.wallpaper.random === "timer")
+                root.randomTick();
+            else
+                root.randomPending = false;
+        }
+    }
+
+    Process {
+        id: randomProc
+
+        // Gesetzt: nur wuerfeln, wenn fuer diese Sitzung noch nicht geschehen
+        property string only: ""
+
+        // Laesst sich im Unterordner nichts Neues finden (nur ein Bild),
+        // faellt es auf den ganzen Wallpaper-Ordner zurueck
+        command: ["sh", "-c", `
+            mark="$1"; only="$2"; cli="$3"; dir="$4"; all="$5"
+            if [ -n "$only" ]; then
+                [ "$(cat "$mark" 2>/dev/null)" = "$only" ] && exit 0
+                mkdir -p "$(dirname "$mark")" && printf '%s\n' "$only" > "$mark"
+            fi
+            "$cli" wallpaper -r "$dir" 2>/dev/null || "$cli" wallpaper -r "$all"
+        `, "sh", root.randomSessionPath, randomProc.only, root.cli, root.randomDir(), root.wallsDir]
+    }
+
     // ---- Vorschau ----
     // Bild und Farben: `wallpaper -p` rechnet die Palette aus, die das Bild
     // ergeben WUERDE, ohne etwas zu setzen (~90-230ms, danach aus dem Cache).
@@ -140,7 +308,26 @@ Singleton {
     // Nur wenn das Schema ueberhaupt am Wallpaper haengt: bei einem festen
     // Schema (catppuccin, tokyonight, ...) aendert ein Bildwechsel die Farben
     // nicht, die Vorschau wuerde also etwas zeigen, was nie eintritt.
+    //
+    // Der Pfad darf auch ausserhalb des Wallpaper-Ordners liegen (dann ohne
+    // Vorschaubild der Auswahl – siehe thumbPathFor).
     function preview(path: string): void {
+        root.previewSmall = false;
+        root.previewAs(path);
+    }
+
+    // Dasselbe mit einem kleinen Bild (Thumb, z.B. ein Treffer aus dem Netz,
+    // der lokal noch nicht liegt): der Hintergrund zieht es nur hoch, statt
+    // es beim Dekodieren auf Bildschirmgroesse zu rechnen. Fuer die Palette
+    // reicht es – die CLI rechnet ohnehin auf einem 128-px-Abzug.
+    function previewThumb(path: string): void {
+        root.previewSmall = true;
+        root.previewAs(path);
+    }
+
+    function previewAs(path: string): void {
+        if (root.previewPath !== path)
+            root.previewVariant = "";
         root.previewPath = path;
         root.showPreview = true;
 
@@ -155,6 +342,8 @@ Singleton {
     function stopPreview(): void {
         root.showPreview = false;
         root.previewPath = "";
+        root.previewSmall = false;
+        root.previewVariant = "";
         colourPreview.running = false;
         Colors.clearPreview();
     }
@@ -171,8 +360,14 @@ Singleton {
                 // Wer inzwischen weitergeblaettert oder zugemacht hat, soll
                 // nicht die Farben von vorhin bekommen. Leer = der Prozess
                 // wurde fuer das naechste Bild abgebrochen.
-                if (text.trim() !== "" && root.showPreview && colourPreview.wall === root.previewPath)
+                if (text.trim() !== "" && root.showPreview && colourPreview.wall === root.previewPath) {
                     Colors.loadPreview(text);
+                    try {
+                        root.previewVariant = JSON.parse(text).variant ?? "";
+                    } catch (e) {
+                        root.previewVariant = "";
+                    }
+                }
             }
         }
     }
@@ -247,6 +442,11 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: root.actualCurrent = text().trim()
+        onLoaded: {
+            root.actualCurrent = text().trim();
+            // Erst jetzt: "ordner" braucht das aktuelle Bild
+            root.randomAtStart();
+        }
+        onLoadFailed: root.randomAtStart()
     }
 }

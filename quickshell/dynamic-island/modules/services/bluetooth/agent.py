@@ -62,6 +62,8 @@ class Agent:
             self.ready = True
             emit("ready", ready=True)
         except GLib.Error as error:
+            self.ready = False
+            emit("ready", ready=False)
             emit("error", message=error.message)
 
     def vanished(self, *_):
