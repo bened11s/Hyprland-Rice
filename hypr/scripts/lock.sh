@@ -1,6 +1,6 @@
 #!/bin/sh
 # Sitzung sperren. Welcher Sperrbildschirm startet, entscheidet die
-# Shell-Einstellung "Sperrbildschirm" (shell.json, lockscreen.style):
+# Shell-Einstellung "Sperrbildschirm" (shell.json, lock.style):
 #
 #   karte     Lockscreen der dynamic-island-Shell (quickshell/dynamic-island/
 #             modules/lock); laeuft die Shell nicht, hyprlock mit

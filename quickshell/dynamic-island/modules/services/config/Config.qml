@@ -597,9 +597,6 @@ Singleton {
                 property string randomScope: "alle"
             }
 
-            // Sperrbildschirm (SUPER+L, hypridle, Lock-Kachel). Der Wert wird
-            // von ~/.local/bin/hyprlock-select aus shell.json gelesen und
-            // entscheidet, welche der beiden hyprlock-Konfigurationen startet.
             property JsonObject bar: JsonObject {
                 property bool workspaces: true
                 property int workspaceCount: 5
