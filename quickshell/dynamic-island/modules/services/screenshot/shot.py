@@ -73,10 +73,13 @@ def op_freeze(args):
     with ThreadPoolExecutor(max_workers=max(1, len(monitors))) as pool:
         shots = dict(pool.map(grab, monitors))
 
+    # Hyprland 0.57 gibt Spezial-Workspaces keine IDs mehr (id = null), deshalb
+    # wird ueber den Namen verglichen – der ist immer gesetzt (z. B. "3" oder
+    # "special:communication").
     visible = {}
     for m in monitors:
-        ws = {m["activeWorkspace"]["id"]}
-        special = (m.get("specialWorkspace") or {}).get("id", 0)
+        ws = {m["activeWorkspace"].get("name")}
+        special = (m.get("specialWorkspace") or {}).get("name") or ""
         if special:
             ws = {special}      # Spezial-Workspace liegt ueber allem
         visible[m["id"]] = (m["name"], ws)
@@ -86,7 +89,7 @@ def op_freeze(args):
         mon = visible.get(c.get("monitor"))
         if not mon or not c.get("mapped") or c.get("hidden"):
             continue
-        if c["workspace"]["id"] not in mon[1]:
+        if (c.get("workspace") or {}).get("name") not in mon[1]:
             continue
         windows.append({
             "x": c["at"][0], "y": c["at"][1], "w": c["size"][0], "h": c["size"][1],
