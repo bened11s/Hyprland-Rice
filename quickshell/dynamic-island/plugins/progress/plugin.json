@@ -1,0 +1,28 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "progress",
+    "name": "Fortschritt",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "donut_large",
+    "description": "Wie viel vom Tag, der Woche, dem Monat und dem Jahr schon vorbei ist.",
+    "author": "nox",
+    "defaultEnabled": true,
+    "widgets": {
+        "progress": {
+            "title": "Fortschritt",
+            "desc": "Tag, Woche, Monat, Jahr – als Ringe oder Balken",
+            "icon": "donut_large",
+            "component": "ProgressWidget.qml",
+            "size": [15, 8],
+            "options": {
+                "stil": { "title": "Stil", "values": ["ringe", "balken"], "default": "ringe" },
+                "tag": { "title": "Tag", "bool": true, "default": true },
+                "woche": { "title": "Woche", "bool": true, "default": true },
+                "monat": { "title": "Monat", "bool": true, "default": true },
+                "jahr": { "title": "Jahr", "bool": true, "default": true }
+            }
+        }
+    }
+}

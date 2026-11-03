@@ -1,0 +1,4 @@
+Heute noch offen
+Milch und Kaffee holen
+Rust-Build für nox-media laufen lassen
+Abend: Docker-Images prüfen

@@ -1,0 +1,25 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "notiz",
+    "name": "Notiz",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "sticky_note_2",
+    "description": "Ein Zettel auf dem Desktop – liest ~/.config/dynamic-island/notiz.txt.",
+    "author": "nox",
+    "defaultEnabled": true,
+    "widgets": {
+        "notiz": {
+            "title": "Notiz",
+            "desc": "Text aus notiz.txt, erste Zeile als Überschrift",
+            "icon": "sticky_note_2",
+            "component": "NotizWidget.qml",
+            "size": [16, 8],
+            "options": {
+                "zeilen": { "title": "Zeilen", "values": ["3", "5", "8", "12"], "default": "5" },
+                "kopf": { "title": "Überschrift", "bool": true, "default": true }
+            }
+        }
+    }
+}

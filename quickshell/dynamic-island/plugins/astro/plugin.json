@@ -1,0 +1,26 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "astro",
+    "name": "Sonnenstand",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "wb_twilight",
+    "description": "Sonnenaufgang, Untergang, Tageslichtverlauf und Mondphase – reine Rechnung, ohne Netz.",
+    "author": "nox",
+    "defaultEnabled": true,
+    "widgets": {
+        "astro": {
+            "title": "Sonnenstand",
+            "desc": "Aufgang, Untergang, Tageslicht und Mondphase",
+            "icon": "wb_twilight",
+            "component": "AstroWidget.qml",
+            "size": [15, 8],
+            "options": {
+                "ort": { "title": "Ort", "values": ["Köln", "Berlin", "Hamburg", "München", "Leipzig", "Wien", "Zürich"], "default": "Köln" },
+                "verlauf": { "title": "Tageslicht", "bool": true, "default": true },
+                "mond": { "title": "Mond", "bool": true, "default": true }
+            }
+        }
+    }
+}

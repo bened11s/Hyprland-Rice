@@ -1,0 +1,27 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "worldclock",
+    "name": "Weltuhr",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "public",
+    "description": "Drei Zeitzonen nebeneinander – mit Sommerzeit, ohne Netz.",
+    "author": "nox",
+    "defaultEnabled": true,
+    "widgets": {
+        "worldclock": {
+            "title": "Weltuhr",
+            "desc": "Drei Städte mit Uhrzeit und Tag/Nacht-Punkt",
+            "icon": "public",
+            "component": "WorldClockWidget.qml",
+            "size": [12, 7],
+            "options": {
+                "zone1": { "title": "Ort 1", "values": ["tokio", "singapur", "dubai", "berlin", "london", "new-york", "los-angeles", "sydney", "keine"], "default": "tokio" },
+                "zone2": { "title": "Ort 2", "values": ["tokio", "singapur", "dubai", "berlin", "london", "new-york", "los-angeles", "sydney", "keine"], "default": "new-york" },
+                "zone3": { "title": "Ort 3", "values": ["tokio", "singapur", "dubai", "berlin", "london", "new-york", "los-angeles", "sydney", "keine"], "default": "london" },
+                "sekunden": { "title": "Sekunden", "bool": true, "default": false }
+            }
+        }
+    }
+}
