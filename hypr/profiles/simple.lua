@@ -371,6 +371,11 @@ end
 -- Gruppe wird zu einer Zeile mit mehreren Kuerzeln zusammengefasst.
 -- bind() merkt sich die Aktion beschriebener Binds, damit die Uebersicht sie
 -- per Klick ausloesen kann (bind_described/run_keybind in ../hyprland.lua).
+-- Shell-Binds: Plugin-Tastenkuerzel (z. B. SUPER + ALT + W fuer Wallhaven,
+-- SUPER + ALT + D fuer die Desktop-Widgets) stehen in
+-- ~/.local/state/dynamic-island/keybinds.lua und werden von sync_keybinds()
+-- in ../hyprland.lua gebunden. Ohne diese Zeile fehlen sie komplett.
+keybinds_from_shell = true
 local bind = bind_described
 local group = ""
 local function desc(text, opts, label)
