@@ -31,6 +31,7 @@ Singleton {
     readonly property alias quick: adapter.quick
     readonly property alias osd: adapter.osd
     readonly property alias wallpaper: adapter.wallpaper
+    readonly property alias lockscreen: adapter.lockscreen
 
     // Schrift fuer alle Texte der Shell (Icons behalten Material Symbols)
     readonly property string font: adapter.appearance.font
@@ -135,6 +136,12 @@ Singleton {
             desc: "Länge des Übergangs. Beim Durchblättern in der Auswahl läuft er schneller",
             min: 200, max: 2000, step: 100, unit: "ms"
         },
+        // Welchen Sperrbildschirm SUPER+L startet (~/.local/bin/hyprlock-select)
+        "lockscreen.style": {
+            title: "Sperrbildschirm",
+            desc: "Optik beim Sperren. Karte: Pillen-Optik mit Uhr. Vollbild: große Uhr und Datum über dem unscharfen Wallpaper",
+            options: ["karte", "vollbild"]
+        },
         // `editor` statt Bedienelement: das Menue laedt dafuer einen eigenen
         // Editor (modules/settings/QuickLayoutEditor.qml)
         // Regler am rechten Rand (modules/osd)
@@ -160,7 +167,7 @@ Singleton {
 
     // Reihenfolge und Symbole der Gruppen im Menue (Material-Symbols-Namen).
     // Gruppen, die hier fehlen, haengt das Menue hinten an.
-    readonly property var sectionOrder: ["bar", "quick", "osd", "notch", "appearance", "wallpaper", "notifications", "vpn"]
+    readonly property var sectionOrder: ["bar", "quick", "osd", "notch", "appearance", "wallpaper", "lockscreen", "notifications", "vpn"]
     readonly property var sectionIcons: ({
         "bar": "space_dashboard",
         "quick": "dashboard_customize",
@@ -168,6 +175,7 @@ Singleton {
         "notch": "web_asset",
         "appearance": "palette",
         "wallpaper": "wallpaper_slideshow",
+        "lockscreen": "lock",
         "notifications": "notifications",
         "vpn": "vpn_key"
     })
@@ -180,6 +188,7 @@ Singleton {
         "vpn": "VPN",
         "appearance": "Darstellung",
         "wallpaper": "Wallpaper",
+        "lockscreen": "Sperrbildschirm",
         "notch": "Notch-Layout"
     })
 
@@ -377,6 +386,13 @@ Singleton {
             property JsonObject wallpaper: JsonObject {
                 property string transition: "kreis"
                 property int duration: 800
+            }
+
+            // Sperrbildschirm (SUPER+L, hypridle, Lock-Kachel). Der Wert wird
+            // von ~/.local/bin/hyprlock-select aus shell.json gelesen und
+            // entscheidet, welche der beiden hyprlock-Konfigurationen startet.
+            property JsonObject lockscreen: JsonObject {
+                property string style: "karte"
             }
 
             property JsonObject bar: JsonObject {

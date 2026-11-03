@@ -33,12 +33,15 @@ hl.window_rule({ match = { tag = "float" }, float = true })
 -- Opaque Apps (Terminal, Image Viewers, Creative Software, Games) as they prefer native transparency as required
 hl.window_rule({
     match = {
-        class = "foot|equibop|org.quickshell|imv|swappy|krita|gimp|inkscape|darktable|resolve|kdenlive|shotcut|blender|godot|zen|(steam_app_(default|[0-9]+))|gamescope|deckhand",
+        class = "foot|equibop|org.quickshell|imv|swappy|krita|gimp|inkscape|darktable|resolve|kdenlive|shotcut|blender|godot|(steam_app_(default|[0-9]+))|gamescope|deckhand",
     },
     tag = "+opaque_app",
 })
 
 hl.window_rule({ match = { tag = "opaque_app" }, opaque = true })
+
+-- Zen Browser: leicht transparent wie das Rice
+hl.window_rule({ match = { class = "zen" }, opacity = "0.92 0.88 override" })
 
 -- Firefox: opak, außer ein YouTube-Tab ist aktiv (Titel enthält "YouTube")
 hl.window_rule({ match = { class = "firefox" }, opacity = "1 1 override" })

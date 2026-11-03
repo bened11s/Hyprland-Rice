@@ -48,18 +48,22 @@ end
 local cfg = {
 	-- Apps
 	terminal = "kitty",
-	browser = "opera-gx",
+	browser = "zen-browser",
 	editor = "kate",
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
-	-- Sperrbildschirm (SUPER + L): die eigene Config, ~/.config/hypr/hyprlock.conf.
+	-- Sperrbildschirm (SUPER + L): hyprlock-select entscheidet nach der
+	-- Shell-Einstellung "Sperrbildschirm" (shell.json, lockscreen.style),
+	-- welche Config startet:
+	--   karte     -> ~/.config/hypr/hyprlock.conf       (Pillen-Optik)
+	--   vollbild  -> ~/.config/hypr/hyprlock-full.conf  (grosse Uhr, Wallpaper)
 	-- Layout 12 aus Hyprlock-Dots liegt weiterhin unter ~/.config/hyprlock.
 	-- Wieder darauf umstellen:
 	--   lockCmd = "hyprlock -c " .. home .. "/.config/hyprlock/layout12.conf"
 	-- oder mit vorher gebautem Hintergrund (unscharfe Spalte links):
 	--   lockCmd = home .. "/.config/hyprlock/scripts/lock.sh"
-	lockCmd = "hyprlock",
+	lockCmd = home .. "/.local/bin/hyprlock-select",
 
 	-- Tastatur / Maus
 	kbLayout = "de",

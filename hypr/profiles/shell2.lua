@@ -58,13 +58,15 @@ local cfg = {
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
-	-- Sperrbildschirm (SUPER + L): die eigene Config, ~/.config/hypr/hyprlock.conf.
-	-- Layout 12 aus Hyprlock-Dots liegt weiterhin unter ~/.config/hyprlock.
+	-- Sperrbildschirm (SUPER + L): hyprlock-select entscheidet nach der
+	-- Shell-Einstellung "Sperrbildschirm" (shell.json, lockscreen.style),
+	-- welche Config startet (karte = hyprlock.conf, vollbild =
+	-- hyprlock-full.conf). Layout 12 aus Hyprlock-Dots unter ~/.config/hyprlock.
 	-- Wieder darauf umstellen:
 	--   lockCmd = "hyprlock -c " .. home .. "/.config/hyprlock/layout12.conf"
 	-- oder mit vorher gebautem Hintergrund (unscharfe Spalte links):
 	--   lockCmd = home .. "/.config/hyprlock/scripts/lock.sh"
-	lockCmd = "hyprlock",
+	lockCmd = home .. "/.local/bin/hyprlock-select",
 
 	-- Tastatur / Maus
 	kbLayout = "de",

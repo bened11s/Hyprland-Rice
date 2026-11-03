@@ -1135,7 +1135,7 @@ ColumnLayout {
         CircleToggle {
             icon: "lock"
             active: false
-            onToggled: Quickshell.execDetached(["hyprlock"])
+            onToggled: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/hyprlock-select"])
         }
     }
 
