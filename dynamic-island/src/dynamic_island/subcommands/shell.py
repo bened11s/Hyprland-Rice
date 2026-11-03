@@ -51,8 +51,17 @@ class Command:
                 args.extend(["--log-rules", self.args.log_rules])
             env = os.environ | SHELL_ENV
             if self.args.daemon:
-                args.append("-d")
-                subprocess.run(args, env=env)
+                # Selbst abkoppeln statt `qs -d`: im Daemon-Modus kommen
+                # zusaetzliche Variablen (SHELL_ENV) beim gestarteten qs nicht
+                # an – nachgemessen 2026-10-21
+                subprocess.Popen(
+                    args,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
             else:
                 shell = subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True, env=env)
 

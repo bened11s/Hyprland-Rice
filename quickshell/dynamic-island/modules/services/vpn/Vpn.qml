@@ -7,16 +7,18 @@ import Quickshell.Io
 import qs.modules.services.config
 import qs.modules.services.core
 
+import qs
+
 Singleton {
     id: root
 
     readonly property string provider: Config.vpn.provider === "cloudflare" ? "cloudflare" : "nordvpn"
     readonly property string providerName: provider === "cloudflare" ? "Cloudflare WARP" : "NordVPN"
     readonly property bool connected: statusProc.status === "Connected"
-    readonly property string statusText: !root.available ? (root.toolsChecked ? "Nicht installiert" : "Nicht bereit")
-                                                : connected ? "Verbunden"
-                                                : statusProc.status === "Disconnected" ? "Getrennt"
-                                                : "Nicht bereit"
+    readonly property string statusText: !root.available ? (root.toolsChecked ? I18n.tr("Nicht installiert") : I18n.tr("Nicht bereit"))
+                                                : connected ? I18n.tr("Verbunden")
+                                                : statusProc.status === "Disconnected" ? I18n.tr("Getrennt")
+                                                : I18n.tr("Nicht bereit")
     // Welche CLIs installiert sind – fehlende werden gar nicht erst aufgerufen
     property bool nordAvailable: false
     property bool warpAvailable: false
@@ -123,7 +125,7 @@ Singleton {
             if (_prevStatus !== "" && known(_prevStatus) && known(status) && was !== now) {
                 console.log("VPN status changed:", now ? "connected" : "disconnected");
                 Quickshell.execDetached(["notify-send", "-a", "dynamic-island", root.providerName,
-                                         now ? "Verbunden" : "Getrennt"]);
+                                         now ? I18n.tr("Verbunden") : I18n.tr("Getrennt")]);
             }
             _prevStatus = status;
         }
@@ -212,9 +214,14 @@ Singleton {
         onTriggered: root.refreshStatus()
     }
 
-    // Regelmäßiges Polling, falls sich außerhalb der Shell was ändert
+    // Kachel geht auf: sofort frisch lesen, statt auf den naechsten Takt zu warten
+    onWatchingChanged: if (root.watching) root.refreshStatus()
+
+    // Regelmäßiges Polling, falls sich außerhalb der Shell was ändert. Ohne
+    // offene Kachel nur selten – sichtbar ist der Status dann hoechstens als
+    // Symbol der Insel-Pille.
     Timer {
-        interval: root.watching ? 15000 : 60000
+        interval: root.watching ? 15000 : 300000
         running: root.toolsChecked && (root.nordAvailable || root.warpAvailable)
         repeat: true
         onTriggered: {

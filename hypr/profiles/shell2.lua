@@ -58,15 +58,15 @@ local cfg = {
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
-	-- Sperrbildschirm (SUPER + L): hyprlock-select entscheidet nach der
-	-- Shell-Einstellung "Sperrbildschirm" (shell.json, lockscreen.style),
-	-- welche Config startet (karte = hyprlock.conf, vollbild =
-	-- hyprlock-full.conf). Layout 12 aus Hyprlock-Dots unter ~/.config/hyprlock.
+	-- Sperrbildschirm (SUPER + L): scripts/lock.sh liest die Shell-Einstellung
+	-- "Sperrbildschirm" (shell.json, lockscreen.style): karte = Lockscreen der
+	-- dynamic-island-Shell (Fallback hyprlock.conf), vollbild = hyprlock mit
+	-- hyprlock-full.conf. Layout 12 aus Hyprlock-Dots unter ~/.config/hyprlock.
 	-- Wieder darauf umstellen:
 	--   lockCmd = "hyprlock -c " .. home .. "/.config/hyprlock/layout12.conf"
 	-- oder mit vorher gebautem Hintergrund (unscharfe Spalte links):
 	--   lockCmd = home .. "/.config/hyprlock/scripts/lock.sh"
-	lockCmd = home .. "/.local/bin/hyprlock-select",
+	lockCmd = home .. "/.config/hypr/scripts/lock.sh",
 
 	-- Tastatur / Maus
 	kbLayout = "de",
@@ -504,7 +504,7 @@ hl.bind("SUPER + Period", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island emoji 
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("dynamic-island wallpaper -r"))
 hl.bind("CTRL + SUPER + SHIFT + T", hl.dsp.exec_cmd("dynamic-island scheme set -r"))
 
--- Shell dieses Profils neu starten / beenden (wie im Caelestia-Profil belegt)
+-- Shell dieses Profils neu starten / beenden
 hl.bind("CTRL + SUPER + ALT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-restart"), { release = true })
 hl.bind("CTRL + SUPER + SHIFT + R", hl.dsp.exec_cmd(hyprProfile .. " shell-kill"), { release = true })
 

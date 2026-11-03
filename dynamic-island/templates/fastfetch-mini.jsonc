@@ -1,0 +1,25 @@
+// fastfetch in Schema-Farben, mini (~32 Spalten) – siehe templates/fastfetch.jsonc
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "none"
+    },
+    "display": {
+        "separator": " ",
+        "color": {
+            "keys": "38;2;{{ primary.ansi }}",
+            "output": "default"
+        }
+    },
+    "modules": [
+        {
+            "type": "title",
+            "key": "\u001b[38;2;{{ tertiary.ansi }}m",
+            "format": "\u001b[1;38;2;{{ primary.ansi }}m{user-name}\u001b[0m\u001b[38;2;{{ outline.ansi }}m @ \u001b[0m\u001b[1;38;2;{{ tertiary.ansi }}m{host-name}\u001b[0m"
+        },
+        { "type": "os", "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰣇  OS  ", "format": "{pretty-name}" },
+        { "type": "kernel", "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󰒋  Krnl", "format": "{release}" },
+        { "type": "uptime", "key": "\u001b[38;2;{{ outline.ansi }}m│\u001b[38;2;{{ primary.ansi }}m 󱎫  Up  " },
+        { "type": "memory", "key": "\u001b[38;2;{{ outline.ansi }}m╰\u001b[38;2;{{ primary.ansi }}m 󰘚  RAM ", "format": "{used} / {total}" }
+    ]
+}

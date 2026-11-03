@@ -1,0 +1,27 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "matrix",
+    "name": "Matrix-Regen",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "code",
+    "description": "Fallende Zeichen als GPU-Shader, pausiert mit dem Desktop.",
+    "author": "gamecat",
+    "defaultEnabled": true,
+    "widgets": {
+        "matrix": {
+            "title": "Matrix",
+            "desc": "Fallende Zeichen als GPU-Shader – kostet fast nichts",
+            "icon": "code",
+            "component": "MatrixWidget.qml",
+            "size": [30, 20],
+            "options": {
+                "form": { "title": "Form", "values": ["quer", "hoch", "breit", "spalte"], "default": "quer" },
+                "speed": { "title": "Tempo", "values": ["langsam", "mittel", "schnell"], "default": "mittel" },
+                "density": { "title": "Dichte", "values": ["dünn", "mittel", "dicht"], "default": "mittel" },
+                "glyphs": { "title": "Zeichen", "values": ["katakana", "binär", "hex"], "default": "katakana" }
+            }
+        }
+    }
+}

@@ -8,8 +8,8 @@ import qs.modules.services.core
 
 // Auslastung und Temperaturen aus /proc und /sys.
 //
-// Quickshell bringt dafuer nichts mit (caelestia loest es mit einem
-// kompilierten C++-Plugin), also wird gelesen. Ein einziger Aufruf pro Takt
+// Quickshell bringt dafuer nichts mit, also wird ohne kompiliertes Plugin
+// direkt gelesen. Ein einziger Aufruf pro Takt
 // holt alles und gibt Zeilen mit Praefix aus – dasselbe Muster wie der
 // WLAN-Scan in services/network/Network.qml.
 //

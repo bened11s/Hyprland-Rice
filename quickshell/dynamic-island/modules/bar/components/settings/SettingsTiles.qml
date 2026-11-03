@@ -12,6 +12,7 @@ import qs.modules.services.brightness
 import qs.modules.services.core
 import qs.modules.services.network
 import qs.modules.services.notifications
+import qs.modules.services.plugins
 import qs.modules.services.record
 import qs.modules.services.system
 import qs.modules.services.vpn
@@ -19,6 +20,7 @@ import qs.modules.services.vpn
 import qs.modules.monitors
 import qs.modules.services.monitors
 import qs.modules.settings
+import qs.modules.bar.components.settings.edit
 
 import qs
 import qs.modules.services.config
@@ -52,10 +54,62 @@ ColumnLayout {
     // (plus die Luecken dazwischen). Reihen mit weniger belegten Spalten
     // bleiben rechts frei – so sieht man im Editor, wo noch Platz ist.
     readonly property real gridSpacing: 10
-    readonly property real unit: (root.width - root.gridSpacing * (QuickLayout.columns - 1)) / QuickLayout.columns
+    readonly property real unit: (root.width - root.framePad * 2 - root.gridSpacing * (QuickLayout.columns - 1)) / QuickLayout.columns
 
     function cellWidth(span: int): real {
         return root.unit * span + root.gridSpacing * (span - 1);
+    }
+
+    // Breite des Eintrags `i` einer Reihe, wie sie gerade zu sehen ist: beim
+    // Ziehen am Griff die Vorschau, und eine Luecke direkt dahinter schrumpft
+    // um das, was die Kachel waechst (wie QuickLayout.resize)
+    function shownSpan(entries: var, i: int): int {
+        const e = entries[i];
+        if (!e)
+            return 0;
+        const prev = entries[i - 1];
+        if (e.id === QuickLayout.gap && prev && prev.id === root.edit.resizeId) {
+            const grow = root.edit.resizeSpan - prev.span;
+            return grow > 0 ? Math.max(0, e.span - grow) : e.span;
+        }
+        return root.edit.previewSpan(e.id, e.span);
+    }
+
+    // ---------- Kachel-Editor (nur im Einstellungs-Menue) ----------
+    // Vorbild Android 16 "Kacheln bearbeiten": Kacheln werden an Ort und
+    // Stelle gewaehlt, gezogen und in der Breite geaendert, im Modus "Layout"
+    // die Reihen als Bloecke verschoben. Zustand und Trefferrechnung:
+    // QuickEdit (edit/). Nur QuickTilesEditor setzt `editable` – dann ist der
+    // Modus immer an; Steuerung und Settings-Pille bleiben unveraendert.
+    property bool editable: false
+    readonly property QuickEdit edit: QuickEdit {
+        editable: root.editable
+        frame: frame
+        grid: grid
+        rows: rowsRepeater
+        tray: available.item
+        rowGap: root.spacing
+        slotGap: root.gridSpacing
+    }
+    // Im Bearbeitungsmodus bekommt das Raster einen Rahmen mit Polster
+    property real framePad: root.edit.editing ? 10 : 0
+
+    Behavior on framePad {
+        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+    }
+
+    // Offene Dropdowns schliessen, sobald bearbeitet wird – die Kacheln
+    // sind dann stumm, ein haengendes Menue waere verwirrend
+    Connections {
+        target: root.edit
+
+        function onEditingChanged(): void {
+            if (!root.edit.editing)
+                return;
+            root.sleepMenuOpen = false;
+            root.vpnMenuOpen = false;
+            root.powerMenuOpen = false;
+        }
     }
 
     // Der Pfeil auf der Wi-Fi-Pille fuehrt in die Netzliste; die Karte
@@ -70,8 +124,10 @@ ColumnLayout {
     // sollen dasselbe zeigen und nicht je eigene Poller/Inhibitoren starten.
     readonly property bool wifiOn: WifiStatus.radioOn
     readonly property string wifiStatus: !WifiStatus.loaded ? "…"
-        : !WifiStatus.radioOn ? "Aus"
-        : !WifiStatus.connected ? "Getrennt"
+        : !WifiStatus.radioOn ? I18n.tr("Aus")
+        : WifiStatus.connecting ? (WifiStatus.connectingSsid !== ""
+                                   ? I18n.tr("Verbinde mit %1…").arg(WifiStatus.connectingSsid) : I18n.tr("Verbinde…"))
+        : !WifiStatus.connected ? I18n.tr("Getrennt")
         : WifiStatus.ssid + " · " + WifiStatus.signal + "%"
 
     readonly property bool btOn: BluetoothService.enabled
@@ -110,6 +166,7 @@ ColumnLayout {
         "nosleep": noSleepComponent,
         "gamemode": gameModeComponent,
         "monitors": monitorsComponent,
+        "airplane": airplaneComponent,
         "settings": settingsComponent,
         "record": recordComponent,
         "volume": volumeComponent,
@@ -132,6 +189,10 @@ ColumnLayout {
     }
     DemandRequest {
         demand: Vpn.demand
+        active: root.visible
+    }
+    DemandRequest {
+        demand: Airplane.demand
         active: root.visible
     }
 
@@ -489,7 +550,7 @@ ColumnLayout {
 
             tapEnabled: false   // Toggle macht der bewachte TapHandler unten
 
-            icon: root.wifiOn ? "wifi" : "wifi_off"
+            icon: !root.wifiOn ? "wifi_off" : WifiStatus.connecting ? WifiStatus.icon : "wifi"
             title: "Wi-Fi"
             subtitle: root.wifiStatus
             active: root.wifiOn
@@ -553,9 +614,8 @@ ColumnLayout {
             tapEnabled: false
             icon: root.btOn ? "bluetooth" : "bluetooth_disabled"
             title: "Bluetooth"
-            subtitle: !root.btOn ? "Aus"
-                      : BluetoothService.adapter?.devices?.values.some(device => device.connected)
-                        ? "Verbunden" : "An"
+            subtitle: !root.btOn ? I18n.tr("Aus")
+                      : BluetoothService.summary || I18n.tr("An")
             active: root.btOn
             onToggled: root.toggleBt()
 
@@ -635,6 +695,16 @@ ColumnLayout {
                 demand: Monitors.demand
                 active: root.visible
             }
+        }
+    }
+
+    Component {
+        id: airplaneComponent
+
+        CircleToggle {
+            icon: "flight"
+            active: Airplane.active
+            onToggled: Airplane.toggle()
         }
     }
 
@@ -799,10 +869,10 @@ ColumnLayout {
 
             icon: "coffee"
             title: "No Sleep"
-            subtitle: !root.noSleep ? "Aus"
-                     : root.sleepDurationSec === -1 ? "Aktiv (unbegrenzt)"
-                     : root.sleepDurationSec === 0 ? "Unendlich"
-                     : "Noch " + root.fmtRemaining(root.sleepRemaining)
+            subtitle: !root.noSleep ? I18n.tr("Aus")
+                     : root.sleepDurationSec === -1 ? I18n.tr("Aktiv (unbegrenzt)")
+                     : root.sleepDurationSec === 0 ? I18n.tr("Unendlich")
+                     : I18n.tr("Noch %1").arg(root.fmtRemaining(root.sleepRemaining))
             active: root.noSleep
             onToggled: root.toggleNoSleep()
 
@@ -999,11 +1069,11 @@ ColumnLayout {
             tapEnabled: false   // Toggle macht der bewachte TapHandler unten
 
             icon: Recorder.active ? "stop_circle" : "screen_record"
-            title: "Aufnahme"
+            title: I18n.tr("Aufnahme")
             subtitle: Recorder.active
-                      ? "Läuft · " + Recorder.elapsedLabel
-                      : (Recorder.region ? "Bereich" : "Vollbild")
-                        + (Recorder.sound ? " · mit Ton" : " · ohne Ton")
+                      ? I18n.tr("Läuft · %1").arg(Recorder.elapsedLabel)
+                      : I18n.tr(Recorder.sound ? "%1 · mit Ton" : "%1 · ohne Ton")
+                        .arg(I18n.tr(Recorder.region ? "Bereich" : "Vollbild"))
             active: Recorder.active
             accent: Colors.record
             onAccent: Colors.fgRecord
@@ -1135,7 +1205,7 @@ ColumnLayout {
         CircleToggle {
             icon: "lock"
             active: false
-            onToggled: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/hyprlock-select"])
+            onToggled: Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/lock.sh"])
         }
     }
 
@@ -1143,7 +1213,7 @@ ColumnLayout {
         id: volumeComponent
 
         LevelSlider {
-            title: "Lautstärke"
+            title: I18n.tr("Lautstärke")
             icon: Audio.muted ? "volume_off"
                                : Audio.volume >= 0.5 ? "volume_up" : "volume_down"
             value: Audio.volume
@@ -1163,7 +1233,7 @@ ColumnLayout {
         id: micComponent
 
         LevelSlider {
-            title: "Mikrofon"
+            title: I18n.tr("Mikrofon")
             icon: Audio.sourceMuted ? "mic_off" : "mic"
             value: Audio.sourceVolume
             accent: Audio.sourceMuted ? Colors.error : Colors.secondary
@@ -1194,8 +1264,8 @@ ColumnLayout {
                 : Power.profiles.filter(p => p.value !== PowerProfile.Performance)
 
             icon: current.icon
-            title: "Energie"
-            subtitle: usable ? current.label : "Nur mit Akku"
+            title: I18n.tr("Energie")
+            subtitle: usable ? current.label : I18n.tr("Nur mit Akku")
             active: usable && Power.profile !== PowerProfile.Balanced
             tapEnabled: usable
             opacity: usable ? 1 : 0.45
@@ -1347,7 +1417,7 @@ ColumnLayout {
         id: brightnessComponent
 
         LevelSlider {
-            title: Brightness.readyFor(root.monitorName) ? "Helligkeit" : "Helligkeit nicht verfügbar"
+            title: I18n.tr("Helligkeit")
             icon: "brightness_6"
             value: Brightness.valueFor(root.monitorName)
             accent: value > 0.5
@@ -1359,43 +1429,277 @@ ColumnLayout {
         }
     }
 
+    // ---------- Bearbeiten: Zuruecksetzen / Entfernen ----------
+    Loader {
+        Layout.fillWidth: true
+        active: root.editable
+        visible: active && root.edit.editing
+
+        sourceComponent: EditHeader {
+            edit: root.edit
+        }
+    }
+
     // ---------- Die Reihen aus QuickLayout.rows ----------
-    Repeater {
-        model: QuickLayout.rows
+    // Im Bearbeitungsmodus bekommt das Raster einen Rahmen (frame); im Modus
+    // "Layout" weicht es den Reihen-Bloecken.
+    Rectangle {
+        id: frame
 
-        RowLayout {
-            id: tileRow
+        Layout.fillWidth: true
+        implicitHeight: (root.edit.layoutMode ? blocks.implicitHeight : grid.implicitHeight) + root.framePad * 2
+        radius: 20
+        color: root.edit.editing ? Colors.alpha(Colors.fgSurface, 0.04) : "transparent"
+        border.width: root.edit.editing ? 1 : 0
+        border.color: Colors.alpha(Colors.outline, 0.25)
+        // Beim Ziehen ueber die Ablage darunter liegen: dort wohnt der Geist
+        z: root.edit.dragging ? 5 : 0
 
-            required property var modelData     // Array von Kachel-IDs
-            required property int index
+        Behavior on color {
+            ColorAnimation { duration: 160 }
+        }
 
-            Layout.fillWidth: true
-            spacing: 10
-            readonly property var ids: tileRow.modelData.map(t => t.id)
-            // Reihe mit offenem Dropdown ueber die darunter liegenden heben
-            z: (root.sleepMenuOpen && tileRow.ids.includes("nosleep"))
-               || (root.vpnMenuOpen && tileRow.ids.includes("vpn"))
-               || (root.powerMenuOpen && tileRow.ids.includes("power")) ? 100 : 0
+        // Tippen neben die Kacheln hebt die Wahl auf
+        TapHandler {
+            enabled: root.edit.editing
+            onTapped: root.edit.selectedId = ""
+        }
+
+        ColumnLayout {
+            id: grid
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: parent.top
+                margins: root.framePad
+            }
+            spacing: root.spacing
+            visible: !root.edit.layoutMode
 
             Repeater {
-                model: tileRow.modelData
+                id: rowsRepeater
 
-                Loader {
-                    id: slot
+                // Nur die Anzahl als Modell: ein neues rows-Array (jede
+                // Aenderung) baut so nicht alle Kacheln neu, die Plaetze
+                // lesen ihren Eintrag selbst und laden nur bei neuer ID
+                model: QuickLayout.rows.length
 
-                    required property var modelData     // { id, span }
+                RowLayout {
+                    id: tileRow
 
-                    Layout.fillWidth: false
-                    Layout.preferredWidth: root.cellWidth(slot.modelData.span)
-                    Layout.preferredHeight: slot.item?.implicitHeight ?? 54
-                    sourceComponent: root.tileComponents[slot.modelData.id] ?? null
+                    required property int index
+                    // Array von { id, span }; id "_" = Luecke
+                    readonly property var entries: QuickLayout.rows[tileRow.index] ?? []
+                    readonly property var starts: QuickLayout.columnsOf(tileRow.entries)
+
+                    readonly property alias slots: slotRepeater
+
+                    Layout.fillWidth: true
+                    spacing: root.gridSpacing
+                    readonly property var ids: tileRow.entries.map(t => t.id)
+                    // Reihe mit offenem Dropdown ueber die darunter liegenden heben
+                    z: (root.sleepMenuOpen && tileRow.ids.includes("nosleep"))
+                       || (root.vpnMenuOpen && tileRow.ids.includes("vpn"))
+                       || (root.powerMenuOpen && tileRow.ids.includes("power")) ? 100 : 0
+
+                    Repeater {
+                        id: slotRepeater
+
+                        model: tileRow.entries.length
+
+                        // Eingebaute Kacheln kommen aus tileComponents, Plugin-Kacheln
+                        // ("<plugin>.<kachel>") als QML-Datei aus Plugins.tiles – die
+                        // bekommt `plugin` (Kontext) und, wenn sie es kennt, `tileId`
+                        // (QuickTile in modules/widgets hat beides).
+                        Loader {
+                            id: slot
+
+                            required property int index
+                            readonly property var modelData: tileRow.entries[slot.index] ?? ({ id: "", span: 1 })
+
+                            readonly property string tileId: slot.modelData.id
+                            readonly property bool isGap: slot.tileId === QuickLayout.gap
+                            // Nur der Pfad als Abhaengigkeit: Plugins.tiles wird bei
+                            // jeder Plugin-Aenderung neu gebaut, die Kachel soll aber
+                            // nur neu laden, wenn ihre Datei wechselt
+                            readonly property string pluginUrl: Plugins.tiles[slot.tileId]?.url ?? ""
+
+                            Layout.fillWidth: false
+                            // Beim Ziehen am Griff zeigt der Platz die neue Breite live
+                            readonly property int shownSpan: root.shownSpan(tileRow.entries, slot.index)
+
+                            Layout.preferredWidth: root.cellWidth(slot.shownSpan)
+                            Layout.preferredHeight: slot.item?.implicitHeight ?? 54
+                            // Die gezogene Kachel bleibt blass zurueck, der Geist wandert
+                            opacity: root.edit.dragId === slot.tileId ? 0.35 : 1
+                            // Eine ganz aufgebrauchte Luecke nimmt keinen Platz mehr
+                            visible: slot.shownSpan > 0
+                            // Ring und Griff der gewaehlten Kachel ragen in die Luecke –
+                            // ueber die Nachbarn heben
+                            z: root.edit.selectedId === slot.tileId ? 2 : 0
+
+                            Behavior on opacity {
+                                NumberAnimation { duration: 120 }
+                            }
+
+                            // Bearbeitungs-Schicht ueber der Kachel (nur eingebettet):
+                            // langer Druck, Auswahl-Ring, Griff, Ziehen – und im Modus
+                            // schluckt sie jede Eingabe, damit die Kachel nicht schaltet
+                            Loader {
+                                anchors.fill: parent
+                                z: 1
+                                active: root.editable && !slot.isGap
+
+                                sourceComponent: TileEditOverlay {
+                                    edit: root.edit
+                                    tileId: slot.tileId
+                                    span: slot.modelData.span
+                                    step: root.unit + root.gridSpacing
+                                }
+                            }
+
+                            function rebuild(): void {
+                                if (slot.pluginUrl !== "")
+                                    slot.setSource(slot.pluginUrl, { plugin: Plugins.tiles[slot.tileId].plugin });
+                                else
+                                    slot.sourceComponent = slot.isGap ? gapCells : root.tileComponents[slot.tileId] ?? null;
+                            }
+
+                            Component.onCompleted: slot.rebuild()
+                            // Neue Kachel auf diesem Platz (Reihe umgestellt): nach dem
+                            // Binding neu laden, nicht mitten drin (sonst Binding-Schleife)
+                            onTileIdChanged: Qt.callLater(slot.rebuild)
+                            onPluginUrlChanged: slot.rebuild()
+                            onLoaded: {
+                                if (slot.pluginUrl !== "" && slot.item && "tileId" in slot.item)
+                                    slot.item.tileId = slot.tileId.slice(slot.tileId.indexOf(".") + 1);
+                            }
+                            onStatusChanged: {
+                                if (slot.status === Loader.Error) {
+                                    console.warn(`Kachel ${slot.tileId}: ${slot.pluginUrl} laedt nicht`);
+                                    slot.sourceComponent = brokenTile;
+                                }
+                            }
+
+                            // Luecke: im Editor je Spalte eine Blase, sonst leer
+                            Component {
+                                id: gapCells
+
+                                Row {
+                                    spacing: root.gridSpacing
+
+                                    Repeater {
+                                        model: root.editable ? slot.shownSpan : 0
+
+                                        CellBubble {
+                                            required property int index
+
+                                            width: root.cellWidth(1)
+                                            edit: root.edit
+                                            rowIndex: tileRow.index
+                                            column: (tileRow.starts[slot.index] ?? 0) + index
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ersatz fuer eine Plugin-Kachel, deren QML-Datei nicht
+                            // laedt – das Raster behaelt seinen Platz, und man sieht,
+                            // welche Kachel es ist
+                            Component {
+                                id: brokenTile
+
+                                Tile {
+                                    icon: "error"
+                                    title: Plugins.tiles[slot.tileId]?.label ?? slot.tileId
+                                    subtitle: I18n.tr("Kachel lädt nicht")
+                                    active: false
+                                    tapEnabled: false
+                                    opacity: 0.6
+                                }
+                            }
+                        }
+                    }
+
+                    // Editor: der freie Rest der Reihe als Blasen. Breitenziehen
+                    // zaehlt mit der Vorschau-Breite, die Blasen weichen live.
+                    Repeater {
+                        id: restCells
+
+                        readonly property int used: tileRow.entries.reduce(
+                            (sum, t, i) => sum + root.shownSpan(tileRow.entries, i), 0)
+
+                        model: root.editable ? Math.max(0, QuickLayout.columns - restCells.used) : 0
+
+                        CellBubble {
+                            required property int index
+
+                            edit: root.edit
+                            Layout.preferredWidth: root.cellWidth(1)
+                            Layout.preferredHeight: 54
+                            Layout.alignment: Qt.AlignVCenter
+                            rowIndex: tileRow.index
+                            column: restCells.used + index
+                        }
+                    }
+
+                    // Rest der Reihe bleibt frei
+                    Item {
+                        Layout.fillWidth: true
+                    }
                 }
             }
+        }
 
-            // Rest der Reihe bleibt frei
-            Item {
-                Layout.fillWidth: true
+        // Modus "Layout": Reihen als Bloecke
+        Loader {
+            id: blocks
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: parent.top
+                margins: root.framePad
             }
+            active: root.edit.layoutMode
+            visible: active
+
+            sourceComponent: RowBlocks {}
+        }
+
+        // Geist und Markierung beim Ziehen
+        Loader {
+            anchors.fill: parent
+            active: root.editable && root.edit.dragging
+
+            sourceComponent: DragOverlay {
+                edit: root.edit
+            }
+        }
+    }
+
+    // ---------- Bearbeiten: Ablage "Verfuegbar" ----------
+    Loader {
+        id: available
+
+        Layout.fillWidth: true
+        active: root.editable
+        visible: active && root.edit.tilesMode
+
+        sourceComponent: EditAvailable {
+            edit: root.edit
+        }
+    }
+
+    // ---------- Ansicht-Pille ----------
+    Loader {
+        Layout.fillWidth: true
+        active: root.editable
+        visible: active
+
+        sourceComponent: EditFooter {
+            edit: root.edit
         }
     }
 }

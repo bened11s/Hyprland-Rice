@@ -1,109 +1,160 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Effects
 
 import qs
-import qs.modules.services.config
 import qs.modules.services.media
-import qs.modules.widgets
 
 // "Jetzt laeuft" in der aufgeklappten Notch (Uebersicht): Cover, Titel und
 // Interpret, Visualiser, Play/Pause. Nur da, solange es einen Player gibt –
 // alles Weitere (Player-Auswahl, Fortschritt, Vor/Zurueck) steht im
 // Medien-Untermenue (SUPER+M bzw. blaettern).
 //
-// Wisch-Geste der Notch (swipe in Notch.qml): nur der Hintergrund folgt
-// dem Zeiger (`shift`), Cover, Text und Knopf bleiben stehen. Neben dem
-// Hintergrund haengt eine leere Dummy-Flaeche mit demselben Cover-Blend,
-// die mit hereingezogen wird – welcher Titel kommt, verraet MPRIS nicht,
-// deshalb steht dort nichts. `pull` ist der Fortschritt bis zur Schwelle,
-// -1..1 (negativ = nach links = naechster Titel). Beim Wechsel faehrt die
-// Dummy-Flaeche ganz herein, dann springt alles auf 0 zurueck; da beide
-// Flaechen gleich aussehen, faellt der Sprung nicht auf.
+// Wisch-Geste der Notch (swipe in Notch.qml): nur die Hintergruende wandern.
+// Der Cover-Blend der echten Karte folgt dem Zeiger (`shift`), daneben
+// haengt der Blend des naechsten bzw. vorigen Titels (ghost, nur
+// Hintergrund) und wird mit hereingezogen. Kennt MediaQueue die
+// Warteschlange (Spotify), ist das dessen Cover; sonst der aktuelle Blend.
+// Cover, Titel, Visualiser und Knopf bleiben die ganze Zeit stehen. `pull`
+// ist der Fortschritt bis zur Schwelle, -1..1 (negativ = nach links =
+// naechster Titel).
+//
+// Beim Wechsel (skipSong → commit) faehrt der zweite Blend ganz herein,
+// dann springt der Versatz ohne Animation auf 0 zurueck – der Blend der
+// echten Karte zeigt dann denselben Titel, der Sprung ist unsichtbar. Der
+// stehende Inhalt blendet derweil aus und mit dem neuen Titel wieder ein:
+// erst der alte Titel (`flipFrom`), dann der neue aus dem Schnappschuss
+// (`flipTo`) – MPRIS hinkt dem Wechsel ein paar hundert Millisekunden
+// hinterher. Erst wenn Media nachgezogen hat (oder nach einer Frist),
+// uebernimmt wieder der Live-Stand.
 Item {
     id: root
-
-    readonly property real artSize: 36
 
     property real shift: 0
     property real pull: 0
     // Kartenfarbe, in die der Cover-Hintergrund nach rechts ausblendet
     property color fadeColor: Appearance.notchColor
-    // Abstand zur Dummy-Karte; so weit muss `shift` beim Wechsel laufen
+    // Abstand zur zweiten Karte; so weit muss `shift` beim Wechsel laufen
     readonly property real gap: 16
     readonly property real flipDistance: root.width + root.gap
-    // Dummy-Flaeche rechts (naechster) oder links (voriger)
+    // Zweite Karte rechts (naechster) oder links (voriger)
     readonly property real ghostSide: root.pull < 0 ? 1 : -1
 
-    implicitHeight: 52
+    // ---- Was die Karten zeigen ----
+    // Titel-Objekte wie aus MediaQueue: { title, artist, art }. `live` ist
+    // der MPRIS-Stand, alles andere sind Schnappschuesse.
+    readonly property var live: ({ title: Media.title, artist: Media.artist, art: Media.art })
 
-    // ---- Hintergrund: Karte mit verwaschenem Cover ----
-    // Das Cover, stark verwaschen ueber die ganze Zeile gezogen und nach
-    // rechts in die Kartenfarbe ausgeblendet – so bleibt der Text lesbar.
-    // Winzige Decodegroesse: der Weichzeichner macht ohnehin alles glatt.
-    component CardBackground: Rectangle {
-        id: bg
+    // Nachbar fuer die zweite Karte, beim ersten Zug eingefroren: die Queue
+    // rechnet nach dem Wechsel um (bzw. ist kurz ungueltig), die Karte darf
+    // mitten in der Fahrt nicht umspringen. null = Queue unbekannt (leer).
+    property var ghostTrack: null
+    property int ghostTrackSide: 0
 
-        property real strength: 0.45
+    // Uebergabe beim Wechsel (siehe Kopfkommentar)
+    property var flipFrom: null    // alter Titel, solange die echte Karte hinausfaehrt
+    property var flipTo: null      // neuer Titel, bis Media nachgezogen hat
+    readonly property var shown: root.flipFrom ?? root.flipTo ?? root.live
 
-        radius: 16
-        color: Colors.alpha(Colors.fgBackground, 0.05)
-
-        Item {
-            anchors.fill: parent
-            visible: blendSource.status === Image.Ready
-
-            Image {
-                id: blendSource
-
-                anchors.fill: parent
-                source: Media.art
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                sourceSize.width: 48
-                sourceSize.height: 48
-                visible: false
-            }
-
-            Rectangle {
-                id: blendMask
-
-                anchors.fill: parent
-                radius: bg.radius
-                color: "black"
-                layer.enabled: true
-                visible: false
-            }
-
-            MultiEffect {
-                anchors.fill: parent
-                source: blendSource
-                blurEnabled: true
-                blur: 1
-                blurMax: 32
-                maskEnabled: true
-                maskSource: blendMask
-                opacity: bg.strength
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: bg.radius
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: Colors.alpha(root.fadeColor, 0.15) }
-                    GradientStop { position: 0.55; color: Colors.alpha(root.fadeColor, 0.6) }
-                    GradientStop { position: 1.0; color: Colors.alpha(root.fadeColor, 0.85) }
-                }
-            }
+    // Media hat den neuen Titel samt Cover: Schnappschuss nicht mehr noetig.
+    // Ohne das Cover-Kriterium blitzte kurz der Platzhalter auf, weil
+    // Media.art beim Titelwechsel erst leer ist und dann aus dem Cache kommt.
+    readonly property bool caughtUp: !!root.flipTo && Media.title === root.flipTo.title && Media.art !== ""
+    // Entkoppelt per callLater: flipTo direkt im Handler zu leeren wertet
+    // caughtUp mitten in seiner eigenen Auswertung neu aus (Binding-Loop)
+    onCaughtUpChanged: {
+        if (root.caughtUp) {
+            catchUp.stop();
+            Qt.callLater(() => root.flipTo = null);
         }
     }
 
-    // ---- Dummy-Flaeche: naechster / voriger Titel ----
-    // Haengt neben dem echten Hintergrund und faehrt mit `shift` herein.
-    // Solange nichts gezogen wird, liegt sie ausserhalb der Notch-Karte
-    // (die clippt). Bewusst leer – nur der Blend.
-    CardBackground {
+    // Frist, falls Media nie passt (anderer Player, Titel weicht ab)
+    Timer {
+        id: catchUp
+
+        interval: 1500
+        onTriggered: root.flipTo = null
+    }
+
+    // Ueberblenden des stehenden Inhalts beim Wechsel: raus, solange die
+    // Hintergruende fahren (commit), rein mit dem neuen Titel (pull → 0).
+    // Einmalige Animationen statt Behavior – `shift`/`pull` aendern sich pro
+    // Frame, die Deckkraft soll nur hier angestossen werden.
+    property real contentOpacity: 1
+
+    NumberAnimation {
+        id: contentOut
+
+        target: root
+        property: "contentOpacity"
+        to: 0
+        duration: Appearance.morphDuration
+        easing.type: Easing.OutCubic
+    }
+
+    NumberAnimation {
+        id: contentIn
+
+        target: root
+        property: "contentOpacity"
+        to: 1
+        duration: Appearance.fadeDuration
+        easing.type: Easing.OutCubic
+    }
+
+    implicitHeight: 52
+
+    onPullChanged: {
+        if (root.pull === 0) {
+            // Zug vorbei (zurueckgeschnappt oder Wechsel durch): zweiter Blend
+            // weg, der Inhalt zeigt ab jetzt flipTo bzw. den Live-Stand
+            root.ghostTrack = null;
+            root.ghostTrackSide = 0;
+            root.flipFrom = null;
+            // Inhalt wieder her – auch nach einem abgebrochenen Wechsel
+            if (contentOut.running || root.contentOpacity < 1) {
+                contentOut.stop();
+                contentIn.restart();
+            }
+            return;
+        }
+        const sideChanged = root.ghostTrackSide !== root.ghostSide;
+        // Waehrend des Wechsels steht der Schnappschuss fest – es sei denn,
+        // der Zug wurde unterbrochen und laeuft in die andere Richtung
+        if (root.flipFrom && !sideChanged)
+            return;
+        // Nachladen, solange das Cover der Queue noch fehlt (laedt gerade)
+        if (sideChanged || !root.ghostTrack || !root.ghostTrack.art) {
+            const next = MediaQueue.valid
+                ? (root.ghostSide > 0 ? MediaQueue.upcoming : MediaQueue.previous)
+                : null;
+            root.ghostTrackSide = root.ghostSide;
+            if (next !== root.ghostTrack)
+                root.ghostTrack = next;
+        }
+    }
+
+    // Vom Wechsel (Notch.skipSong) aufgerufen, bevor der zweite Blend ganz
+    // hereinfaehrt: der alte Titel bleibt stehen und blendet aus, der neue
+    // kommt vom Schnappschuss – auch wenn Media schon unterwegs umspringt.
+    function commit(): void {
+        root.flipFrom = root.shown;
+        root.flipTo = root.ghostTrack;
+        if (root.flipTo && !root.caughtUp)
+            catchUp.restart();
+        else {
+            root.flipTo = null;
+            catchUp.stop();
+        }
+        contentIn.stop();
+        contentOut.restart();
+    }
+
+    // ---- Zweiter Blend: naechster / voriger Titel ----
+    // Nur der Hintergrund, haengt neben der echten Karte und faehrt mit
+    // `shift` herein. Solange nichts gezogen wird, liegt er ausserhalb der
+    // Notch-Karte (die clippt).
+    NowPlayingCard {
         id: ghost
 
         x: root.ghostSide * root.flipDistance
@@ -112,162 +163,20 @@ Item {
         transform: Translate { x: root.shift }
         visible: root.pull !== 0
         opacity: 0.45 + 0.55 * Math.abs(root.pull)
+        fadeColor: root.fadeColor
+        showContent: false
+        track: root.ghostTrack
     }
 
-    // ---- Echte Karte: Hintergrund gleitet, Inhalt steht ----
-    Item {
+    // ---- Echte Karte: Blend gleitet mit dem Zeiger, Inhalt steht ----
+    NowPlayingCard {
         id: card
 
         anchors.fill: parent
-
-        CardBackground {
-            anchors.fill: parent
-            transform: Translate { x: root.shift }
-        }
-
-        // ---- Cover, rund maskiert ----
-        Item {
-            id: art
-
-            anchors {
-                left: parent.left
-                leftMargin: 8
-                verticalCenter: parent.verticalCenter
-            }
-            width: root.artSize
-            height: root.artSize
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 10
-                color: Colors.surfaceContainer
-
-                Text {
-                    anchors.centerIn: parent
-                    visible: artImage.status !== Image.Ready
-                    text: "music_note"
-                    color: Colors.fgSurfaceVariant
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 16
-                }
-            }
-
-            Image {
-                id: artImage
-
-                anchors.fill: parent
-                source: Media.art
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                sourceSize.width: root.artSize * 2
-                sourceSize.height: root.artSize * 2
-                visible: false
-            }
-
-            Rectangle {
-                id: artMask
-
-                anchors.fill: parent
-                radius: 10
-                color: "black"
-                layer.enabled: true
-                visible: false
-            }
-
-            MultiEffect {
-                anchors.fill: parent
-                source: artImage
-                maskEnabled: true
-                maskSource: artMask
-                visible: artImage.status === Image.Ready
-            }
-        }
-
-        // ---- Titel / Interpret ----
-        Column {
-            anchors {
-                left: art.right
-                leftMargin: 10
-                right: wave.left
-                rightMargin: 10
-                verticalCenter: parent.verticalCenter
-            }
-            spacing: 2
-
-            Text {
-                width: parent.width
-                text: Media.title !== "" ? Media.title : Media.source
-                color: Colors.fgBackground
-                font.family: Config.font
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
-
-            Text {
-                width: parent.width
-                text: Media.artist !== "" ? Media.artist : Media.source
-                color: Colors.fgSurfaceVariant
-                font.family: Config.font
-                font.pixelSize: 11
-                elide: Text.ElideRight
-            }
-        }
-
-        // ---- Visualiser ----
-        Visualizer {
-            id: wave
-
-            anchors {
-                right: playButton.left
-                rightMargin: 12
-                verticalCenter: parent.verticalCenter
-            }
-            height: 22
-            count: 7
-            barWidth: 3
-            active: Media.playing
-        }
-
-        // ---- Play/Pause ----
-        Item {
-            id: playButton
-
-            anchors {
-                right: parent.right
-                rightMargin: 10
-                verticalCenter: parent.verticalCenter
-            }
-            width: 32
-            height: 32
-            scale: playHover.hovered ? 1.08 : 1
-
-            Morph on scale {}
-
-            Rectangle {
-                anchors.fill: parent
-                radius: width / 2
-                color: playHover.hovered ? Colors.alpha(Colors.primary, 0.3) : Colors.alpha(Colors.primary, 0.18)
-            }
-
-            Text {
-                anchors.centerIn: parent
-                text: Media.playing ? "pause" : "play_arrow"
-                color: Colors.primary
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 18
-                font.variableAxes: ({ FILL: 1, wght: 600 })
-            }
-
-            HoverHandler {
-                id: playHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                onTapped: Media.playPause()
-            }
-        }
+        live: true
+        fadeColor: root.fadeColor
+        shift: root.shift
+        contentOpacity: root.contentOpacity
+        track: root.shown
     }
 }

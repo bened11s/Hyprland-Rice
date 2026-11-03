@@ -21,9 +21,14 @@ Item {
         id: signalStrength
         anchors.centerIn: parent
 
-        color: WifiStatus.radioOn ? Colors.secondary : Colors.error
+        color: !WifiStatus.radioOn ? Colors.error
+             : WifiStatus.connecting ? Colors.primary : Colors.secondary
         text: WifiStatus.icon
         font.family: "Material Symbols Outlined"
         font.pointSize: 12
+
+        Behavior on color {
+            ColorAnimation { duration: Appearance.fadeDuration }
+        }
     }
 }

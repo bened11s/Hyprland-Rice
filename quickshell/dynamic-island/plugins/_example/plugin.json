@@ -1,0 +1,26 @@
+{
+    "id": "example",
+    "name": "Beispiel",
+    "version": "0.1.0",
+    "api": 1,
+    "author": "",
+    "icon": "lightbulb",
+    "description": "Vorlage für ein eigenes Plugin: eine Einstellung, eine Schnellkachel und eine Launcher-Aktion.",
+    "defaultEnabled": false,
+    "main": "Main.qml",
+    "settings": {
+        "lamp": {
+            "default": false,
+            "title": "Lampe an",
+            "desc": "Dieselbe Einstellung schalten auch die Kachel und die Launcher-Aktion"
+        }
+    },
+    "tiles": {
+        "lamp": {
+            "label": "Lampe",
+            "icon": "lightbulb",
+            "kind": "pill",
+            "component": "Tile.qml"
+        }
+    }
+}

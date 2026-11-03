@@ -42,7 +42,7 @@ Item {
             topMargin: 1
         }
         text: {
-            const name = Qt.formatDate(column.day, "ddd").replace(".", "").toUpperCase();
+            const name = column.day.toLocaleDateString(I18n.locale, "ddd").replace(".", "").toUpperCase();
             return column.isFocus ? name : name.charAt(0);
         }
         color: column.isToday ? Colors.error

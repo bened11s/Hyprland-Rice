@@ -109,10 +109,10 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
 
-                text: Power.hasBattery && !Power.hasSystemBattery ? Power.deviceIcon(Power.shown)
+                text: Power.hasBattery && !Power.showsSystem ? Power.deviceIcon(Power.shown)
                     : Power.hasBattery ? Power.batteryIcon
                     : "monitoring"
-                color: Power.hasBattery && Power.percent <= 20 && !Power.charging ? Colors.error
+                color: Power.low ? Colors.error
                      : root.open ? Colors.primary : Colors.fgSurfaceVariant
                 font.family: "Material Symbols Outlined"
                 font.pixelSize: 16

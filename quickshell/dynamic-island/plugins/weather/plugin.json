@@ -1,0 +1,28 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "weather",
+    "name": "Wetter",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "partly_cloudy_day",
+    "description": "Wetter von open-meteo.com (ohne API-Key): jetzt, die nächsten Stunden, sieben Tage. Ort aus der IP oder fest: qs -c dynamic-island ipc call plugins call weather ort \"Köln\".",
+    "author": "gamecat",
+    "homepage": "https://open-meteo.com",
+    "defaultEnabled": true,
+    "main": "Main.qml",
+    "widgets": {
+        "weather": {
+            "title": "Wetter",
+            "desc": "Wetter jetzt, in den nächsten Stunden oder für die Woche",
+            "icon": "partly_cloudy_day",
+            "component": "WeatherWidget.qml",
+            "size": [18, 10],
+            "options": {
+                "style": { "title": "Stil", "values": ["aktuell", "stunden", "woche", "kompakt"], "default": "aktuell" },
+                "details": { "title": "Details", "bool": true, "default": true },
+                "place": { "title": "Ort zeigen", "bool": true, "default": true }
+            }
+        }
+    }
+}

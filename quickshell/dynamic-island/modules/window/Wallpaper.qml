@@ -7,7 +7,7 @@ import qs
 
 // Hintergrund-Layer (Wallpaper) – enthält selbst die Pro-Monitor-Logik.
 // Die `required property modelData` im Delegaten wird von `Variants`
-// automatisch mit dem jeweiligen Screen befüllt (Caelestia-Stil).
+// automatisch mit dem jeweiligen Screen befüllt.
 // Bewusst nicht "Window.qml" genannt – der Name würde den QML-Typ `Window`
 // aus QtQuick überdecken.
 //

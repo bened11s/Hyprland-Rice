@@ -57,7 +57,30 @@ Item {
     readonly property real compactLeft: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
                                       : showWorkspaces ? compactWorkspaces.implicitWidth
                                       : 0
-    readonly property real compactSide: Math.max(compactLeft, compactRight.implicitWidth)
+    // Akku (compactBattery) sitzt auf der schmaleren Seite: die Seiten sind
+    // gleich breit, ein Symbol auf der breiteren Seite liesse gegenueber eine
+    // Luecke. Bei Gleichstand bleibt er rechts.
+    // Akku und Visualiser teilen sich den Platz: laeuft Musik, weicht einer
+    // (Config.notch.batteryPriority). Vorgabe: ein fester Systemakku (Laptop)
+    // schlaegt die Pegel, Geraete-Akkus (Maus, Tastatur …) weichen ihnen.
+    readonly property bool batteryWanted: docked && Power.hasBattery && Config.bar.battery
+    readonly property bool visualizerWanted: docked && Config.notch.visualizer && Media.playing
+    readonly property bool batteryWins: Config.notch.batteryPriority === "akku"
+        || (Config.notch.batteryPriority !== "visualiser" && Power.showsSystem)
+    // Ring-Stil (NotchBatteryRing): der Akku liegt am Rand und nimmt keinem
+    // etwas weg – dann gibt es keinen Vorrang und keine Seiten-Batterie
+    readonly property bool batteryRingStyle: Config.notch.batteryStyle === "ring"
+    readonly property bool showBattery: batteryWanted && !batteryRingStyle && !(visualizerWanted && !batteryWins)
+    readonly property real batteryAddLeft: compactLeft > 0 ? compactBattery.implicitWidth + compactRight.spacing
+                                                           : compactBattery.implicitWidth
+    readonly property real batteryAddRight: compactRight.implicitWidth > 0 ? compactBattery.implicitWidth + compactRight.spacing
+                                                                          : compactBattery.implicitWidth
+    readonly property bool batteryLeft: showBattery
+        && Math.max(compactLeft + batteryAddLeft, compactRight.implicitWidth)
+           < Math.max(compactLeft, compactRight.implicitWidth + batteryAddRight)
+    readonly property real compactSide: !showBattery ? Math.max(compactLeft, compactRight.implicitWidth)
+        : batteryLeft ? Math.max(compactLeft + batteryAddLeft, compactRight.implicitWidth)
+        : Math.max(compactLeft, compactRight.implicitWidth + batteryAddRight)
     // Hoehe des oberen Bands (eingeklappt plus Hover-Wachstum): Uhr und
     // Seitenelemente bleiben darin mittig
     readonly property real bandHeight: collapsedHeight + growth
@@ -78,7 +101,8 @@ Item {
     readonly property real pageWidth: 548
     readonly property real panelBottom: collapsedHeight + clockDropMax + panel.outerHeight
     readonly property bool showNowPlaying: Media.available
-    readonly property real overviewBottom: systemGlance.y + systemGlance.height
+    readonly property real overviewBottom: batteryGlance.visible ? batteryGlance.y + batteryGlance.height
+                                                                 : systemGlance.y + systemGlance.height
     // Seiten-Indikator: Punkte fuer Uebersicht + Untermenues
     readonly property bool pagerShown: docked && (overviewShown || viewOpen)
     // Mitte der Kopfzeile: Uhr (Uebersicht) bzw. Titel (Untermenue) stehen
@@ -91,7 +115,8 @@ Item {
     // Blaettern: Inhalt gleitet in Scrollrichtung herein (siehe flipWheel)
     property real slide: 0
     // Song-Wechsel per Wischen: die Jetzt-laeuft-Karte folgt dem Zeiger 1:1,
-    // daneben kommt eine Dummy-Karte (NowPlayingRow) mit herein. songPull =
+    // daneben kommt eine zweite Karte mit dem naechsten/vorigen Titel
+    // (NowPlayingRow, Queue aus MediaQueue) mit herein. songPull =
     // Fortschritt bis zur Schwelle, -1..1 (negativ = nach links = naechster
     // Titel), aus songSlide abgeleitet, damit Zurueckschnappen und Einblenden
     // dieselbe Animation nutzen.
@@ -115,17 +140,24 @@ Item {
         }
     }
 
-    // Song vor (dir = +1) oder zurueck (-1). Die Dummy-Karte faehrt ganz
+    // Song vor (dir = +1) oder zurueck (-1). Die zweite Karte faehrt ganz
     // herein (songFlip), der Player wechselt derweil; am Ende springt der
     // Versatz auf 0 und die echte Karte zeigt den neuen Titel an derselben
-    // Stelle. Geht es nicht, schnappt die Karte nur zurueck.
+    // Stelle (NowPlayingRow.commit friert dafuer alten und neuen Titel ein,
+    // bis MPRIS nachgezogen hat). Geht es nicht, schnappt die Karte nur zurueck.
     function skipSong(dir: int): void {
         const can = dir > 0 ? Media.canNext : Media.canPrevious;
         if (can) {
-            if (dir > 0)
+            nowPlaying.commit();
+            if (dir > 0) {
                 Media.next();
-            else
+            } else {
+                // Spotifys "Zurueck" startet den laufenden Titel neu, wenn er
+                // schon ein paar Sekunden laeuft – erst an den Anfang, dann
+                // springt es wirklich zum vorigen (wie im Medien-Untermenue)
+                Media.seek(0);
                 Media.previous();
+            }
             songFlip.to = -dir * nowPlaying.flipDistance;
             songFlip.restart();
         } else {
@@ -179,13 +211,18 @@ Item {
     readonly property bool themeOpen: launcherOpen && LauncherState.mode === "theme"
     readonly property bool powerOpen: launcherOpen && LauncherState.mode === "power"
     readonly property bool keysOpen: launcherOpen && LauncherState.mode === "keys"
+    readonly property bool clipboardOpen: launcherOpen && LauncherState.mode === "clipboard"
     // Untermenues (siehe oben)
     readonly property bool mediaOpen: launcherOpen && LauncherState.mode === "media"
     readonly property bool controlOpen: launcherOpen && LauncherState.mode === "control"
     readonly property bool notificationsOpen: launcherOpen && LauncherState.mode === "notifications"
     readonly property bool systemOpen: launcherOpen && LauncherState.mode === "system"
     readonly property bool viewOpen: mediaOpen || controlOpen || notificationsOpen || systemOpen
-    readonly property bool appsOpen: launcherOpen && !wallpaperOpen && !themeOpen && !powerOpen && !keysOpen && !viewOpen
+    // Direkt am Modus, nicht als "keine der anderen": die abgeleiteten
+    // Flags oben werden nach `launcherOpen` neu ausgewertet, waren also kurz
+    // noch false – dann war appsOpen fuer einen Moment wahr und jedes andere
+    // Menue baute beim Oeffnen den App-Launcher mit (~25 ms) und warf ihn weg.
+    readonly property bool appsOpen: launcherOpen && LauncherState.mode === "apps"
     readonly property bool authOpen: Auth.active && Auth.screen === hostScreen
     readonly property bool open: expanded || launcherOpen || authOpen
 
@@ -209,7 +246,7 @@ Item {
     // auf beiden Seiten gleich breiter, die Uhr bleibt also mittig.
     readonly property bool showMedia: docked && Config.notch.media && Media.playing
     // Pegel rechts – eigene Einstellung, unabhaengig vom Cover
-    readonly property bool showVisualizer: docked && Config.notch.visualizer && Media.playing
+    readonly property bool showVisualizer: visualizerWanted && !(batteryWanted && !batteryRingStyle && batteryWins)
     readonly property real mediaArtSize: 20
     readonly property real mediaEdge: 8
 
@@ -222,14 +259,20 @@ Item {
     // Maße: eingeklappt exakt wie vorher, ausgeklappt wächst die Karte nach
     // unten und mittig etwas in die Breite.
     // Angedockt: 1 px hoeher, weil der obere Rand ausserhalb liegt (y < 0)
-    readonly property real collapsedHeight: docked ? parent.height - 8 : parent.height - verticalMargin
+    // Mit Akku-Ring (NotchBatteryRing) etwas groesser: der Ring nimmt am
+    // Rand Platz, die Batterie unten braucht Luft unter der Uhr
+    readonly property bool batteryRingShown: docked && batteryRingStyle && batteryWanted
+    readonly property real ringGrowX: batteryRingShown ? 12 : 0
+    readonly property real ringGrowY: batteryRingShown ? 3 : 0
+    readonly property real collapsedHeight: docked ? parent.height - 8 + ringGrowY : parent.height - verticalMargin
     readonly property real collapsedWidth: docked
-        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
+        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge)) + ringGrowX
         : clock.implicitWidth + 50 + recordReserve
     readonly property real launcherWidth: wallpaperOpen ? wallpapers.outerWidth
                                         : themeOpen ? themes.outerWidth
                                         : powerOpen ? powerMenu.outerWidth
                                         : keysOpen ? keysView.outerWidth
+                                        : clipboardOpen ? clipboardView.outerWidth
                                         : mediaOpen ? mediaView.outerWidth
                                         : controlOpen ? controlLoader.outerWidth
                                         : notificationsOpen ? notificationsView.outerWidth
@@ -239,6 +282,7 @@ Item {
                                          : themeOpen ? themes.outerHeight
                                          : powerOpen ? powerMenu.outerHeight
                                          : keysOpen ? keysView.outerHeight
+                                         : clipboardOpen ? clipboardView.outerHeight
                                          : mediaOpen ? mediaView.outerHeight
                                          : controlOpen ? controlLoader.outerHeight
                                          : notificationsOpen ? notificationsView.outerHeight
@@ -386,7 +430,7 @@ Item {
             readonly property real threshold: 60
             readonly property real follow: 0.4     // Daempfung beim Blaettern
             readonly property real followMax: 48
-            // Beim Song folgt die Karte 1:1, hoechstens bis die Dummy-Karte steht
+            // Beim Song folgt die Karte 1:1, hoechstens bis die zweite Karte steht
             readonly property real songFollowMax: nowPlaying.flipDistance
             // "song", "tabs" oder "" (nichts zu tun)
             property string kind: ""
@@ -564,6 +608,28 @@ Item {
             }
         }
 
+        // ---- Eingeklappt: Akku auf der schmaleren Seite (notch.batteryLeft) ----
+        // Links hinter Workspaces bzw. Cover, rechts vor der Gruppe compactRight.
+        // Nur die Batterie – die Prozentzahl steht in der Uebersicht.
+        BatteryGlyph {
+            id: compactBattery
+
+            readonly property real leftX: notch.compactEdge + notch.growth
+                + (notch.compactLeft > 0 ? notch.compactLeft + compactRight.spacing : 0)
+            readonly property real rightX: parent.width - compactRight.anchors.rightMargin - compactRight.implicitWidth
+                - (compactRight.implicitWidth > 0 ? compactRight.spacing : 0) - width
+
+            x: notch.batteryLeft ? leftX : rightX
+            anchors.verticalCenter: clock.verticalCenter
+            opacity: notch.showBattery && !notch.open ? 1 : 0
+            visible: opacity > 0
+            percent: Power.percent
+            charging: Power.charging
+            fg: Colors.alpha(Colors.fgBackground, 0.75)
+
+            Fade on opacity {}
+        }
+
         // ---- Eingeklappt, rechts: Hinweise + Datum bzw. Pegel ----
         // Von innen nach aussen: Aufnahme-Punkt, Nachrichten-Zaehler, dann
         // Datum – oder, solange Musik laeuft, die Cava-Pegel. Die Notch misst
@@ -577,7 +643,7 @@ Item {
                 rightMargin: (notch.showVisualizer ? notch.mediaEdge + 3 : notch.compactEdge) + notch.growth
                 verticalCenter: clock.verticalCenter
             }
-            spacing: 8
+            spacing: 7
             opacity: notch.docked && !notch.open ? 1 : 0
             // Beim Oeffnen sofort aus dem Layout nehmen: die kompakte
             // Aktionsgruppe darf nicht hinter der offenen Kopfzeile ausfaden.
@@ -635,44 +701,11 @@ Item {
                 }
             }
 
-            // Akku (nur mit Systemakku und Einstellung "Akkuanzeige"). Der Ring
-            // des Insel-Layouts passt nicht um die angedockte Notch – hier
-            // stehen Symbol und Prozent, knapp = rot.
-            Row {
-                id: compactBattery
-
-                readonly property bool low: Power.percent <= 20 && !Power.charging
-
-                anchors.verticalCenter: parent.verticalCenter
-                visible: Power.hasSystemBattery && Config.bar.battery
-                spacing: 2
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: Power.batteryIcon
-                    rotation: 90
-                    color: compactBattery.low ? Colors.error
-                         : Power.charging ? Colors.primary
-                         : Colors.alpha(Colors.fgBackground, 0.7)
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 15
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: `${Power.percent}%`
-                    color: compactBattery.low ? Colors.error : Colors.alpha(Colors.fgBackground, 0.7)
-                    font.family: Config.font
-                    font.pixelSize: 11
-                    font.weight: Font.DemiBold
-                }
-            }
-
             // Wochentag und Tag, gedaempft – die Uhr bleibt der Blickfang
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: Config.notch.date && !notch.showVisualizer
-                text: Qt.formatDate(clock.date, "ddd d")
+                text: clock.date.toLocaleDateString(I18n.locale, "ddd d")
                 color: Colors.alpha(Colors.fgBackground, 0.55)
                 font.family: Config.font
                 font.pixelSize: 12
@@ -697,7 +730,7 @@ Item {
                 // Ist die Insel offen, zeigt die Medienzeile ihre eigenen
                 // Balken – die kleinen neben der Uhr duerfen dann stehen
                 // bleiben, sonst laeuft der Visualizer doppelt.
-                live: Hyprland.focusedMonitor?.name === notch.hostScreen?.name && !notch.open
+                focused: Hyprland.focusedMonitor?.name === notch.hostScreen?.name && !notch.open
             }
         }
 
@@ -927,6 +960,20 @@ Item {
             Fade on opacity {}
         }
 
+        // ---- Uebersicht: Akkus aller Geraete ----
+        BatteryGlance {
+            id: batteryGlance
+            transform: Translate { x: notch.slide }
+
+            x: notch.overviewInset
+            y: systemGlance.y + systemGlance.height + 6
+            width: parent.width - 2 * notch.overviewInset
+            opacity: notch.overviewShown ? 1 : 0
+            enabled: notch.overviewShown
+
+            Fade on opacity {}
+        }
+
         // ---- Seiten-Indikator ----
         // Ein Punkt je Ansicht (LauncherState.views), der aktive breit in der
         // Akzentfarbe. Klick springt direkt auf die Seite; blaettern geht
@@ -1082,7 +1129,7 @@ Item {
             easing.type: Easing.OutCubic
         }
 
-        // Wechsel: Dummy-Karte ganz herein, dann ohne Animation zurueck auf 0
+        // Wechsel: zweite Karte ganz herein, dann ohne Animation zurueck auf 0
         NumberAnimation {
             id: songFlip
 
@@ -1239,7 +1286,9 @@ Item {
                 + (batteryRing.toLength - batteryRing.fromLength) * chargeProgress
             readonly property real pathLength: Math.max(0, batteryRing.toLength - pathStart)
             readonly property real distance: pathStart + pathLength * travel
-            readonly property var point: batteryRing.pointAt(distance)
+            // Nur waehrend des Impulses: sonst rechnete der Punkt jede
+            // Groessenaenderung der Pille mit (~1000x/s waehrend eines Morphs)
+            readonly property var point: running ? batteryRing.pointAt(distance) : Qt.point(0, 0)
             readonly property int travelDuration: Math.round(750 - rateFactor * 400)
             readonly property int pulseInterval: Math.round(1800 - rateFactor * 1200)
 
@@ -1375,6 +1424,18 @@ Item {
             }
         }
 
+        LazyPanel {
+            id: clipboardView
+
+            open: notch.clipboardOpen
+
+            sourceComponent: ClipboardPanel {
+                topOffset: notch.launcherTop
+                cardRadius: notch.cardRadius
+                active: true
+            }
+        }
+
         // ---- Untermenues (Notch-Layout und Insel) ----
         LazyPanel {
             id: mediaView
@@ -1471,6 +1532,22 @@ Item {
         visible: notch.docked
 
         Morph on size {}
+    }
+
+    // Angedockt (notch.batteryStyle "ring"): Ring entlang der Kante bis in
+    // die Schultern, Batterie unten in der Mitte. Steht hier neben den
+    // Schultern und nicht in der Karte – die schneidet alles ausserhalb ab.
+    // Wie der Insel-Ring nur eingeklappt.
+    NotchBatteryRing {
+        anchors.fill: pill
+        opacity: notch.batteryRingShown && !notch.open ? 1 : 0
+        visible: opacity > 0
+        percent: Power.percent
+        charging: Power.charging
+        bottomRadius: pill.radius
+        shoulder: notch.shoulder
+
+        Fade on opacity {}
     }
 
     // Reiner Hover-Sensor fuer das Auf-/Zuklappen.

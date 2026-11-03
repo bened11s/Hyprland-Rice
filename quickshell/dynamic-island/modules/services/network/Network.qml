@@ -6,11 +6,12 @@ import Quickshell.Io
 
 import qs.modules.services.core
 
+import qs
+
 // WLAN-Dienst auf nmcli-Basis: sichtbare Netze, gespeicherte Profile,
 // Verbinden/Trennen/Vergessen.
 //
-// Zwei Dinge macht er bewusst anders als der Caelestia-Wechsler, an dem die
-// doppelten Netze entstanden:
+// Zwei Dinge sind bewusst so gebaut, damit keine doppelten Netze entstehen:
 //
 //  1. Ein Netz erscheint EINMAL. Ein Accesspoint pro Band/Repeater bringt
 //     denselben SSID mehrfach in die Scan-Liste (hier z.B. "Gastwlan" mit 79%
@@ -50,14 +51,32 @@ Singleton {
 
     readonly property var activeNetwork: root.networks.find(n => n.active) ?? null
 
+    // ---- Rueckmeldung je Zeile ----
+    // Woran gerade gearbeitet wird, damit die Zeile selbst zeigt, dass etwas
+    // passiert (`connection up` blockiert bis zur fertigen Verbindung, gern
+    // mehrere Sekunden). Ziel ist die SSID bzw. "dev:<geraet>" fuer LAN,
+    // Art "connect" | "disconnect" | "forget" | "password" | "cleanup".
+    property string pendingTarget: ""
+    property string pendingKind: ""
+    // Kurz nach dem Ende: gelungen (Haken) oder gescheitert (rot + Wackeln)
+    property string doneTarget: ""
+    property string doneKind: ""
+    property string failedTarget: ""
+    // Zaehlt hoch, damit dieselbe Zeile auch zweimal hintereinander wackelt
+    property int failCount: 0
+
+    // WLAN-Verbindungsaufbau aus dieser Oberflaeche (fuer Leiste und Kachel)
+    readonly property string connectingSsid: root.pendingKind === "connect"
+        && !root.pendingTarget.startsWith("dev:") ? root.pendingTarget : ""
+
     // ---- Auftragsliste ----
     // nmcli-Aufrufe laufen nacheinander. Eigene Liste statt `sh -c "a && b"`,
     // damit Passwoerter nicht durch eine Shell-Zeile muessen (Anfuehrungs-
     // zeichen, $, ` ...).
     property var queue: []
 
-    function run(cmd: var, note: string): void {
-        root.queue = root.queue.concat([{ cmd, note }]);
+    function run(cmd: var, note: string, target: string, kind: string): void {
+        root.queue = root.queue.concat([{ cmd, note, target, kind }]);
         root.pump();
     }
 
@@ -67,7 +86,13 @@ Singleton {
 
         const job = root.queue[0];
         root.queue = root.queue.slice(1);
-        root.status = job.note;
+        // Das Aufraeumen nach einem Fehlversuch laesst dessen Meldung stehen
+        if (job.kind !== "cleanup")
+            root.status = job.note;
+        root.pendingTarget = job.target ?? "";
+        // Passwort setzen gehoert schon zum Verbinden – die Zeile soll nicht
+        // zwischen zwei Zustaenden springen
+        root.pendingKind = job.kind === "password" ? "connect" : (job.kind ?? "");
         root.busy = true;
         action.command = job.cmd;
         action.running = true;
@@ -95,10 +120,20 @@ Singleton {
         }
     }
 
+    // Wie refresh(false), aber nur wenn die Liste aelter als `maxAge` ms ist.
+    // Fuers Vorladen beim Oeffnen der Steuerung: wer sie schnell hinterein-
+    // ander auf- und zumacht, startet nicht jedes Mal den nmcli-Lauf (~70 ms CPU).
+    property real lastScan: 0
+
+    function refreshIfStale(maxAge: int): void {
+        if (Date.now() - root.lastScan > maxAge)
+            root.refresh(false);
+    }
+
     // ---- Aktionen ----
     function setRadio(on: bool): void {
         root.run(["nmcli", "radio", "wifi", on ? "on" : "off"],
-                 on ? "WLAN wird eingeschaltet…" : "WLAN wird ausgeschaltet…");
+                 on ? I18n.tr("WLAN wird eingeschaltet…") : I18n.tr("WLAN wird ausgeschaltet…"), "", "radio");
     }
 
     // Verbinden. Gibt es ein Profil, wird DAS genommen – auch wenn ein
@@ -108,30 +143,37 @@ Singleton {
         if (!net)
             return;
 
+        // Doppelklick waehrend des Verbindens stellt nicht nochmal an
+        if (root.pendingTarget === net.ssid && root.pendingKind === "connect")
+            return;
+
         const profile = root.bestProfile(net);
+        const note = I18n.tr("Verbinde mit %1…").arg(net.ssid);
 
         if (profile && password) {
             root.run(["nmcli", "connection", "modify", "uuid", profile.uuid,
-                      "802-11-wireless-security.psk", password], `Passwort für ${net.ssid} wird gesetzt…`);
-            root.run(["nmcli", "connection", "up", "uuid", profile.uuid], `Verbinde mit ${net.ssid}…`);
+                      "802-11-wireless-security.psk", password], I18n.tr("Passwort für %1 wird gesetzt…").arg(net.ssid),
+                     net.ssid, "password");
+            root.run(["nmcli", "connection", "up", "uuid", profile.uuid], note, net.ssid, "connect");
         } else if (profile) {
-            root.run(["nmcli", "connection", "up", "uuid", profile.uuid], `Verbinde mit ${net.ssid}…`);
+            root.run(["nmcli", "connection", "up", "uuid", profile.uuid], note, net.ssid, "connect");
         } else if (password) {
             // Neues Netz: nmcli legt das Profil an. Scheitert es, raeumen wir
             // den dabei entstandenen Rest gleich wieder weg (siehe cleanupSsid).
             scan.cleanupSsid = net.ssid;
             root.run(["nmcli", "device", "wifi", "connect", net.ssid, "password", password],
-                     `Verbinde mit ${net.ssid}…`);
+                     note, net.ssid, "connect");
         } else {
             scan.cleanupSsid = net.ssid;
-            root.run(["nmcli", "device", "wifi", "connect", net.ssid], `Verbinde mit ${net.ssid}…`);
+            root.run(["nmcli", "device", "wifi", "connect", net.ssid], note, net.ssid, "connect");
         }
     }
 
     function disconnect(net: var): void {
         const profile = root.bestProfile(net);
         if (profile)
-            root.run(["nmcli", "connection", "down", "uuid", profile.uuid], `Trenne ${net.ssid}…`);
+            root.run(["nmcli", "connection", "down", "uuid", profile.uuid], I18n.tr("Trenne %1…").arg(net.ssid),
+                     net.ssid, "disconnect");
     }
 
     function forget(net: var): void {
@@ -141,7 +183,7 @@ Singleton {
         // beim naechsten Mal von selbst wieder
         for (const profile of net.profiles)
             root.run(["nmcli", "connection", "delete", "uuid", profile.uuid],
-                     `${net.ssid} wird vergessen…`);
+                     I18n.tr("%1 wird vergessen…").arg(net.ssid), net.ssid, "forget");
     }
 
     // LAN laeuft ueber das Geraet, nicht ueber ein Profil: `device connect`
@@ -149,23 +191,41 @@ Singleton {
     // `device disconnect` sperrt das automatische Verbinden, bis man wieder
     // verbindet – gewollt, sonst waere Trennen nach Sekunden zurueckgenommen.
     function connectWired(dev: var): void {
-        root.run(["nmcli", "device", "connect", dev.device], `Verbinde ${dev.device}…`);
+        root.run(["nmcli", "device", "connect", dev.device], I18n.tr("Verbinde %1…").arg(dev.device),
+                 `dev:${dev.device}`, "connect");
     }
 
     function disconnectWired(dev: var): void {
-        root.run(["nmcli", "device", "disconnect", dev.device], `Trenne ${dev.device}…`);
+        root.run(["nmcli", "device", "disconnect", dev.device], I18n.tr("Trenne %1…").arg(dev.device),
+                 `dev:${dev.device}`, "disconnect");
+    }
+
+    // Zustand einer Zeile fuer die Oberflaeche: "connect" | "disconnect" |
+    // "forget" (laeuft), "done" (eben gelungen), "failed" oder ""
+    function phaseOf(target: string): string {
+        if (target === "")
+            return "";
+        // Aufraeumen nach einem Fehlversuch laeuft still – sonst wuerde es
+        // das "Fehlgeschlagen" der Zeile gleich wieder ueberdecken
+        if (root.pendingTarget === target && root.pendingKind !== "cleanup")
+            return root.pendingKind;
+        if (root.failedTarget === target)
+            return "failed";
+        if (root.doneTarget === target)
+            return "done";
+        return "";
     }
 
     function wiredStateText(dev: var): string {
         if (dev.connected)
-            return "Verbunden";
+            return I18n.tr("Verbunden");
         if (dev.connecting)
-            return "Verbinde…";
+            return I18n.tr("Verbinde…");
         if (dev.state === "unavailable")
-            return "Kein Kabel";
+            return I18n.tr("Kein Kabel");
         if (dev.state === "unmanaged")
-            return "Nicht verwaltet";
-        return "Getrennt";
+            return I18n.tr("Nicht verwaltet");
+        return I18n.tr("Getrennt");
     }
 
     // Die Profile wegwerfen, die nie zu einer Verbindung gefuehrt haben – und
@@ -173,7 +233,7 @@ Singleton {
     function dropStale(net: var): void {
         for (const profile of net.stale)
             root.run(["nmcli", "connection", "delete", "uuid", profile.uuid],
-                     `Doppeltes Profil "${profile.name}" wird entfernt…`);
+                     I18n.tr("Doppeltes Profil \"%1\" wird entfernt…").arg(profile.name), net.ssid, "cleanup");
     }
 
     // Das Profil, ueber das verbunden werden soll: das zuletzt benutzte.
@@ -221,20 +281,64 @@ Singleton {
 
         onExited: (code, status) => {
             root.busy = false;
+            const target = root.pendingTarget;
+            const kind = root.pendingKind;
+            root.pendingTarget = "";
+            root.pendingKind = "";
 
             if (code === 0) {
-                root.status = "";
-                root.queue = [];        // Erfolg: nichts mehr nachzuholen
+                if (kind !== "cleanup")
+                    root.status = "";
+                // Erst nach dem letzten Schritt (Passwort setzen -> verbinden)
+                // ist die Zeile fertig
+                if (root.queue.length === 0 && target !== "" && kind !== "cleanup") {
+                    root.failedTarget = "";
+                    root.doneTarget = target;
+                    root.doneKind = kind;
+                    doneFlash.restart();
+                }
             } else {
                 // nmcli schreibt "Error: ..." nach stderr
                 const msg = action.stderr.text.trim().split("\n").pop();
-                root.status = msg !== "" ? msg : `Fehlgeschlagen (Code ${code})`;
+                root.status = msg !== "" ? msg : I18n.tr("Fehlgeschlagen (Code %1)").arg(code);
+                // Gescheitert: die restlichen Schritte bauen darauf auf
                 root.queue = [];
+                if (target !== "") {
+                    root.doneTarget = "";
+                    root.failedTarget = target;
+                    root.failCount++;
+                    failFlash.restart();
+                    // Neu lesen baut die Zeilen der Liste neu auf – erst
+                    // nachdem die Zeile fertig gewackelt hat
+                    failRefresh.restart();
+                    return;
+                }
             }
 
             root.refresh(false);
             root.pump();
         }
+    }
+
+    Timer {
+        id: failRefresh
+
+        interval: 400
+        onTriggered: root.refresh(false)
+    }
+
+    Timer {
+        id: doneFlash
+
+        interval: 2200
+        onTriggered: root.doneTarget = ""
+    }
+
+    Timer {
+        id: failFlash
+
+        interval: 4000
+        onTriggered: root.failedTarget = ""
     }
 
     // Suche anstossen (ohne zu warten)
@@ -379,6 +483,7 @@ Singleton {
 
                 root.networks = list;
                 root.loaded = true;
+                root.lastScan = Date.now();
 
                 if (scan.pending) {
                     scan.pending = false;
@@ -391,7 +496,7 @@ Singleton {
                     scan.cleanupSsid = "";
                     if (net && net.stale.length > 0 && !net.active) {
                         root.dropStale(net);
-                        root.status += " · unbrauchbares Profil entfernt";
+                        root.status += I18n.tr(" · unbrauchbares Profil entfernt");
                     }
                 }
             }

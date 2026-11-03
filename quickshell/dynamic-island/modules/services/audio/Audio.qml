@@ -4,6 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Pipewire
 
+import qs
+
 // Zentrale PipeWire-Quelle fuer Lautstaerke und Geraeteauswahl.
 Singleton {
     id: root
@@ -82,14 +84,14 @@ Singleton {
 
     function deviceLabel(node: PwNode): string {
         if (!node)
-            return "Unbekanntes Gerät";
+            return I18n.tr("Unbekanntes Gerät");
         return node.properties["node.description"]
             || node.properties["device.description"]
             || node.properties["node.nick"]
             || node.description
             || node.nickname
             || node.name
-            || "Unbekanntes Gerät";
+            || I18n.tr("Unbekanntes Gerät");
     }
 
     function isSinkSelected(node: PwNode): bool {

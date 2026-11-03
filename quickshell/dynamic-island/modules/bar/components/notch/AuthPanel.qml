@@ -67,7 +67,7 @@ Item {
             rightMargin: 20
             topMargin: 13
         }
-        text: "Authentifizierung erforderlich"
+        text: I18n.tr("Authentifizierung erforderlich")
         color: Colors.fgBackground
         font.pixelSize: 16
         font.weight: Font.DemiBold
@@ -85,7 +85,7 @@ Item {
             rightMargin: 20
             topMargin: 10
         }
-        text: panel.flow?.message ?? "Eine Anwendung benötigt zusätzliche Berechtigungen."
+        text: panel.flow?.message ?? I18n.tr("Eine Anwendung benötigt zusätzliche Berechtigungen.")
         color: Colors.fgSurfaceVariant
         font.pixelSize: 11
         wrapMode: Text.WordWrap
@@ -104,7 +104,7 @@ Item {
             topMargin: 7
         }
         text: panel.flow?.selectedIdentity
-            ? "Als " + panel.flow.selectedIdentity.displayName : ""
+            ? I18n.tr("Als %1").arg(panel.flow.selectedIdentity.displayName) : ""
         color: Colors.alpha(Colors.fgSurfaceVariant, 0.72)
         font.pixelSize: 10
         elide: Text.ElideRight
@@ -152,8 +152,8 @@ Item {
                 anchors.fill: parent
                 visible: password.text === ""
                 text: panel.flow?.isResponseRequired
-                    ? (panel.flow.inputPrompt || "Passwort")
-                    : "Authentifizierung wird vorbereitet..."
+                    ? (panel.flow.inputPrompt || I18n.tr("Passwort"))
+                    : I18n.tr("Authentifizierung wird vorbereitet...")
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.65)
                 font: password.font
                 verticalAlignment: Text.AlignVCenter
@@ -193,7 +193,7 @@ Item {
         Text {
             font.family: Config.font
             anchors.centerIn: parent
-            text: "Abbrechen"
+            text: I18n.tr("Abbrechen")
             color: Colors.fgSurface
             font.pixelSize: 11
             font.weight: Font.Medium
@@ -229,7 +229,7 @@ Item {
         Text {
             font.family: Config.font
             anchors.centerIn: parent
-            text: "Bestätigen"
+            text: I18n.tr("Bestätigen")
             color: Colors.fgPrimary
             font.pixelSize: 11
             font.weight: Font.DemiBold

@@ -1,0 +1,59 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "wallhaven",
+    "name": "Wallhaven",
+    "version": "1.0.0",
+    "api": 1,
+    "author": "Gamecat",
+    "icon": "travel_explore",
+    "homepage": "https://wallhaven.cc",
+    "description": "Wallhaven-Suche in der Wallpaper-Auswahl, Download nach Wallpapers/Wallhaven. SUPER+ALT+W oder Strg+W in der Auswahl.",
+    "defaultEnabled": true,
+    "main": "Main.qml",
+    "migrateFrom": "wallhaven",
+    "keybinds": {
+        "open": { "keys": "SUPER + ALT + W", "title": "Wallhaven-Suche", "group": "Werkzeuge", "ipc": "open" }
+    },
+    "panels": {
+        "wallpaper": { "component": "Section.qml", "icon": "travel_explore" }
+    },
+    "settings": {
+        "fullPreview": {
+            "default": true,
+            "title": "Vorschau in voller Qualität",
+            "desc": "Lädt das Vollbild, sobald die Auswahl kurz auf einem Treffer steht"
+        },
+        "sorting": {
+            "default": "top",
+            "title": "Sortierung",
+            "options": ["relevanz", "neu", "zufall", "views", "favoriten", "top"]
+        },
+        "topRange": {
+            "default": "1 Monat",
+            "title": "Top-Zeitraum",
+            "options": ["1 Tag", "3 Tage", "1 Woche", "1 Monat", "3 Monate", "6 Monate", "1 Jahr"],
+            "requires": { "sorting": "top" }
+        },
+        "purity": {
+            "default": "sfw",
+            "title": "Inhalt",
+            "desc": "sfw: nur jugendfrei. sketchy: dazu Grenzfälle (NSFW nur mit API-Key: python3 -I wallhaven.py key <KEY> im Plugin-Ordner)",
+            "options": ["sfw", "sfw+sketchy"]
+        },
+        "categories": {
+            "default": "alle",
+            "title": "Kategorien",
+            "options": ["alle", "general", "anime", "people", "general+anime"]
+        },
+        "atleast": {
+            "default": "aus",
+            "title": "Mindestauflösung",
+            "options": ["aus", "1920x1080", "2560x1440", "3840x2160"]
+        },
+        "ratios": {
+            "default": "alle",
+            "title": "Seitenverhältnis",
+            "options": ["alle", "16x9", "16x10", "21x9"]
+        }
+    }
+}

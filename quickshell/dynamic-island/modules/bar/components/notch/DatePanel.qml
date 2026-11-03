@@ -155,7 +155,7 @@ Item {
 
         anchors.horizontalCenter: parent.horizontalCenter
         y: panel.topPadding
-        text: Qt.formatDate(panel.focusDay, "MMMM yyyy")
+        text: panel.focusDay.toLocaleDateString(I18n.locale, "MMMM yyyy")
         color: Colors.fgSurfaceVariant
         font.pixelSize: 10
         font.weight: Font.Medium

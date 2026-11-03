@@ -1,0 +1,27 @@
+{
+    "$schema": "../plugin.schema.json",
+    "id": "calendar",
+    "name": "Kalender",
+    "version": "1.0.0",
+    "api": 1,
+    "parent": "desktop",
+    "icon": "calendar_month",
+    "description": "Monatsblatt mit Kalenderwochen und den Feiertagen deines Bundeslands.",
+    "author": "gamecat",
+    "defaultEnabled": true,
+    "widgets": {
+        "calendar": {
+            "title": "Kalender",
+            "desc": "Monatsblatt, Woche oder Streifen mit Feiertagen",
+            "icon": "calendar_month",
+            "component": "CalendarWidget.qml",
+            "size": [15, 18],
+            "options": {
+                "style": { "title": "Stil", "values": ["monat", "woche", "streifen"], "default": "monat" },
+                "weeks": { "title": "KW", "bool": true, "default": true },
+                "holidays": { "title": "Feiertage", "values": ["NW", "BY", "BW", "HE", "NI", "HH", "HB", "SH", "BE", "BB", "MV", "SN", "ST", "TH", "RP", "SL", "aus"], "default": "NW" },
+                "upcoming": { "title": "Nächste Feiertage", "bool": true, "default": true }
+            }
+        }
+    }
+}

@@ -45,8 +45,13 @@ Singleton {
     // Jeder Lauf kostet zwei ddcutil-Aufrufe ueber I2C (~0,1 s CPU).
     readonly property Demand demand: Demand {}
     readonly property bool watching: root.demand.active
+    // Letzter abgeschlossener Lauf. Ist er frisch (< 15 s), liest das Oeffnen
+    // nicht sofort nach – OSD-Hover und Kacheln oeffnen oft kurz hintereinander,
+    // der 8-s-Timer unten holt Monitor-Tasten-Aenderungen trotzdem.
+    property real lastQuery: 0
 
-    onWatchingChanged: if (root.watching && !writeProcess.running && !writeTimer.running && !settleTimer.running)
+    onWatchingChanged: if (root.watching && Date.now() - root.lastQuery > 15000
+                           && !writeProcess.running && !writeTimer.running && !settleTimer.running)
         root.startQuery()
 
     // ---- je Monitor ----
@@ -231,6 +236,7 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.lastQuery = Date.now();
                 if (root.backend === "backlight") {
                     // Ein aelterer Leselauf darf den gerade gezogenen Wert
                     // und insbesondere backlightPending nicht zuruecksetzen.

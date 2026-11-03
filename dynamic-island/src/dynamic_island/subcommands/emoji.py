@@ -1,7 +1,6 @@
 import json
 import subprocess
 from argparse import Namespace
-from urllib.request import urlopen
 
 from dynamic_island.utils.paths import cli_data_dir
 
@@ -25,6 +24,9 @@ class Command:
             print((cli_data_dir / "emojis.txt").read_text(), end="")
 
     def fetch_emojis(self) -> None:
+        # Erst hier: urllib kostet sonst jeden CLI-Aufruf ~20 ms Startzeit
+        from urllib.request import urlopen
+
         data = [
             "¿? question upside down reversed spanish",
             "← left arrow",

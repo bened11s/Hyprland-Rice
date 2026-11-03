@@ -12,7 +12,7 @@ import qs.modules.bar.components.mediaPlayer
 ViewPanel {
     id: root
 
-    title: "Medien"
+    title: I18n.tr("Medien")
     icon: "music_note"
     contentWidth: 380
     contentHeight: Media.available ? media.outerHeight : 60
@@ -33,7 +33,7 @@ ViewPanel {
     Text {
         anchors.centerIn: parent
         visible: !Media.available
-        text: "Nichts spielt gerade"
+        text: I18n.tr("Nichts spielt gerade")
         color: Colors.fgSurfaceVariant
         font.family: Config.font
         font.pixelSize: 12

@@ -24,7 +24,7 @@ import qs
 
 // Leiste oben – enthält selbst die Pro-Monitor-Logik.
 // Die `required property modelData` im Delegaten wird von `Variants`
-// automatisch mit dem jeweiligen Screen befüllt (Caelestia-Stil).
+// automatisch mit dem jeweiligen Screen befüllt.
 Variants {
     model: Quickshell.screens
 
@@ -91,12 +91,13 @@ Variants {
         // ueberschrieb die des anderen.
         //
         // Visualiser (eigener Prozess): nur, solange etwas spielt UND jemand
-        // die Pegel zeigt – Medien-Pille, eingeklappte Notch (notch.visualizer),
+        // die Pegel zeigt – Medien-Pille, eingeklappte Notch (notch.showVisualizer,
+        // weicht ggf. dem Akku),
         // Uebersicht oder Medien-Untermenue.
         DemandRequest {
             demand: Cava.demand
             active: Media.playing && (bar.notchMode
-                ? Config.notch.visualizer || notch.wantsVisualizer
+                ? notch.showVisualizer || notch.wantsVisualizer
                 : Config.bar.media || notch.mediaOpen)
         }
 
@@ -129,7 +130,7 @@ Variants {
         // wird in der Steuerung ein WLAN-Passwort oder eine PIN getippt.
         WlrLayershell.keyboardFocus: notch.authOpen
                                      || notch.appsOpen || notch.wallpaperOpen || notch.themeOpen || notch.powerOpen
-                                     || notch.keysOpen
+                                     || notch.keysOpen || notch.clipboardOpen
                                      || notch.controlTyping
                                      || (bar.pillSettings?.typingPassword ?? false)
                                      || (bar.pillSettings?.typingPin ?? false)

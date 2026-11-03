@@ -265,8 +265,55 @@ Surface {
         }
 
         StatusIcon {
-            text: tiles.btOn ? "bluetooth" : "bluetooth_disabled"
+            text: BluetoothService.primaryDevice ? "bluetooth_connected"
+                : tiles.btOn ? "bluetooth" : "bluetooth_disabled"
             active: tiles.btOn
+        }
+
+        // Verbundenes BT-Geraet: Name (samt Akku-Prozent aus `summary`) und
+        // Akkusymbol direkt hinter dem Bluetooth-Zeichen. Ohne Verbindung ist
+        // die Gruppe null breit und damit ganz weg – wie der Akku unten.
+        Row {
+            id: btSummary
+
+            readonly property bool shown: settings.peek && BluetoothService.summary !== ""
+            readonly property int battery: BluetoothService.batteryLevel(BluetoothService.primaryDevice)
+
+            anchors.verticalCenter: parent.verticalCenter
+            width: btSummary.shown ? implicitWidth + 6 : 0
+            visible: width > 0
+            opacity: btSummary.shown ? 1 : 0
+            spacing: 3
+            clip: true
+
+            Behavior on width {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: 160 }
+            }
+
+            Text {
+                font.family: Config.font
+                anchors.verticalCenter: parent.verticalCenter
+
+                width: Math.min(implicitWidth, 150)
+                text: BluetoothService.summary
+                color: Colors.fgBackground
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+
+                visible: btSummary.battery >= 0
+                text: BluetoothService.batteryIcon(btSummary.battery)
+                color: btSummary.battery <= 10 ? Colors.error : Colors.secondary
+                font.family: "Material Symbols Outlined"
+                font.pixelSize: 15
+            }
         }
 
         StatusIcon {
@@ -294,8 +341,6 @@ Surface {
             id: battery
 
             readonly property bool shown: settings.peek && Power.hasBattery && Config.bar.battery
-            readonly property bool low: Power.percent <= 20 && !Power.charging
-
             anchors.verticalCenter: parent.verticalCenter
             width: battery.shown ? implicitWidth + 6 : 0
             visible: width > 0
@@ -310,15 +355,21 @@ Surface {
                 NumberAnimation { duration: 160 }
             }
 
+            // Steckt der Akku in einem Geraet, sagt das Maus- bzw.
+            // Tastatursymbol davor, wessen Akku es ist
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-
-                // Ohne Systemakku steckt der Akku in einem Geraet – dann sagt
-                // das Maus- bzw. Tastatursymbol mehr als ein Akku-Symbol
-                text: Power.hasSystemBattery ? Power.batteryIcon : Power.deviceIcon(Power.shown)
-                color: battery.low ? Colors.error : Colors.secondary
+                visible: !Power.showsSystem
+                text: Power.deviceIcon(Power.shown)
+                color: Colors.secondary
                 font.family: "Material Symbols Outlined"
-                font.pixelSize: 15
+                font.pixelSize: 14
+            }
+
+            BatteryGlyph {
+                anchors.verticalCenter: parent.verticalCenter
+                percent: Power.percent
+                charging: Power.charging
             }
 
             Text {
@@ -326,9 +377,10 @@ Surface {
                 anchors.verticalCenter: parent.verticalCenter
 
                 text: `${Power.percent} %`
-                color: battery.low ? Colors.error : Colors.fgBackground
+                color: Power.critical ? Colors.error : Colors.fgBackground
                 font.pixelSize: 11
                 font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }
             }
         }
     }
@@ -476,7 +528,7 @@ Surface {
         interval: 700
         // Waehrend eines Passworts darf die Maus rausrutschen
         onTriggered: {
-            if (settings.embedded || settings.typingPassword || BluetoothService.pairingActive)
+            if (settings.embedded || settings.typingPassword || settings.typingPin || BluetoothService.pairingActive)
                 return;
             // Der Zeiger steht noch auf der Karte (z. B. direkt nach einem
             // Klick, der den Hover mitgenommen hat) -> nicht zuklappen

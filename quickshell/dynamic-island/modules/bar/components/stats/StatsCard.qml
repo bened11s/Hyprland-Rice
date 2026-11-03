@@ -70,9 +70,9 @@ Column {
         width: parent.width
         visible: SystemStats.diskTotal > 0
         icon: "hard_drive"
-        label: "Platte"
+        label: I18n.tr("Platte")
         value: SystemStats.diskTotal > 0 ? SystemStats.diskUsed / SystemStats.diskTotal : 0
-        detail: `${SystemStats.formatBytes(SystemStats.diskFree)} frei`
+        detail: I18n.tr("%1 frei").arg(SystemStats.formatBytes(SystemStats.diskFree))
     }
 
     // Was sonst noch Temperatur hat, in einer Zeile
@@ -86,7 +86,7 @@ Column {
             for (const t of SystemStats.nvmeTemps)
                 parts.push(`SSD ${Math.round(t)} °C`);
             if (SystemStats.waterTemp > 0)
-                parts.push(`Wasser ${Math.round(SystemStats.waterTemp)} °C`);
+                parts.push(I18n.tr("Wasser %1 °C").arg(Math.round(SystemStats.waterTemp)));
             return parts.join("  ·  ");
         }
         color: Colors.fgSurfaceVariant
@@ -116,7 +116,7 @@ Column {
         width: parent.width
         topPadding: 2
         visible: Power.degraded
-        text: `Leistung gedrosselt: ${Power.degradedReason}`
+        text: I18n.tr("Leistung gedrosselt: %1").arg(Power.degradedReason)
         color: Colors.error
         font.pixelSize: 10
         elide: Text.ElideRight

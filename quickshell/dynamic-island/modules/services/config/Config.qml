@@ -8,7 +8,7 @@ import Quickshell.Io
 //
 //     ~/.config/dynamic-island/shell.json
 //
-// Dieselbe Idee wie caelestias shell.json, nur mit Bordmitteln: FileView +
+// Nur Bordmittel: FileView +
 // JsonAdapter (dasselbe Gespann wie in LauncherFavorites.qml). Die Defaults
 // stehen unten im Adapter – fehlt ein Schluessel in der Datei, gilt der
 // Default, und die Datei wird beim ersten Start angelegt.
@@ -31,7 +31,12 @@ Singleton {
     readonly property alias quick: adapter.quick
     readonly property alias osd: adapter.osd
     readonly property alias wallpaper: adapter.wallpaper
-    readonly property alias lockscreen: adapter.lockscreen
+    readonly property alias media: adapter.media
+    readonly property alias lock: adapter.lock
+    readonly property alias idle: adapter.idle
+    readonly property alias sounds: adapter.sounds
+    readonly property alias bluetooth: adapter.bluetooth
+    readonly property alias battery: adapter.battery
 
     // Schrift fuer alle Texte der Shell (Icons behalten Material Symbols)
     readonly property string font: adapter.appearance.font
@@ -42,154 +47,317 @@ Singleton {
     //
     // Felder:  title, desc        Beschriftung
     //          options: [...]     feste Auswahl (Chips) fuer Strings
+    //          source             Auswahl samt Namen live statt `options`:
+    //                             "batteries" (UPower-Akkus)
+    //          labels: {...}      Anzeigenamen der Optionen (sonst I18n.tr(Wert))
     //          min, max, step     Zahl mit Schieberegler; `unit` haengt hinten dran
     //          requires           Zeile nur aktiv, wenn erfuellt: "bar.battery"
     //                             (Wahrheitswert) oder { "appearance.layout": "notch" }
+    //          hidden             nicht im Menue (wird anderswo bedient)
+    //          page               auf einer anderen Seite zeigen ("battery"),
+    //                             gespeichert wird weiter unter dem eigenen Schluessel
+    //          group              Karte innerhalb der Gruppe ("Workspaces", "Akku" …);
+    //                             ohne Angabe teilen sich die Zeilen eine Karte ohne Titel
     readonly property var meta: ({
-        "bar.workspaces": { title: "Workspace-Punkte", desc: "Die Punktreihe links aussen" },
+        "bar.workspaces": { title: "Workspace-Punkte", group: "Workspaces" },
         "bar.workspaceCount": {
+            group: "Workspaces",
             title: "Workspaces je Monitor",
-            desc: "Wie viele Punkte die Reihe zeigt (Hyprland vergibt je Monitor 10)",
             min: 1, max: 10, step: 1, requires: "bar.workspaces"
         },
-        "bar.stats": { title: "System-Pille", desc: "Akkustand, Energieprofile und Auslastung" },
-        "bar.tray": { title: "Systemtray", desc: "Die Icons links neben der Uhr" },
-        "bar.settings": { title: "Settings-Karte", desc: "Der Kreis rechts der Uhr mit WLAN, Bluetooth und Co." },
-        "bar.media": { title: "Medien-Karte", desc: "Titel, Cover und Steuerung rechts aussen" },
-        "bar.notifications": { title: "Benachrichtigungen", desc: "Die Glocke mit Zaehler in der Leiste" },
-        "bar.battery": { title: "Akkuanzeige", desc: "Ring um die Uhr und Akkustand in der Settings-Pille" },
+        "bar.stats": { title: "System-Pille", group: "Module" },
+        "bar.tray": { title: "Systemtray", group: "Module" },
+        "bar.settings": { title: "Settings-Karte", group: "Module" },
+        "bar.media": { title: "Medien-Karte", group: "Module" },
+        "bar.notifications": { title: "Benachrichtigungen", group: "Module" },
+        // Akku-Zeilen stehen auf der Seite "Akku" (meta.page), gespeichert
+        // bleiben sie unter bar/notch
+        "bar.battery": { title: "Akkuanzeige", group: "Anzeige", page: "battery" },
+        // Auswahl kommt live aus UPower (source "batteries", siehe SettingsCard)
+        "bar.batteryDevice": {
+            title: "Akku von", group: "Anzeige", page: "battery", source: "batteries", requires: "bar.battery",
+            desc: "Automatisch = Systemakku, sonst der schwächste Geräte-Akku"
+        },
         // Anzeigen in der eingeklappten Notch (nur Notch-Layout)
         "notch.workspaces": {
-            title: "Workspaces in der Notch", desc: "Kleine Staebchen links neben der Uhr, solange die Notch zu ist",
+            group: "Anzeigen",
+            title: "Workspaces in der Notch",
             requires: { "appearance.layout": "notch" }
         },
         "notch.date": {
-            title: "Datum in der Notch", desc: "Wochentag und Tag rechts neben der Uhr",
+            group: "Anzeigen",
+            title: "Datum in der Notch",
             requires: { "appearance.layout": "notch" }
         },
         "notch.media": {
-            title: "Cover in der Notch", desc: "Albumcover links neben der Uhr, solange etwas spielt",
+            group: "Anzeigen",
+            title: "Cover in der Notch",
             requires: { "appearance.layout": "notch" }
         },
         "notch.visualizer": {
-            title: "Visualiser in der Notch", desc: "Pegel rechts neben der Uhr, solange etwas spielt (statt des Datums)",
+            group: "Anzeigen",
+            title: "Visualiser in der Notch",
+            requires: { "appearance.layout": "notch" }
+        },
+        // Akku in der eingeklappten Notch: Batterie neben der Uhr oder Ring
+        // innen am Rand mit Batterie unten in der Mitte (NotchBatteryRing)
+        "notch.batteryStyle": {
+            group: "Anzeige",
+            page: "battery",
+            title: "Akkuanzeige in der Notch",
+            options: ["symbol", "ring"],
+            labels: { "symbol": "Symbol neben der Uhr", "ring": "Ring mit Symbol unten" },
+            requires: { "appearance.layout": "notch" }
+        },
+        // Wer in der eingeklappten Notch weicht, wenn Musik laeuft und ein
+        // Akku angezeigt wird (Notch.batteryWins) – nur beim Symbol, der
+        // Ring kostet keinen Platz
+        "notch.batteryPriority": {
+            group: "Anzeige",
+            page: "battery",
+            title: "Akku oder Visualiser",
+            options: ["system", "akku", "visualiser"],
+            labels: { "system": "Nur Systemakku vor Visualiser", "akku": "Akku vor Visualiser", "visualiser": "Visualiser vor Akku" },
             requires: { "appearance.layout": "notch" }
         },
         "notch.messages": {
-            title: "Nachrichten-Zaehler", desc: "Anzahl ungelesener Benachrichtigungen neben der Uhr",
+            group: "Anzeigen",
+            title: "Nachrichten-Zaehler",
             requires: { "appearance.layout": "notch" }
         },
-        "bar.batteryPulse": { title: "Akku-Ladeimpuls", desc: "Bewegter Impuls im leeren Teil des Akkurings", requires: "bar.battery" },
-        "notifications.dnd": { title: "Nicht stören", desc: "Nachrichten sammeln, aber nicht von selbst aufklappen" },
+        // Stil-Varianten der Notch-Anzeigen. `preview` zeigt im Menue statt
+        // Text-Chips eine kleine Vorschau der Variante (SettingsRow -> StylePreview)
+        "notch.clockStyle": {
+            group: "Stile",
+            title: "Uhr-Stil",
+            options: ["digital", "split", "analog"], preview: "clock",
+            requires: { "appearance.layout": "notch" }
+        },
+        "notch.workspaceStyle": {
+            group: "Stile",
+            title: "Workspace-Stil",
+            options: ["staebchen", "punkte", "zahlen"], preview: "workspaces",
+            requires: "notch.workspaces"
+        },
+        "notch.visualizerStyle": {
+            group: "Stile",
+            title: "Visualiser-Stil",
+            options: ["spiegel", "saeulen", "punkte", "welle"], preview: "visualizer",
+            requires: "notch.visualizer"
+        },
+        // Medienansicht (MediaPanel)
+        "media.cover": {
+            title: "Cover",
+            options: ["rund", "vinyl"]
+        },
+        "media.lyrics": {
+            title: "Songtexte", desc: "Spotify-Extension, sonst lrclib.net"
+        },
+        // Sperrbildschirm (modules/lock)
+        // Was hinter dem Sperrbildschirm liegt. Das Desktop-Foto braucht er
+        // ohnehin fuer den Uebergang, "wallpaper" blendet nur dahin ueber
+        "lock.background": {
+            group: "Bild",
+            title: "Hintergrund",
+            options: ["wallpaper", "desktop"]
+        },
+        "lock.blur": { title: "Wallpaper unscharf", group: "Bild" },
+        // Welcher Sperrbildschirm startet (hypr/scripts/lock.sh liest den Wert):
+        // karte = Lockscreen der Shell, vollbild = hyprlock mit hyprlock-full.conf
+        "lock.style": {
+            title: "Stil",
+            group: "Anzeige",
+            desc: "Karte: Lockscreen der Shell. Vollbild: riesige Uhr, Datum und Begruessung ueber dem unscharfen Wallpaper (hyprlock)",
+            options: ["karte", "vollbild"]
+        },
+        // Sichtbarkeit von Uhr/Karte steht im Anordnungs-Editor (lock.layout
+        // hidden); der alte Schalter gilt nur noch als Vorgabe dafuer
+        "lock.media": { title: "Medien-Karte", hidden: true },
+        "lock.notifications": { title: "Nachrichten-Zaehler" },
+        "lock.layout": { title: "Anordnung", editor: "lock" },
+        // Inaktivitaet (services/idle), ersetzt hypridle
+        "idle.enabled": { title: "Automatisch sperren", group: "Sperren" },
+        "idle.lockMinutes": {
+            group: "Sperren",
+            title: "Sperren nach", min: 1, max: 60, step: 1, unit: "min", requires: "idle.enabled"
+        },
+        "idle.warnSeconds": {
+            group: "Sperren",
+            title: "Vorher abdunkeln", min: 0, max: 30, step: 1, unit: "s", requires: "idle.enabled"
+        },
+        "idle.screenOffMinutes": {
+            group: "Energie",
+            title: "Bildschirme aus nach", desc: "0 = nie", min: 0, max: 60, step: 1, unit: "min", requires: "idle.enabled"
+        },
+        "idle.suspendMinutes": {
+            group: "Energie",
+            title: "Ruhezustand nach", desc: "0 = nie", min: 0, max: 120, step: 5, unit: "min", requires: "idle.enabled"
+        },
+        "idle.media": { title: "Nicht bei laufender Musik", group: "Ausnahmen", requires: "idle.enabled" },
+        "idle.fullscreen": { title: "Nicht bei Vollbild-Apps", group: "Ausnahmen", requires: "idle.enabled" },
+        "idle.lockOnSleep": { title: "Vor dem Ruhezustand sperren", group: "Sperren" },
+        // Bluetooth (services/bluetooth); den Adapter waehlt das Bluetooth-Panel
+        "bluetooth.adapter": { hidden: true },
+        "bluetooth.autoConnect": { hidden: true },
+        "bluetooth.notify": { title: "Verbinden und Trennen melden", group: "Meldungen", desc: "Nur was von allein passiert, nicht Klicks im Panel" },
+        "bluetooth.lowBattery": { title: "Warnung bei schwachem Akku", group: "Meldungen", min: 0, max: 50, step: 5, unit: "%", desc: "0 = aus" },
+        "bluetooth.scanSeconds": { title: "Suche endet nach", group: "Suche", min: 15, max: 300, step: 15, unit: "s" },
+        // Kurze Systemklaenge (services/sounds)
+        "sounds.enabled": { title: "Systemklänge" },
+        "sounds.volume": { title: "Lautstärke", min: 10, max: 100, step: 5, unit: "%", requires: "sounds.enabled" },
+        "sounds.notifications": { title: "Neue Nachricht", group: "Anlässe", requires: "sounds.enabled" },
+        "sounds.screenshot": { title: "Screenshot", group: "Anlässe", requires: "sounds.enabled" },
+        "sounds.power": { title: "Ladekabel", group: "Anlässe", requires: "sounds.enabled" },
+        "sounds.lock": { title: "Sperren und Entsperren", group: "Anlässe", requires: "sounds.enabled" },
+        "sounds.bluetooth": { title: "Bluetooth verbunden/getrennt", group: "Anlässe", requires: "sounds.enabled" },
+        "sounds.library": { title: "Eigene Klänge", group: "Eigene Klänge", editor: "sounds" },
+        "battery.history": { title: "Akkuverlauf", editor: "battery" },
+        "battery.warnLow": { title: "Warnung bei schwachem Akku", group: "Meldungen", min: 0, max: 50, step: 5, unit: "%", desc: "0 = aus" },
+        "battery.warnCritical": { title: "Warnung bei fast leerem Akku", group: "Meldungen", min: 0, max: 20, step: 1, unit: "%", desc: "0 = aus" },
+        "battery.notifyFull": { title: "Meldung bei vollem Akku", group: "Meldungen" },
+        "battery.kdeconnect": { title: "Handy über KDE Connect", group: "Quellen" },
+        "battery.novabase": { title: "Headset über novabase", group: "Quellen" },
+        "media.queueOpen": {
+            title: "Warteschlange offen", desc: "Die ganze Spotify-Warteschlange zeigen statt nur vorigem und nächstem Titel"
+        },
+        "bar.batteryPulse": { title: "Akku-Ladeimpuls", group: "Anzeige", page: "battery", requires: "bar.battery" },
+        "notifications.dnd": { title: "Nicht stören" },
         "vpn.provider": {
             title: "VPN-Anbieter",
-            desc: "Anbieter der VPN-Kachel",
             options: ["nordvpn", "cloudflare"]
         },
         "notifications.peekSeconds": {
             title: "Anzeigedauer",
-            desc: "Wie lange eine neue Nachricht in der Leiste aufklappt, wenn sie keine eigene Dauer mitbringt",
             min: 2, max: 15, step: 1, unit: "s", requires: "bar.notifications"
+        },
+        // Sprache der Oberflaeche (I18n.qml). `labels` zeigt statt des Werts
+        // einen Namen – Sprachnamen stehen immer in ihrer eigenen Sprache
+        "appearance.language": {
+            group: "Sprache und Schrift",
+            title: "Sprache",
+            options: ["en", "de"],
+            labels: { "en": "English", "de": "Deutsch" }
         },
         // `options` macht aus der Zeile eine Auswahl. Nicht installierte
         // Schriften blendet das Menue aus.
         "appearance.font": {
+            group: "Sprache und Schrift",
             title: "Schriftart",
-            desc: "Für alle Texte der Shell",
             options: ["SF Pro", "SF Pro Rounded", "Inter", "Noto Sans", "Adwaita Sans", "Fira Sans", "Cantarell"]
         },
         // Welche Elemente die Leiste zeigt. "insel": alle Pillen. "notch": nur
         // die Notch, angedockt an der Oberkante (Bar.qml und Notch.qml lesen das).
         "appearance.layout": {
+            group: "Form",
             title: "Layout",
             desc: "Insel: alle Pillen. Notch: nur die angedockte Notch oben in der Mitte",
             options: ["insel", "notch"]
         },
         // Nachschwingen der Pillen beim Aufklappen (siehe Appearance.qml)
         "appearance.bounce": {
+            group: "Animation",
             title: "Nachschwingen",
-            desc: "Wie stark Pillen und Karten beim Aufklappen federn",
             options: ["aus", "leicht", "mittel", "stark"]
         },
         "appearance.speed": {
+            group: "Animation",
             title: "Animationstempo",
-            desc: "Faktor fuer alle Auf- und Zuklapp-Bewegungen",
             min: 0.5, max: 2, step: 0.1, unit: "x"
         },
         "appearance.radius": {
+            group: "Form",
             title: "Eckenrundung",
-            desc: "Rundung der aufgeklappten Karten; flache Pillen bleiben halbrund",
             min: 8, max: 28, step: 1, unit: "px"
         },
-        "appearance.shadow": { title: "Schatten", desc: "Weicher Schatten unter Pillen und Karten" },
-        "appearance.opacity": { title: "Deckkraft", desc: "Transparenz der Shell-Flaechen, Text bleibt deckend", min: 0.65, max: 1, step: 0.05 },
-        "appearance.clock": { title: "Uhrzeit", desc: "Anzeigeformat der Uhr in der Notch", options: ["24h", "12h"] },
-        // Uebergang beim Wallpaperwechsel (modules/window/WallpaperStage.qml);
-        // dieselbe Auswahl steht als Chip-Reihe in der Wallpaper-Auswahl
+        "appearance.shadow": { title: "Schatten", group: "Form" },
+        "appearance.opacity": { title: "Deckkraft", desc: "Transparenz der Shell-Flaechen, Text bleibt deckend", group: "Form", min: 0.65, max: 1, step: 0.05 },
+        "appearance.clock": { title: "Uhrzeit", group: "Sprache und Schrift", options: ["24h", "12h"] },
+        // Uebergang beim Wallpaperwechsel (modules/window/WallpaperStage.qml)
         "wallpaper.transition": {
+            group: "Animation",
             title: "Übergang",
-            desc: "Wie das neue Wallpaper erscheint. Zufall würfelt je Bild",
             options: ["blende", "wischen", "schieben", "kreis", "zoom", "aus", "zufall"]
         },
         "wallpaper.duration": {
+            group: "Animation",
             title: "Dauer",
-            desc: "Länge des Übergangs. Beim Durchblättern in der Auswahl läuft er schneller",
             min: 200, max: 2000, step: 100, unit: "ms"
         },
-        // Welchen Sperrbildschirm SUPER+L startet (~/.local/bin/hyprlock-select)
-        "lockscreen.style": {
-            title: "Sperrbildschirm",
-            desc: "Optik beim Sperren. Karte: Pillen-Optik mit Uhr. Vollbild: große Uhr und Datum über dem unscharfen Wallpaper",
-            options: ["karte", "vollbild"]
+        // Zufallsmodus (Wallpapers.qml): "start" wuerfelt einmal je Login,
+        // "timer" zusaetzlich alle randomMinutes
+        "wallpaper.random": {
+            group: "Zufall",
+            title: "Zufallsmodus",
+            desc: "Start: bei jedem Login ein zufälliges Wallpaper. Timer: dazu regelmäßig ein neues",
+            options: ["aus", "start", "timer"]
+        },
+        "wallpaper.randomMinutes": {
+            group: "Zufall",
+            title: "Wechsel alle",
+            desc: "Wartet bei Vollbild oder Game-Mode",
+            min: 5, max: 240, step: 5, unit: "min", requires: { "wallpaper.random": "timer" }
+        },
+        "wallpaper.randomScope": {
+            group: "Zufall",
+            title: "Zufall aus",
+            desc: "Ordner: nur der Ordner des aktuellen Bilds",
+            options: ["alle", "ordner"]
         },
         // `editor` statt Bedienelement: das Menue laedt dafuer einen eigenen
-        // Editor (modules/settings/QuickLayoutEditor.qml)
+        // Editor (z. B. modules/settings/QuickTilesEditor.qml)
         // Regler am rechten Rand (modules/osd)
-        "osd.enabled": { title: "Regler am rechten Rand", desc: "Lautstärke und Helligkeit, mittig an der rechten Bildschirmkante" },
-        "osd.hover": { title: "Beim Hovern zeigen", desc: "Maus an den rechten Rand in der Bildschirmmitte", requires: "osd.enabled" },
-        "osd.brightness": { title: "Helligkeitsregler", desc: "Zweiter Regler unter der Lautstärke", requires: "osd.enabled" },
+        "osd.enabled": { title: "Regler am rechten Rand" },
+        "osd.hover": { title: "Beim Hovern zeigen", requires: "osd.enabled" },
+        "osd.brightness": { title: "Helligkeitsregler", requires: "osd.enabled" },
         "osd.hideDelay": {
             title: "Einblenddauer",
-            desc: "Wie lange die Regler nach einer Änderung sichtbar bleiben",
             min: 1, max: 10, step: 1, unit: "s", requires: "osd.enabled"
         },
         "quick.columns": {
             title: "Raster",
-            desc: "Spalten des Kachel-Rasters; eine Kachel kann mehrere belegen",
             min: 2, max: 6, step: 1
         },
         "quick.rows": {
             title: "Aufbau der Karte",
-            desc: "Kacheln ziehen: umsortieren, neue Reihe, ausblenden. Am rechten Rand ziehen: breiter oder schmaler",
             editor: "quick"
         }
     })
 
     // Reihenfolge und Symbole der Gruppen im Menue (Material-Symbols-Namen).
     // Gruppen, die hier fehlen, haengt das Menue hinten an.
-    readonly property var sectionOrder: ["bar", "quick", "osd", "notch", "appearance", "wallpaper", "lockscreen", "notifications", "vpn"]
+    readonly property var sectionOrder: ["bar", "battery", "quick", "bluetooth", "osd", "notch", "media", "lock", "idle", "sounds", "appearance", "wallpaper", "notifications", "vpn"]
     readonly property var sectionIcons: ({
         "bar": "space_dashboard",
+        "battery": "battery_horiz_075",
         "quick": "dashboard_customize",
+        "bluetooth": "bluetooth",
         "osd": "volume_up",
         "notch": "web_asset",
+        "media": "music_note",
+        "lock": "lock",
+        "idle": "bedtime",
+        "sounds": "notifications_active",
         "appearance": "palette",
         "wallpaper": "wallpaper_slideshow",
-        "lockscreen": "lock",
         "notifications": "notifications",
         "vpn": "vpn_key"
     })
 
     readonly property var sectionMeta: ({
         "bar": "Leiste",
+        "battery": "Akku",
         "quick": "Schnelleinstellungen",
+        "bluetooth": "Bluetooth",
         "osd": "Regler am Rand",
         "notifications": "Benachrichtigungen",
         "vpn": "VPN",
         "appearance": "Darstellung",
         "wallpaper": "Wallpaper",
-        "lockscreen": "Sperrbildschirm",
-        "notch": "Notch-Layout"
+        "notch": "Notch-Layout",
+        "media": "Medien",
+        "lock": "Sperrbildschirm",
+        "idle": "Inaktivität",
+        "sounds": "Klänge"
     })
 
     // Die Datei als einfaches Objekt – daraus baut das Einstellungs-Fenster
@@ -273,7 +441,31 @@ Singleton {
     }
 
     function save(): void {
+        saveDelay.stop();
         file.writeAdapter();
+    }
+
+    // Schieberegler rufen set() bei jedem Rasterschritt – sofort schreiben
+    // hiesse: Datei schreiben, Watcher, JSON neu parsen, alles neu binden,
+    // dutzendfach pro Sekunde. Der Adapter und `raw` haben den Wert schon,
+    // auf die Platte geht er gesammelt.
+    Timer {
+        id: saveDelay
+
+        interval: 300
+        onTriggered: root.save()
+    }
+
+    Component.onDestruction: if (saveDelay.running) file.writeAdapter()
+
+    // Schluessel sortiert serialisieren: die Datei kommt alphabetisch zurueck,
+    // `raw` in Einfuege-Reihenfolge – fuer den Vergleich in reread()
+    function canonical(v: var): string {
+        if (Array.isArray(v))
+            return "[" + v.map(x => root.canonical(x)).join(",") + "]";
+        if (typeof v === "object" && v !== null)
+            return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + root.canonical(v[k])).join(",") + "}";
+        return JSON.stringify(v);
     }
 
     // Wert setzen, ohne den Namen fest zu verdrahten
@@ -290,7 +482,13 @@ Singleton {
         next[section][key] = value;
         root.raw = next;
 
-        root.save();
+        // Zahlen kommen von Schiebereglern (viele Schritte pro Sekunde) –
+        // gesammelt schreiben. Alles andere sofort: QuickLayout rechnet mit
+        // seinem 400-ms-Schutz ab dem Aufruf.
+        if (typeof value === "number")
+            saveDelay.restart();
+        else
+            root.save();
     }
 
     function get(section: string, key: string): var {
@@ -318,12 +516,17 @@ Singleton {
     }
 
     function reread(): void {
+        let parsed;
         try {
-            root.raw = JSON.parse(file.text());
+            parsed = JSON.parse(file.text());
         } catch (e) {
             // Halb geschriebene Datei o.ae. – beim naechsten Mal wieder
             return;
         }
+        // Meist ist das nur das Echo des eigenen Schreibens: dann `raw` nicht
+        // neu setzen, sonst baut z.B. das Einstellungs-Fenster jede Zeile neu
+        if (root.canonical(parsed) !== root.canonical(root.raw))
+            root.raw = parsed;
 
         if (!root.normalised) {
             root.normalised = true;
@@ -367,6 +570,8 @@ Singleton {
             }
 
             property JsonObject appearance: JsonObject {
+                // "en" oder "de" (I18n.qml); install.sh setzt es beim Einrichten
+                property string language: "en"
                 property string font: "SF Pro"
                 property string bounce: "mittel"
                 property string layout: "insel"
@@ -382,19 +587,19 @@ Singleton {
                 property string provider: "nordvpn"
             }
 
-            // Wallpaperwechsel: Animation und ihre Dauer in ms
+            // Wallpaperwechsel: Animation und ihre Dauer in ms, dazu der
+            // Zufallsmodus (aus | start | timer) samt Abstand und Auswahl
             property JsonObject wallpaper: JsonObject {
                 property string transition: "kreis"
                 property int duration: 800
+                property string random: "aus"
+                property int randomMinutes: 30
+                property string randomScope: "alle"
             }
 
             // Sperrbildschirm (SUPER+L, hypridle, Lock-Kachel). Der Wert wird
             // von ~/.local/bin/hyprlock-select aus shell.json gelesen und
             // entscheidet, welche der beiden hyprlock-Konfigurationen startet.
-            property JsonObject lockscreen: JsonObject {
-                property string style: "karte"
-            }
-
             property JsonObject bar: JsonObject {
                 property bool workspaces: true
                 property int workspaceCount: 5
@@ -406,6 +611,8 @@ Singleton {
                 property bool stats: false
                 property bool battery: true
                 property bool batteryPulse: true
+                // "auto", "system" oder das Modell eines Geraets (Power.target)
+                property string batteryDevice: "auto"
             }
 
             // Was die eingeklappte Notch im Notch-Layout zeigt
@@ -414,7 +621,86 @@ Singleton {
                 property bool date: true
                 property bool media: true
                 property bool visualizer: true
+                // "symbol" | "ring"
+                property string batteryStyle: "symbol"
+                // "system" | "akku" | "visualiser"
+                property string batteryPriority: "system"
                 property bool messages: true
+                property string clockStyle: "digital"
+                property string workspaceStyle: "staebchen"
+                property string visualizerStyle: "spiegel"
+            }
+
+            property JsonObject media: JsonObject {
+                property string cover: "rund"
+                property bool lyrics: true
+                property bool queueOpen: false
+            }
+
+            // Sperrbildschirm (modules/lock)
+            property JsonObject lock: JsonObject {
+                // "karte" | "vollbild" – hypr/scripts/lock.sh entscheidet damit,
+                // ob der Shell-Lockscreen oder hyprlock-full.conf startet
+                property string style: "karte"
+                // "wallpaper" | "desktop" (Foto des Desktops, LockScreen.qml)
+                property string background: "wallpaper"
+                property bool blur: true
+                property bool media: true
+                property bool notifications: true
+                // Positionen von Uhr und Medien-Karte, leer = Standard
+                // (modules/lock/LockLayout.qml)
+                property var layout: ({})
+            }
+
+            // Inaktivitaet (services/idle/Idle.qml), Zeiten in Minuten
+            property JsonObject idle: JsonObject {
+                property bool enabled: true
+                property int lockMinutes: 3
+                property int warnSeconds: 10
+                property int screenOffMinutes: 4
+                property int suspendMinutes: 0
+                property bool media: true
+                property bool fullscreen: true
+                property bool lockOnSleep: true
+            }
+
+            // Bluetooth (services/bluetooth/BluetoothService.qml)
+            property JsonObject bluetooth: JsonObject {
+                // adapterId ("hci1"), leer = automatisch
+                property string adapter: ""
+                property bool notify: true
+                // Prozent, 0 = aus
+                property int lowBattery: 15
+                property int scanSeconds: 60
+                // Adressen ("AA:BB:…") der Geraete, die automatisch verbunden
+                // werden; schaltet das Geraetemenue im Bluetooth-Panel
+                property list<string> autoConnect: []
+            }
+
+            property JsonObject sounds: JsonObject {
+                property bool enabled: false
+                property int volume: 60
+                property bool notifications: true
+                property bool screenshot: true
+                property bool power: true
+                property bool lock: false
+                property bool bluetooth: true
+                // Nur Anker fuer den Editor (SoundsEditor); die Dateien liegen
+                // in ~/.config/dynamic-island/sounds
+                property string library: ""
+            }
+
+            // Seite "Akku": nur Anker fuer den Verlauf (BatteryHistoryEditor);
+            // die Daten schreibt upowerd nach /var/lib/upower
+            property JsonObject battery: JsonObject {
+                property string history: ""
+                // Meldungen (Power.checkWarnings), 0 = aus
+                property int warnLow: 15
+                property int warnCritical: 5
+                property bool notifyFull: true
+                // Akkus, die UPower nicht kennt (Power.extraBatteries)
+                property bool kdeconnect: true
+                property bool novabase: true
             }
 
             // Aufbau der Schnelleinstellungen (Settings-Karte): je Eintrag eine

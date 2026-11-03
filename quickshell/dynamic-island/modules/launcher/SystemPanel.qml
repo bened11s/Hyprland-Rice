@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 
+import qs
 import qs.modules.bar.components.stats
 
 // Untermenue "System" der Notch: dieselbe Karte wie die System-Pille.
@@ -9,7 +10,7 @@ import qs.modules.bar.components.stats
 ViewPanel {
     id: root
 
-    title: "System"
+    title: I18n.tr("System")
     icon: "monitoring"
     contentWidth: 340
     contentHeight: card.implicitHeight

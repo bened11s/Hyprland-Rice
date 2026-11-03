@@ -53,17 +53,16 @@ local cfg = {
 	fileExplorer = "dolphin",
 	audioSettings = "pavucontrol",
 	launcher = "fuzzel",
-	-- Sperrbildschirm (SUPER + L): hyprlock-select entscheidet nach der
-	-- Shell-Einstellung "Sperrbildschirm" (shell.json, lockscreen.style),
-	-- welche Config startet:
-	--   karte     -> ~/.config/hypr/hyprlock.conf       (Pillen-Optik)
-	--   vollbild  -> ~/.config/hypr/hyprlock-full.conf  (grosse Uhr, Wallpaper)
+	-- Sperrbildschirm (SUPER + L): scripts/lock.sh liest die Shell-Einstellung
+	-- "Sperrbildschirm" (shell.json, lockscreen.style):
+	--   karte     -> Lockscreen der dynamic-island-Shell (modules/lock),
+	--                Fallback hyprlock mit ~/.config/hypr/hyprlock.conf
+	--   vollbild  -> hyprlock mit hyprlock-full.conf (grosse Uhr, Wallpaper)
 	-- Layout 12 aus Hyprlock-Dots liegt weiterhin unter ~/.config/hyprlock.
 	-- Wieder darauf umstellen:
 	--   lockCmd = "hyprlock -c " .. home .. "/.config/hyprlock/layout12.conf"
-	-- oder mit vorher gebautem Hintergrund (unscharfe Spalte links):
-	--   lockCmd = home .. "/.config/hyprlock/scripts/lock.sh"
-	lockCmd = home .. "/.local/bin/hyprlock-select",
+	-- Nur hyprlock (ohne Shell-Lock):  lockCmd = "hyprlock"
+	lockCmd = home .. "/.config/hypr/scripts/lock.sh",
 
 	-- Tastatur / Maus
 	kbLayout = "de",

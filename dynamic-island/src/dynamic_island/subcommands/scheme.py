@@ -10,6 +10,7 @@ from dynamic_island.utils.scheme import (
     scheme_variants,
 )
 from dynamic_island.utils.theme import apply_colours
+from dynamic_island.utils.wallpaper import get_wallpaper, set_wall_variant
 
 
 class Set:
@@ -38,6 +39,11 @@ class Set:
                 if self.args.variant:
                     scheme.variant = self.args.variant
             apply_colours(scheme.colours, scheme.mode)
+
+            # Beim dynamischen Schema haengt der Stil am Wallpaper: merken,
+            # damit er beim naechsten Wechsel auf dieses Bild wiederkommt
+            if self.args.variant and scheme.name == "dynamic" and (wall := get_wallpaper()):
+                set_wall_variant(wall, self.args.variant)
         else:
             print("No args given. Use --name, --flavour, --mode, --variant or --random to set a scheme")
 

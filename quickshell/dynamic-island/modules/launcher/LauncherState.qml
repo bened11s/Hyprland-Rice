@@ -21,11 +21,49 @@ Singleton {
     //   "theme"      eigenes Suchfeld + Farb-Karussell (ThemePanel)
     //   "power"      Sitzungs- und Energieaktionen (PowerPanel)
     //   "keys"       Tastenkuerzel-Uebersicht aus Hyprland (KeybindsPanel)
+    //   "clipboard"  Zwischenablage-Verlauf (ClipboardPanel)
     //   "media"      Medien: Player-Auswahl, Cover mit Ring, Steuerung
     //   "control"    Steuerung: Kacheln, WLAN/BT/Audio, Tray
     //   "notifications"  Benachrichtigungsliste
     //   "system"     Auslastung und Temperaturen
     property string mode: "apps"
+
+    // App-Liste fuer den Launcher als gesammelter Schnappschuss. DesktopEntries
+    // scannt erst beim ersten Zugriff und meldet dann Eintrag fuer Eintrag;
+    // direkt gebunden sortierte jeder davon die Treffer neu und setzte das
+    // Modell zurueck (erstes Oeffnen nach dem Start: rund 130 Resets in
+    // 330 ms, alle Zeilen flackerten mit ihrem Intro). Darum kurz nach dem
+    // Start vorwaermen und Aenderungen 80 ms sammeln.
+    property var apps: []
+    property bool appsWarm: false
+
+    function warmApps(): void {
+        if (root.appsWarm)
+            return;
+        root.appsWarm = true;
+        root.apps = DesktopEntries.applications.values.slice();
+    }
+
+    Timer {
+        running: !root.appsWarm
+        interval: 3000
+        onTriggered: root.warmApps()
+    }
+
+    Timer {
+        id: appsSettle
+
+        interval: 80
+        onTriggered: root.apps = DesktopEntries.applications.values.slice()
+    }
+
+    Connections {
+        target: root.appsWarm ? DesktopEntries.applications : null
+
+        function onValuesChanged(): void {
+            appsSettle.restart();
+        }
+    }
 
     // Die Ansichten, durch die man in der Notch blaettert (Mausrad kippen,
     // Touchpad wischen). "overview" ist keine Launcher-Ansicht, sondern die
@@ -89,6 +127,33 @@ Singleton {
             root.showWallpapers(target);
     }
 
+    // ---- Plugin-Sektion der Wallpaper-Auswahl ----
+    // Plugins koennen unter die lokale Reihe eine Sektion haengen (Manifest
+    // `panels.wallpaper`, siehe WallpaperPanel). Welche aufgeklappt ist
+    // (Plugin-id, "" = keine), lebt hier statt im Panel: das Panel entsteht
+    // bei jedem Oeffnen neu, die Sektion soll aber offen bleiben, wie der
+    // Suchtext darin. Die Tastatur faengt trotzdem in der lokalen Reihe an –
+    // ausser `wallpaperSectionFocus` verlangt die Sektion (das Panel setzt
+    // das Flag zurueck, sobald es die Tastatur dorthin gegeben hat).
+    property string wallpaperSection: ""
+    property bool wallpaperSectionFocus: false
+
+    // Auswahl mit aufgeklappter Sektion und der Tastatur darin (IPC eines
+    // Plugins, Tastenkuerzel)
+    function showWallpaperSection(target: ShellScreen, section: string): void {
+        root.wallpaperSection = section;
+        root.wallpaperSectionFocus = true;
+        root.showWallpapers(target);
+    }
+
+    // Genau so schon offen -> zu
+    function toggleWallpaperSection(target: ShellScreen, section: string): void {
+        if (root.open && root.mode === "wallpaper" && root.wallpaperSection === section)
+            root.close();
+        else
+            root.showWallpaperSection(target, section);
+    }
+
     // Farbschema-Auswahl. Anders als die Wallpaper hat sie keinen Knopf in der
     // Leiste – nur den Launcher-Befehl und diesen Weg hier.
     function showThemes(target: ShellScreen): void {
@@ -117,7 +182,7 @@ Singleton {
 
         function onFocusedMonitorChanged(): void {
             const name = Hyprland.focusedMonitor?.name ?? "";
-            if (root.open && (root.mode === "power" || root.mode === "keys") && name && name !== root.screen?.name)
+            if (root.open && (root.mode === "power" || root.mode === "keys" || root.mode === "clipboard") && name && name !== root.screen?.name)
                 root.close();
         }
     }
@@ -224,6 +289,11 @@ Singleton {
         // Tastenkuerzel-Uebersicht (SUPER+K)
         function keys(): void {
             root.toggleMode(root.focusedScreen(), "keys");
+        }
+
+        // Zwischenablage-Verlauf (SUPER+V)
+        function clipboard(): void {
+            root.toggleMode(root.focusedScreen(), "clipboard");
         }
 
         // Untermenues der Notch (Tastenkuerzel in hypr/profiles/simple.lua)

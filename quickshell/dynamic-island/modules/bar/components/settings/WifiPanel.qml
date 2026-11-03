@@ -100,6 +100,114 @@ Item {
         }
     }
 
+    // Rueckmeldung einer Zeile, solange nmcli an ihr arbeitet: die Flaeche
+    // pulsiert in der Akzentfarbe, unten laeuft ein schmaler Balken durch.
+    // `connection up` braucht gern mehrere Sekunden – ohne das sah ein Klick
+    // aus, als waere nichts passiert.
+    component BusyOverlay: Item {
+        id: busy
+
+        property bool running: false
+        property real radius: 14
+        property color tint: Colors.primary
+
+        visible: busy.running
+
+        Rectangle {
+            anchors.fill: parent
+            radius: busy.radius
+            color: busy.tint
+            opacity: 0.05
+
+            SequentialAnimation on opacity {
+                running: busy.running
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.18; duration: Appearance.morphDuration * 2; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 0.05; duration: Appearance.morphDuration * 2; easing.type: Easing.InOutSine }
+            }
+        }
+
+        Item {
+            id: track
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+                leftMargin: busy.radius
+                rightMargin: busy.radius
+                bottomMargin: 3
+            }
+            height: 2
+            clip: true
+
+            Rectangle {
+                width: track.width * 0.35
+                height: parent.height
+                radius: height / 2
+                color: busy.tint
+
+                NumberAnimation on x {
+                    running: busy.running
+                    loops: Animation.Infinite
+                    from: -track.width * 0.35
+                    to: track.width
+                    duration: Appearance.morphDuration * 3
+                    easing.type: Easing.InOutQuad
+                }
+            }
+        }
+    }
+
+    // Knopf-Symbol rechts in der Zeile, das sich beim Arbeiten dreht
+    component Spinner: Text {
+        id: spinner
+
+        property bool spinning: false
+
+        text: "progress_activity"
+        font.family: "Material Symbols Outlined"
+        font.pixelSize: 16
+        color: Colors.primary
+
+        RotationAnimator {
+            target: spinner
+            running: spinner.spinning && spinner.visible
+            from: 0
+            to: 360
+            duration: Appearance.morphDuration * 3
+            loops: Animation.Infinite
+        }
+    }
+
+    // Kurzes Kopfschuetteln einer Zeile, wenn das Verbinden gescheitert ist
+    component Shake: SequentialAnimation {
+        id: shake
+
+        property QtObject target
+
+        NumberAnimation { target: shake.target; property: "x"; to: -7; duration: 45 }
+        NumberAnimation { target: shake.target; property: "x"; to: 6; duration: 70 }
+        NumberAnimation { target: shake.target; property: "x"; to: -4; duration: 60 }
+        NumberAnimation { target: shake.target; property: "x"; to: 2; duration: 50 }
+        NumberAnimation { target: shake.target; property: "x"; to: 0; duration: 40 }
+    }
+
+    function phaseText(phase: string): string {
+        if (phase === "connect")
+            return I18n.tr("Verbinde…");
+        if (phase === "disconnect")
+            return I18n.tr("Trenne…");
+        if (phase === "forget")
+            return I18n.tr("Wird vergessen…");
+        if (phase === "failed")
+            return I18n.tr("Fehlgeschlagen");
+        if (phase === "done")
+            return Network.doneKind === "disconnect" ? I18n.tr("Getrennt")
+                 : Network.doneKind === "forget" ? I18n.tr("Netz vergessen") : I18n.tr("Verbunden");
+        return "";
+    }
+
     function rowTapped(net: var, index: int): void {
         if (net.active) {
             // Verbundenes Netz: nur das Menue, Trennen ist eine bewusste Geste
@@ -273,8 +381,11 @@ Item {
             right: parent.right
         }
         text: Network.status
-        visible: text !== ""
-        color: text.startsWith("Error") || text.indexOf("Fehl") >= 0 ? Colors.error : Colors.fgSurfaceVariant
+        // Den Fortschritt zeigt die Zeile selbst; hier steht nur, was danach
+        // uebrig bleibt (Fehlermeldung von nmcli) – sonst rutscht die ganze
+        // Liste bei jedem Klick kurz nach unten
+        visible: text !== "" && !Network.busy
+        color: text.startsWith("Error") || text.indexOf("Fehl") >= 0 || text.startsWith("Failed") ? Colors.error : Colors.fgSurfaceVariant
         font.pixelSize: 11
         elide: Text.ElideRight
     }
@@ -304,19 +415,49 @@ Item {
 
                 required property var modelData
 
+                readonly property string phase: Network.phaseOf(`dev:${wiredRow.modelData.device}`)
+                // Auch wenn der NetworkManager selbst gerade verbindet
+                readonly property bool working: wiredRow.phase === "connect" || wiredRow.phase === "disconnect"
+                    || wiredRow.modelData.connecting
                 readonly property bool canConnect: !wiredRow.modelData.connected
-                    && !wiredRow.modelData.connecting && wiredRow.modelData.available
+                    && !wiredRow.working && wiredRow.modelData.available
 
                 width: wiredSection.width
                 height: panel.rowHeight
                 radius: 14
-                color: wiredRow.modelData.connected ? Colors.alpha(Colors.primary, 0.16)
+                color: wiredRow.phase === "failed" ? Colors.alpha(Colors.error, 0.14)
+                     : wiredRow.modelData.connected ? Colors.alpha(Colors.primary, 0.16)
                      : wiredRow.canConnect && wiredArea.containsMouse ? Colors.shade(Colors.background, 0.08)
                      : Colors.shade(Colors.background, 0.05)
                 opacity: wiredRow.modelData.available ? 1 : 0.6
+                scale: wiredArea.pressed && wiredRow.canConnect ? 0.98 : 1
+                transform: Translate { id: wiredShift }
 
                 Behavior on color {
-                    ColorAnimation { duration: 120 }
+                    ColorAnimation { duration: Appearance.fadeDuration }
+                }
+                Behavior on scale {
+                    NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+                }
+
+                Shake {
+                    id: wiredShake
+                    target: wiredShift
+                }
+
+                Connections {
+                    target: Network
+
+                    function onFailCountChanged(): void {
+                        if (wiredRow.phase === "failed")
+                            wiredShake.restart();
+                    }
+                }
+
+                BusyOverlay {
+                    anchors.fill: parent
+                    radius: wiredRow.radius
+                    running: wiredRow.working
                 }
 
                 // Klick verbindet; Trennen nur ueber den Knopf, wie beim WLAN
@@ -368,9 +509,11 @@ Item {
                     Text {
                         font.family: Config.font
                         width: parent.width
-                        text: [Network.wiredStateText(wiredRow.modelData), wiredRow.modelData.device,
-                               wiredRow.modelData.ip].filter(s => s !== "").join(" · ")
-                        color: Colors.fgSurfaceVariant
+                        text: [panel.phaseText(wiredRow.phase) || Network.wiredStateText(wiredRow.modelData),
+                               wiredRow.modelData.device, wiredRow.modelData.ip].filter(s => s !== "").join(" · ")
+                        color: wiredRow.phase === "failed" ? Colors.error
+                             : wiredRow.working || wiredRow.phase === "done" ? Colors.primary
+                             : Colors.fgSurfaceVariant
                         font.pixelSize: 11
                         elide: Text.ElideRight
                     }
@@ -386,16 +529,26 @@ Item {
                     }
                     width: 28
                     height: 28
-                    visible: wiredRow.modelData.connected || wiredRow.canConnect
+                    visible: wiredRow.modelData.connected || wiredRow.canConnect || wiredRow.working
                     radius: height / 2
-                    color: wiredButtonArea.containsMouse ? Colors.alpha(Colors.fgSurface, 0.1) : "transparent"
+                    color: wiredButtonArea.containsMouse && !wiredRow.working
+                           ? Colors.alpha(Colors.fgSurface, 0.1) : "transparent"
+
+                    Spinner {
+                        anchors.centerIn: parent
+                        visible: wiredRow.working
+                        spinning: wiredRow.working
+                    }
 
                     Text {
                         anchors.centerIn: parent
-                        text: wiredRow.modelData.connected ? "link_off" : "link"
+                        visible: !wiredRow.working
+                        text: wiredRow.phase === "done" && wiredRow.modelData.connected ? "check"
+                            : wiredRow.modelData.connected ? "link_off" : "link"
                         font.family: "Material Symbols Outlined"
                         font.pixelSize: 16
-                        color: wiredRow.modelData.connected ? Colors.error : Colors.fgSurfaceVariant
+                        color: wiredRow.phase === "done" && wiredRow.modelData.connected ? Colors.primary
+                             : wiredRow.modelData.connected ? Colors.error : Colors.fgSurfaceVariant
                     }
 
                     MouseArea {
@@ -403,6 +556,7 @@ Item {
 
                         anchors.fill: parent
                         hoverEnabled: true
+                        enabled: !wiredRow.working
                         cursorShape: Qt.PointingHandCursor
                         onClicked: wiredRow.modelData.connected ? Network.disconnectWired(wiredRow.modelData)
                                                                : Network.connectWired(wiredRow.modelData)
@@ -432,6 +586,8 @@ Item {
             clip: true
             spacing: 4
             model: Network.radioOn ? Network.networks : []
+            // Kein Highlight-Nachfuehren (siehe LauncherPanel.qml)
+            highlightFollowsCurrentItem: false
             boundsBehavior: Flickable.StopAtBounds
 
             WheelHandler {
@@ -457,6 +613,10 @@ Item {
                 readonly property bool menuOpen: panel.menuSsid === row.modelData.ssid
                 readonly property bool passwordOpen: panel.passwordSsid === row.modelData.ssid
 
+                readonly property string phase: Network.phaseOf(row.modelData.ssid)
+                readonly property bool working: row.phase === "connect" || row.phase === "disconnect"
+                    || row.phase === "forget"
+
                 // Verfuegbare Aktionen dieses Netzes – bewusst hier auf der
                 // Zeile berechnet, nicht ueber visible-Bindungen an den
                 // Menue-Eintraegen: die evaluierten bei Inline-Komponenten in
@@ -466,12 +626,12 @@ Item {
                     const net = row.modelData;
                     const items = [];
                     if (net.saved && net.secured)
-                        items.push({ action: "password", icon: "key", label: "Passwort ändern" });
+                        items.push({ action: "password", icon: "key", label: I18n.tr("Passwort ändern") });
                     if (net.duplicate && net.stale.length > 0)
                         items.push({ action: "dropStale", icon: "cleaning_services",
-                                     label: `${net.stale.length} doppeltes Profil entfernen` });
+                                     label: I18n.tr("%1 doppeltes Profil entfernen").arg(net.stale.length) });
                     if (net.saved)
-                        items.push({ action: "forget", icon: "delete", label: "Vergessen", danger: true });
+                        items.push({ action: "forget", icon: "delete", label: I18n.tr("Vergessen"), danger: true });
                     return items;
                 }
 
@@ -500,15 +660,45 @@ Item {
 
                 // Zeile selbst
                 Rectangle {
+                    id: rowCard
+
                     width: parent.width
                     height: panel.rowHeight
                     radius: 14
-                    color: row.modelData.active ? Colors.alpha(Colors.primary, 0.16)
-                         : rowArea.containsMouse ? Colors.shade(Colors.background, 0.08)
+                    color: row.phase === "failed" ? Colors.alpha(Colors.error, 0.14)
+                         : row.modelData.active ? Colors.alpha(Colors.primary, 0.16)
+                         : rowArea.containsMouse && !row.working ? Colors.shade(Colors.background, 0.08)
                          : Colors.shade(Colors.background, 0.05)
+                    // Druckgefuehl: die Zeile gibt beim Klicken kurz nach
+                    scale: rowArea.pressed && !row.working ? 0.98 : 1
+                    transform: Translate { id: rowShift }
 
                     Behavior on color {
-                        ColorAnimation { duration: 120 }
+                        ColorAnimation { duration: Appearance.fadeDuration }
+                    }
+                    Behavior on scale {
+                        NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
+                    }
+
+                    Shake {
+                        id: rowShake
+                        target: rowShift
+                    }
+
+                    Connections {
+                        target: Network
+
+                        function onFailCountChanged(): void {
+                            if (row.phase === "failed")
+                                rowShake.restart();
+                        }
+                    }
+
+                    BusyOverlay {
+                        anchors.fill: parent
+                        radius: rowCard.radius
+                        running: row.working
+                        tint: row.phase === "forget" ? Colors.error : Colors.primary
                     }
 
                     MouseArea {
@@ -516,8 +706,9 @@ Item {
 
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.rowTapped(row.modelData, row.index)
+                        cursorShape: row.working ? Qt.BusyCursor : Qt.PointingHandCursor
+                        onClicked: if (!row.working)
+                            panel.rowTapped(row.modelData, row.index)
                     }
 
                     Text {
@@ -528,10 +719,11 @@ Item {
                             leftMargin: 14
                             verticalCenter: parent.verticalCenter
                         }
-                        text: Network.signalIcon(row.modelData)
+                        text: row.phase === "connect" ? WifiStatus.icon : Network.signalIcon(row.modelData)
                         font.family: "Material Symbols Outlined"
                         font.pixelSize: 20
-                        color: row.modelData.active ? Colors.primary : Colors.fgSurfaceVariant
+                        color: row.modelData.active || row.phase === "connect" ? Colors.primary
+                                                                               : Colors.fgSurfaceVariant
                     }
 
                     Column {
@@ -562,19 +754,24 @@ Item {
                             text: {
                                 const net = row.modelData;
                                 const parts = [];
-                                if (net.active)
-                                    parts.push("Verbunden");
+                                const phase = panel.phaseText(row.phase);
+                                if (phase !== "")
+                                    parts.push(phase);
+                                else if (net.active)
+                                    parts.push(I18n.tr("Verbunden"));
                                 else if (net.saved)
-                                    parts.push("Gespeichert");
+                                    parts.push(I18n.tr("Gespeichert"));
                                 if (!net.inRange)
-                                    parts.push("nicht in Reichweite");
+                                    parts.push(I18n.tr("nicht in Reichweite"));
                                 else
                                     parts.push(`${net.signal}%`);
                                 if (net.duplicate)
-                                    parts.push(`${net.profiles.length} Profile`);
+                                    parts.push(I18n.tr("%1 Profile").arg(net.profiles.length));
                                 return parts.join(" · ");
                             }
-                            color: row.modelData.duplicate ? Colors.error : Colors.fgSurfaceVariant
+                            color: row.phase === "failed" || row.modelData.duplicate ? Colors.error
+                                 : row.working || row.phase === "done" ? Colors.primary
+                                 : Colors.fgSurfaceVariant
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
@@ -607,16 +804,31 @@ Item {
                         width: 28
                         height: 28
                         visible: row.modelData.active || (row.modelData.saved && row.modelData.inRange)
+                                 || row.working || row.phase === "done" || row.phase === "failed"
                         radius: height / 2
-                        color: connectionArea.containsMouse
+                        color: connectionArea.containsMouse && !row.working
                                ? Colors.alpha(Colors.fgSurface, 0.1) : "transparent"
 
+                        Spinner {
+                            anchors.centerIn: parent
+                            visible: row.working
+                            spinning: row.working
+                            color: row.phase === "forget" ? Colors.error : Colors.primary
+                        }
+
+                        // Kurz nach dem Ende ein Haken bzw. Ausrufezeichen,
+                        // danach wieder der normale Knopf
                         Text {
                             anchors.centerIn: parent
-                            text: row.modelData.active ? "link_off" : "wifi"
+                            visible: !row.working
+                            text: row.phase === "done" ? "check"
+                                : row.phase === "failed" ? "error"
+                                : row.modelData.active ? "link_off" : "wifi"
                             font.family: "Material Symbols Outlined"
                             font.pixelSize: 16
-                            color: row.modelData.active ? Colors.error : Colors.fgSurfaceVariant
+                            color: row.phase === "done" ? Colors.primary
+                                 : row.phase === "failed" || row.modelData.active ? Colors.error
+                                 : Colors.fgSurfaceVariant
                         }
 
                         MouseArea {
@@ -624,6 +836,7 @@ Item {
 
                             anchors.fill: parent
                             hoverEnabled: true
+                            enabled: !row.working
                             cursorShape: Qt.PointingHandCursor
                             onClicked: row.runConnectionAction()
                         }
@@ -758,7 +971,7 @@ Item {
                         Text {
                             anchors.fill: parent
                             visible: password.text === ""
-                            text: "Passwort"
+                            text: I18n.tr("Passwort")
                             color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                             font: password.font
                             verticalAlignment: Text.AlignVCenter
@@ -793,7 +1006,7 @@ Item {
                         Text {
                             font.family: Config.font
                             anchors.centerIn: parent
-                            text: "Verbinden"
+                            text: I18n.tr("Verbinden")
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
                             color: password.text === "" ? Colors.fgSurfaceVariant : Colors.fgPrimary
@@ -814,7 +1027,7 @@ Item {
             font.family: Config.font
             anchors.centerIn: parent
             visible: list.count === 0
-            text: Network.radioOn ? (Network.loaded ? "Keine Netze gefunden" : "Suche…") : "WLAN ist aus"
+            text: Network.radioOn ? (Network.loaded ? I18n.tr("Keine Netze gefunden") : I18n.tr("Suche…")) : I18n.tr("WLAN ist aus")
             color: Colors.fgSurfaceVariant
             font.pixelSize: 12
         }

@@ -250,7 +250,7 @@ Item {
             height: root.collapsedSize
             verticalAlignment: Text.AlignVCenter
 
-            text: Notifications.dnd ? "Nicht stören" : "Keine Benachrichtigungen"
+            text: Notifications.dnd ? I18n.tr("Nicht stören") : I18n.tr("Keine Benachrichtigungen")
             color: Colors.fgSurfaceVariant
             font.pixelSize: 11
             elide: Text.ElideRight
@@ -286,8 +286,8 @@ Item {
                     leftMargin: 14
                     verticalCenter: parent.verticalCenter
                 }
-                text: Notifications.count > 0 ? `Benachrichtigungen · ${Notifications.count}`
-                                              : "Benachrichtigungen"
+                text: Notifications.count > 0 ? I18n.tr("Benachrichtigungen · %1").arg(Notifications.count)
+                                              : I18n.tr("Benachrichtigungen")
                 color: Colors.fgBackground
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
@@ -347,6 +347,8 @@ Item {
             model: ScriptModel {
                 values: Notifications.groups
             }
+            // Kein Highlight-Nachfuehren (siehe LauncherPanel.qml)
+            highlightFollowsCurrentItem: false
             boundsBehavior: Flickable.StopAtBounds
             opacity: root.open ? 1 : 0
             visible: opacity > 0
@@ -378,7 +380,7 @@ Item {
                 anchors.centerIn: parent
                 visible: Notifications.count === 0
 
-                text: "Nichts Neues"
+                text: I18n.tr("Nichts Neues")
                 color: Colors.fgSurfaceVariant
                 font.pixelSize: 12
             }
