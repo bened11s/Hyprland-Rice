@@ -2673,6 +2673,65 @@
           "accent": "#3ce8ff"
         }
       }
+    ],
+    "wallhaven-zm7pvo.jpg": [
+      {
+        "id": "wmw14swyrsw",
+        "type": "lyrics",
+        "x": 0.099,
+        "y": 0.2336,
+        "size": 1,
+        "monitor": "DVI-I-1",
+        "opts": {
+          "lines": 3,
+          "align": "mitte",
+          "color": "hell"
+        }
+      },
+      {
+        "id": "wmw14tn2h1b",
+        "type": "bonsai",
+        "x": 0.0966,
+        "y": 0.8631,
+        "size": 0.836,
+        "monitor": "DVI-I-1",
+        "opts": {
+          "life": "mittel",
+          "leaves": "&",
+          "pot": "schale",
+          "regrow": "täglich",
+          "grow": true,
+          "color": "hell"
+        }
+      },
+      {
+        "id": "wmw14ty1p4t",
+        "type": "nowplaying",
+        "x": 0.0991,
+        "y": 0.072,
+        "size": 1.207,
+        "monitor": "DVI-I-1",
+        "opts": {
+          "style": "vinyl",
+          "progress": true,
+          "tint": true,
+          "idle": "ausblenden",
+          "color": "hell"
+        }
+      },
+      {
+        "id": "wmw14upclq7",
+        "type": "clock",
+        "x": 0.5,
+        "y": 0.5,
+        "size": 1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "hell"
+        }
+      }
     ]
   }
 }
