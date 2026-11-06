@@ -270,9 +270,23 @@ Singleton {
 
     // ------------------------------------------------- Anwenden ----
 
+    // Wie ein Monitor in der Datei adressiert wird. Normalerweise ueber die
+    // Beschreibung (stabil bei umgesteckten Kabeln), aber NUR wenn sie
+    // eindeutig ist: DisplayLink/evdi meldet zeitweise fuer BEIDE
+    // DVI-Ausgaenge dieselbe Beschreibung (veraltete EDID). Zwei gleiche
+    // desc:-Regeln ueberschreiben sich dann gegenseitig und beide Monitore
+    // landen auf derselben Position. In dem Fall lieber der Ausgangsname.
+    function persistentOutput(m: var): string {
+        const desc = String(m.description ?? "").trim();
+        if (desc === "")
+            return m.name;
+        const same = root.monitors.filter(o => String(o.description ?? "").trim() === desc).length;
+        return same === 1 ? "desc:" + desc : m.name;
+    }
+
     // Eine hl.monitor-Zeile fuer einen Monitorentwurf
     function ruleFor(m: var, persistent = false): string {
-        const output = JSON.stringify(persistent && m.description ? "desc:" + m.description : m.name);
+        const output = JSON.stringify(persistent ? root.persistentOutput(m) : m.name);
         const mode = root.eff(m.name, "mode", root.currentModeString(m));
         const x = root.eff(m.name, "x", m.x);
         const y = root.eff(m.name, "y", m.y);
@@ -443,19 +457,15 @@ with open(path) as f:
             root.busy = false;
             if (code === 0) {
                 root.status = "Gespeichert in monitors.lua";
-                // Neuladen, damit der Datei-Inhalt auch wirklich greift
-                reloadProc.running = false;
-                reloadProc.running = true;
+                // KEIN `hyprctl reload` hier! Der laufende Zustand ist schon
+                // per eval gesetzt; ein Reload laesst evdi/DisplayLink alle
+                // Ausgaenge neu durchzaehlen. Quickshell zerstoert dann seine
+                // Bar-/Notch-Fenster und baut sie neu auf – in dieser Zeit ist
+                // das Menue unbedienbar (und die Monitore tauschen die Namen).
+                refreshDelay.restart();
             } else {
                 root.status = "Speichern fehlgeschlagen (Code " + code + ")";
             }
         }
-    }
-
-    Process {
-        id: reloadProc
-
-        command: ["hyprctl", "reload"]
-        onExited: refreshDelay.restart()
     }
 }

@@ -40,17 +40,22 @@ LazyLoader {
         property real frozenScale: 0
         property var frozenBounds: ({ x: 0, y: 0, w: 1, h: 1 })
 
-        // Vorschau-Massstab: Gesamtanordnung passt in die Flaäche
+        // Vorschau-Massstab: Gesamtanordnung passt in die tatsaechliche
+        // Zeichenflaeche (canvas), nicht in grob geschaetzte Fensterwerte.
         readonly property var bounds: win.dragging ? win.frozenBounds : Monitors.layoutInfo()
         readonly property real previewScale: {
             if (win.dragging && win.frozenScale > 0)
                 return win.frozenScale;
             if (!Monitors.loaded || bounds.w <= 0 || bounds.h <= 0)
                 return 1;
-            const area = Math.min((win.width - win.inset * 2 - 236 - 60) / bounds.w,
-                                  (win.height - win.inset * 2 - 210) / bounds.h);
-            return Math.max(0.02, Math.min(0.5, area));
+            const availW = Math.max(40, canvas.width - 36);
+            const availH = Math.max(40, canvas.height - 36);
+            return Math.max(0.02, Math.min(1, Math.min(availW / bounds.w, availH / bounds.h)));
         }
+
+        // Anordnung in der Flaeche zentrieren
+        readonly property real previewOffsetX: (canvas.width - win.bounds.w * win.previewScale) / 2
+        readonly property real previewOffsetY: (canvas.height - win.bounds.h * win.previewScale) / 2
 
         readonly property real inset: 28
 
@@ -63,8 +68,8 @@ LazyLoader {
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
 
-        implicitWidth: 1010 + inset * 2
-        implicitHeight: 640 + inset * 2
+        implicitWidth: Math.min(1280, (win.modelData?.width ?? 1600) - 120) + inset * 2
+        implicitHeight: Math.min(860, (win.modelData?.height ?? 1000) - 120) + inset * 2
 
         // Liste beim Oeffnen auf den fokussierten Monitor stellen
         onVisibleChanged: if (visible && win.selected === "")
@@ -299,7 +304,7 @@ LazyLoader {
                         rightMargin: 26
                         topMargin: 22
                     }
-                    height: 200
+                    height: Math.max(190, Math.min(340, content.height * 0.42))
 
                     Text {
                         id: previewLabel
@@ -324,7 +329,8 @@ LazyLoader {
                         font.pixelSize: 11
                     }
 
-                    // Flaeche, in der die Monitore liegen
+                    // Flaeche, in der die Monitore liegen. `clip` ist wichtig:
+                    // ohne das ragen die Kaesten in die Einstellungen darunter.
                     Item {
                         id: canvas
 
@@ -335,6 +341,7 @@ LazyLoader {
                             topMargin: 10
                             bottom: parent.bottom
                         }
+                        clip: true
 
                         Rectangle {
                             anchors.fill: parent
@@ -365,10 +372,10 @@ LazyLoader {
                                 // Ursprung des Ausschnitts abziehen: beginnt die
                                 // Anordnung z.B. bei x=1920, steht der Kasten trotzdem
                                 // links in der Vorschau
-                                x: (lx - win.bounds.x) * win.previewScale
-                                y: (ly - win.bounds.y) * win.previewScale
-                                width: Math.max(24, box.size.w * win.previewScale)
-                                height: Math.max(24, box.size.h * win.previewScale)
+                                x: win.previewOffsetX + (lx - win.bounds.x) * win.previewScale
+                                y: win.previewOffsetY + (ly - win.bounds.y) * win.previewScale
+                                width: Math.max(16, box.size.w * win.previewScale)
+                                height: Math.max(16, box.size.h * win.previewScale)
                                 radius: 8
                                 color: box.isSelected ? Colors.alpha(Colors.primary, 0.22)
                                      : Colors.alpha(Colors.surfaceContainer, 0.9)
@@ -412,8 +419,9 @@ LazyLoader {
                                         return dragArea.mapToItem(canvas, mouse.x, mouse.y);
                                     }
 
-                                    onEntered: win.selected = box.m.name
                                     onPressed: (mouse) => {
+                                        // Ziehen waehlt den Monitor gleich mit aus
+                                        win.selected = box.m.name;
                                         // ERST die Werte merken, DANN einfrieren –
                                         // sonst liest bounds/scale schon den
                                         // eingefrorenen (noch leeren) Zustand
@@ -467,7 +475,13 @@ LazyLoader {
                                 }
 
                                 Text {
+                                    id: boxName
+
                                     anchors.centerIn: parent
+                                    anchors.verticalCenterOffset: boxRes.visible ? -6 : 0
+                                    width: parent.width - 8
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
                                     text: box.m.name
                                     font.family: Config.font
                                     font.pixelSize: 10
@@ -476,11 +490,14 @@ LazyLoader {
                                 }
 
                                 Text {
+                                    id: boxRes
+
                                     anchors {
                                         horizontalCenter: parent.horizontalCenter
-                                        bottom: parent.bottom
-                                        bottomMargin: 4
+                                        top: boxName.bottom
+                                        topMargin: 1
                                     }
+                                    visible: box.height > 44
                                     text: box.size.w + "×" + box.size.h
                                     font.family: Config.font
                                     font.pixelSize: 8
@@ -540,7 +557,8 @@ LazyLoader {
 
                             Text {
                                 width: 96
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 6
                                 text: "Modus"
                                 font.family: Config.font
                                 font.pixelSize: 12
@@ -565,7 +583,13 @@ LazyLoader {
                                         // "60.00" matchte sonst nie)
                                         readonly property bool isSelected: Monitors.eff(win.selected, "mode", Monitors.currentModeString(win.selectedLive)) === modelData.mode
 
-                                        height: 28
+                                        // Breite aus dem Text: eine zentrierte
+                                        // Beschriftung gibt dem Rechteck sonst
+                                        // keine implicitWidth (Chips wuerden
+                                        // auf 0 zusammenfallen und die Texte
+                                        // uebereinander laufen).
+                                        implicitWidth: modeText.contentWidth + 20
+                                        implicitHeight: 28
                                         radius: 8
                                         color: modeChip.isSelected ? Colors.alpha(Colors.primary, 0.18)
                                              : modeHover.hovered ? Colors.alpha(Colors.fgSurface, 0.1)
@@ -587,11 +611,10 @@ LazyLoader {
                                         }
 
                                         Text {
+                                            id: modeText
+
                                             anchors.centerIn: parent
-                                            anchors.margins: 0
-                                            leftPadding: 10
-                                            rightPadding: 10
-                                            text: modeChip.modelData.mode.replace("@", " @ ") + " Hz"
+                                            text: modeChip.modelData.mode.replace("x", "×").replace("@", " @ ") + " Hz"
                                             font.family: Config.font
                                             font.pixelSize: 11
                                             color: modeChip.isSelected ? Colors.primary : Colors.fgBackground
@@ -608,7 +631,8 @@ LazyLoader {
 
                             Text {
                                 width: 96
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 6
                                 text: "Skalierung"
                                 font.family: Config.font
                                 font.pixelSize: 12
@@ -638,8 +662,8 @@ LazyLoader {
                                         required property real modelData
                                         readonly property bool isSelected: Math.abs(Monitors.eff(win.selected, "scale", win.selectedLive?.scale ?? 1) - modelData) < 0.01
 
-                                        height: 28
-                                        width: 52
+                                        implicitWidth: Math.max(52, scaleText.contentWidth + 20)
+                                        implicitHeight: 28
                                         radius: 8
                                         color: scaleChip.isSelected ? Colors.alpha(Colors.primary, 0.18)
                                              : scaleHover.hovered ? Colors.alpha(Colors.fgSurface, 0.1)
@@ -657,6 +681,8 @@ LazyLoader {
                                         }
 
                                         Text {
+                                            id: scaleText
+
                                             anchors.centerIn: parent
                                             text: scaleChip.modelData.toFixed(2).replace(/\.?0+$/, "").replace(".", ",")
                                             font.family: Config.font
@@ -675,7 +701,8 @@ LazyLoader {
 
                             Text {
                                 width: 96
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 6
                                 text: "Ausrichtung"
                                 font.family: Config.font
                                 font.pixelSize: 12
@@ -705,7 +732,8 @@ LazyLoader {
                                         required property var modelData
                                         readonly property bool isSelected: Monitors.eff(win.selected, "transform", win.selectedLive?.transform ?? 0) === modelData.t
 
-                                        height: 28
+                                        implicitWidth: rotText.contentWidth + 20
+                                        implicitHeight: 28
                                         radius: 8
                                         color: rotChip.isSelected ? Colors.alpha(Colors.primary, 0.18)
                                              : rotHover.hovered ? Colors.alpha(Colors.fgSurface, 0.1)
@@ -723,9 +751,9 @@ LazyLoader {
                                         }
 
                                         Text {
+                                            id: rotText
+
                                             anchors.centerIn: parent
-                                            leftPadding: 10
-                                            rightPadding: 10
                                             text: rotChip.modelData.label
                                             font.family: Config.font
                                             font.pixelSize: 11
@@ -743,7 +771,8 @@ LazyLoader {
 
                             Text {
                                 width: 96
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 6
                                 text: "Spiegelung"
                                 font.family: Config.font
                                 font.pixelSize: 12
@@ -766,7 +795,8 @@ LazyLoader {
                                         required property string modelData
                                         readonly property bool isSelected: (Monitors.eff(win.selected, "mirror", win.selectedLive?.mirrorOf ?? "") || "") === modelData
 
-                                        height: 28
+                                        implicitWidth: mirrorText.contentWidth + 20
+                                        implicitHeight: 28
                                         radius: 8
                                         color: mirrorChip.isSelected ? Colors.alpha(Colors.primary, 0.18)
                                              : mirrorHover.hovered ? Colors.alpha(Colors.fgSurface, 0.1)
@@ -784,9 +814,9 @@ LazyLoader {
                                         }
 
                                         Text {
+                                            id: mirrorText
+
                                             anchors.centerIn: parent
-                                            leftPadding: 10
-                                            rightPadding: 10
                                             text: mirrorChip.modelData === "" ? "Kein Spiegel" : mirrorChip.modelData
                                             font.family: Config.font
                                             font.pixelSize: 11
@@ -804,7 +834,8 @@ LazyLoader {
 
                             Text {
                                 width: 96
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 6
                                 text: "Sonstiges"
                                 font.family: Config.font
                                 font.pixelSize: 12
@@ -818,7 +849,8 @@ LazyLoader {
                                 property bool checked
                                 signal toggled()
 
-                                height: 28
+                                implicitWidth: miniRow.implicitWidth
+                                implicitHeight: 28
                                 radius: 8
                                 color: mini.checked ? Colors.alpha(Colors.primary, 0.18)
                                      : miniHover.hovered ? Colors.alpha(Colors.fgSurface, 0.1)
@@ -839,6 +871,8 @@ LazyLoader {
                                 }
 
                                 Row {
+                                    id: miniRow
+
                                     anchors.centerIn: parent
                                     spacing: 5
 
@@ -877,11 +911,24 @@ LazyLoader {
                                 onToggled: Monitors.set(win.selected, "vrr", !checked ? 1 : 0)
                             }
                         }
+
+                        // Kurzhilfe – fuellt die ruhige Flaeche unter den
+                        // Einstellungen und erklaert das Ziehen.
+                        Text {
+                            topPadding: 10
+                            text: "Tipp: Monitor im Feld „Anordnung“ mit der Maus ziehen. "
+                                + "Kanten rasten automatisch ein, „Anwenden“ übernimmt sofort."
+                            font.family: Config.font
+                            font.pixelSize: 10
+                            color: Colors.alpha(Colors.fgSurfaceVariant, 0.55)
+                            wrapMode: Text.WordWrap
+                            width: settingsCol.width
+                        }
                     }
                 }
 
                 // ---- Aktionsleiste ----
-                Row {
+                Item {
                     id: actions
 
                     anchors {
@@ -892,7 +939,7 @@ LazyLoader {
                         rightMargin: 26
                         bottomMargin: 20
                     }
-                    spacing: 10
+                    height: 36
 
                     component ActionButton: Rectangle {
                         id: btn
@@ -903,7 +950,11 @@ LazyLoader {
                         property bool enabled: true
                         signal tapped()
 
-                        height: 36
+                        // Wie bei den Chips: die zentrierte Row gibt dem
+                        // Rechteck keine Breite -> ohne implicitWidth waeren
+                        // die Knoepfe unsichtbar (Breite 0).
+                        implicitWidth: btnRow.implicitWidth
+                        implicitHeight: 36
                         radius: 12
                         opacity: btn.enabled ? 1 : 0.4
                         color: btn.primary ? (btnHover.hovered ? Colors.shade(Colors.primary, 0.08) : Colors.primary)
@@ -927,6 +978,8 @@ LazyLoader {
                         }
 
                         Row {
+                            id: btnRow
+
                             anchors.centerIn: parent
                             spacing: 6
 
@@ -953,47 +1006,54 @@ LazyLoader {
                         }
                     }
 
-                    ActionButton {
-                        label: "Verwerfen"
-                        icon: "undo"
-                        enabled: Monitors.dirty && !Monitors.busy
-                        onTapped: Monitors.revert()
-                    }
+                    Row {
+                        id: actionRow
 
-                    ActionButton {
-                        label: "Anwenden"
-                        icon: "check"
-                        primary: true
-                        enabled: Monitors.loaded && !Monitors.busy
-                        onTapped: Monitors.apply()
-                    }
-
-                    ActionButton {
-                        label: "Speichern"
-                        icon: "save"
-                        enabled: Monitors.loaded && !Monitors.busy
-                        onTapped: Monitors.persist()
-                    }
-
-                    // Statuszeile rechts
-                    Item {
-                        width: parent.width - statusText.implicitWidth - 120
-                        height: 1
-
-                        Text {
-                            id: statusText
-
-                            anchors {
-                                right: parent.right
-                                rightMargin: 10
-                                verticalCenter: parent.verticalCenter
-                            }
-                            text: Monitors.status
-                            font.family: Config.font
-                            font.pixelSize: 11
-                            color: Monitors.status.includes("fehlgeschlagen") ? Colors.error
-                                 : Colors.alpha(Colors.fgSurfaceVariant, 0.85)
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
                         }
+                        spacing: 10
+
+                        ActionButton {
+                            label: "Verwerfen"
+                            icon: "undo"
+                            enabled: Monitors.dirty && !Monitors.busy
+                            onTapped: Monitors.revert()
+                        }
+
+                        ActionButton {
+                            label: "Anwenden"
+                            icon: "check"
+                            primary: true
+                            enabled: Monitors.loaded && !Monitors.busy
+                            onTapped: Monitors.apply()
+                        }
+
+                        ActionButton {
+                            label: "Speichern"
+                            icon: "save"
+                            enabled: Monitors.loaded && !Monitors.busy
+                            onTapped: Monitors.persist()
+                        }
+                    }
+
+                    // Statuszeile rechts, weicht den Knoepfen aus
+                    Text {
+                        id: statusText
+
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+                        width: Math.max(0, actions.width - actionRow.width - 20)
+                        horizontalAlignment: Text.AlignRight
+                        elide: Text.ElideRight
+                        text: Monitors.status
+                        font.family: Config.font
+                        font.pixelSize: 11
+                        color: Monitors.status.includes("fehlgeschlagen") ? Colors.error
+                             : Colors.alpha(Colors.fgSurfaceVariant, 0.85)
                     }
                 }
 
