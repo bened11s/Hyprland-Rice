@@ -170,8 +170,10 @@ Item {
                     spacing: root.unit * 0.4
 
                     Text {
+                        id: barLabel
+
                         anchors.verticalCenter: parent.verticalCenter
-                        width: root.unit * 3.2
+                        width: Math.max(root.unit * 3.2, implicitWidth)
                         text: modelData.label
                         font.family: root.display
                         font.pixelSize: root.labelPx
@@ -180,7 +182,10 @@ Item {
 
                     Item {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: barRow.width - root.unit * 3.2 - root.unit * 2.4
+                        // Auch die beiden Abstaende der Row abziehen, sonst
+                        // laeuft der Prozentwert rechts aus dem Widget heraus
+                        width: Math.max(0, barRow.width - barLabel.width - barPct.width
+                                           - 2 * barRow.spacing)
                         height: Math.max(2, root.unit * 0.22)
 
                         Rectangle {
@@ -201,8 +206,10 @@ Item {
                     }
 
                     Text {
+                        id: barPct
+
                         anchors.verticalCenter: parent.verticalCenter
-                        width: root.unit * 2
+                        width: Math.max(root.unit * 2, implicitWidth)
                         horizontalAlignment: Text.AlignRight
                         text: Math.round(modelData.value * 100) + " %"
                         font.family: root.display
