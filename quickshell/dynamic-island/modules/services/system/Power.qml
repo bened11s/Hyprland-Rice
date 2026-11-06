@@ -173,7 +173,7 @@ Singleton {
     // ---- Zusatzquellen (KDE Connect, novabase) ----
     property var extraBatteries: []
     readonly property bool extrasWanted: Config.battery.kdeconnect || Config.battery.novabase
-    readonly property string novabasePython: Quickshell.env("HOME") + "/projects/novabase/.venv/bin/python"
+    readonly property string novabaseCli: Quickshell.env("HOME") + "/projects/novabase/target/release/novabase"
 
     onExtrasWantedChanged: if (!root.extrasWanted) root.extraBatteries = []
 
@@ -206,9 +206,9 @@ Singleton {
             + '  done;'
             + ' fi;'
             + ' if [ "$2" = 1 ] && [ -x "$3" ] && systemctl --user -q is-active novabase; then'
-            + '   printf "N\\t%s\\n" "$(cd "$HOME/projects/novabase" && "$3" -m novabase get 2>/dev/null | tr -d "\\n")";'
+            + '   printf "N\\t%s\\n" "$("$3" get 2>/dev/null | tr -d "\\n")";'
             + ' fi',
-            "sh", Config.battery.kdeconnect ? "1" : "0", Config.battery.novabase ? "1" : "0", root.novabasePython]
+            "sh", Config.battery.kdeconnect ? "1" : "0", Config.battery.novabase ? "1" : "0", root.novabaseCli]
 
         stdout: StdioCollector {
             onStreamFinished: root.extraBatteries = root.parseExtras(text)
