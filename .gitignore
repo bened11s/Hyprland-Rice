@@ -12,6 +12,7 @@ __pycache__/
 *.orig
 *.rej
 *.tmp
+*.backup
 
 # Shell-Einstellungen: pro Rechner, die Vorgaben stehen im Code
 # (config/quickshell/dynamic-island/modules/services/config/Config.qml)
@@ -31,6 +32,7 @@ __pycache__/
 # config/dynamic-island/src/dynamic_island/data/templates/hyprlock.conf.
 # install.sh (seed_scheme) legt beide nach einem frischen Clone wieder an.
 /config/hypr/scheme/current.lua
+/config/hypr/scheme/current.conf
 /config/hypr/scheme/hyprlock.conf
 
 # Zustand, keine Konfiguration: welches Profil und welches Theme gerade laufen.
