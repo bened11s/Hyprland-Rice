@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+"""Farbrechner der Rust-CLI: alles, was aus einem Bild Farben macht.
+
+dynamic-island-rs ruft ihn nur auf, wenn das Ergebnis noch nicht im Cache liegt.
+Die Rechnung selbst (PIL, Celebi, materialyoucolor) bleibt bewusst in Python: Ein
+Rust-Nachbau kam bei 80 echten Vorschaubildern auf keine einzige gleiche Palette,
+die Wallpaper haetten also andere Farben bekommen.
+
+    dynamic-island-colours thumb <bild> <cache-ordner>     Pfad des Vorschaubilds
+    dynamic-island-colours smart <bild> <cache-ordner>     smart.json als JSON
+    dynamic-island-colours gif <bild>                      Pfad des ersten Einzelbilds
+    dynamic-island-colours colours <bild> <stil> <flavour> <modus>   Farben als JSON
+"""
+
+import json
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from dynamic_island.utils.material import get_colours_for_image  # noqa: E402
+from dynamic_island.utils.wallpaper import convert_gif, get_smart_opts, get_thumb  # noqa: E402
+
+
+def main(op: str, *args: str) -> None:
+    if op == "thumb":
+        print(get_thumb(Path(args[0]), Path(args[1])))
+    elif op == "smart":
+        print(json.dumps(get_smart_opts(Path(args[0]), Path(args[1]))))
+    elif op == "gif":
+        print(convert_gif(Path(args[0])))
+    elif op == "colours":
+        scheme = SimpleNamespace(variant=args[1], flavour=args[2], mode=args[3])
+        print(json.dumps(get_colours_for_image(args[0], scheme)))
+    else:
+        raise SystemExit(f"unbekannte Operation: {op}")
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

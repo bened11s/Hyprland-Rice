@@ -1,0 +1,17 @@
+[package]
+name = "dynamic-island-looks"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "dynamic-island-looks"
+path = "src/main.rs"
+
+[dependencies]
+di-common = { path = "../common" }
+regex = "1"
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true

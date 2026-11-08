@@ -24,24 +24,24 @@ names and two profiles that need shells not included here (see
 The interface speaks **English** (default) and **German** — switch it under
 Settings > Appearance > Language.
 
-![Desktop with the notch, clock and visualizer widgets](screenshots/desktop.jpg)
+![Desktop with the notch, clock and visualizer widgets](docs/screenshots/desktop.jpg)
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/medien.jpg" alt="Media panel"><br><sub><b>Media</b> — cover, lyrics, queue (via the notch)</sub></td>
-    <td width="50%"><img src="screenshots/steuerung.jpg" alt="Controls"><br><sub><b>Controls</b> — Android-style quick settings (<code>SUPER + A</code>)</sub></td>
+    <td width="50%"><img src="docs/screenshots/medien.jpg" alt="Media panel"><br><sub><b>Media</b> — cover, lyrics, queue (via the notch)</sub></td>
+    <td width="50%"><img src="docs/screenshots/steuerung.jpg" alt="Controls"><br><sub><b>Controls</b> — Android-style quick settings (<code>SUPER + A</code>)</sub></td>
   </tr>
   <tr>
-    <td><img src="screenshots/launcher.jpg" alt="App menu"><br><sub><b>App menu</b> — <code>&gt;</code> for actions (<code>SUPER</code>)</sub></td>
-    <td><img src="screenshots/system.jpg" alt="System"><br><sub><b>System</b> — CPU, GPU, RAM, temperatures (<code>SUPER + I</code>)</sub></td>
+    <td><img src="docs/screenshots/launcher.jpg" alt="App menu"><br><sub><b>App menu</b> — <code>&gt;</code> for actions (<code>SUPER</code>)</sub></td>
+    <td><img src="docs/screenshots/system.jpg" alt="System"><br><sub><b>System</b> — CPU, GPU, RAM, temperatures (<code>SUPER + I</code>)</sub></td>
   </tr>
   <tr>
-    <td><img src="screenshots/wallpaper.jpg" alt="Wallpaper picker"><br><sub><b>Wallpapers</b> — the color scheme follows the image</sub></td>
-    <td><img src="screenshots/themes.jpg" alt="Theme picker"><br><sub><b>Themes</b> — ready-made and generated schemes</sub></td>
+    <td><img src="docs/screenshots/wallpaper.jpg" alt="Wallpaper picker"><br><sub><b>Wallpapers</b> — the color scheme follows the image</sub></td>
+    <td><img src="docs/screenshots/themes.jpg" alt="Theme picker"><br><sub><b>Themes</b> — ready-made and generated schemes</sub></td>
   </tr>
 </table>
 
-![Keybind overview](screenshots/tastenkuerzel.jpg)
+![Keybind overview](docs/screenshots/tastenkuerzel.jpg)
 <sub><b>Keybind overview</b> (<code>SUPER + K</code>) — live from Hyprland, click to run, keybinds can be rebound right there</sub>
 
 <sub>The screenshots show the German interface.</sub>
@@ -51,11 +51,12 @@ Settings > Appearance > Language.
 ```sh
 git clone https://github.com/Gamecat-HD/Hyprland-Rice.git
 cd Hyprland-Rice
-./dynamic-island/install.sh --install-deps
+./install.sh --install-deps
 ```
 
-The script places `hypr/`, `quickshell/dynamic-island/` and `dynamic-island/`
-into `~/.config` — as symlinks by default, so a `git pull` in the clone
+`config/` in the repo mirrors `~/.config`. The script places `hypr/`,
+`quickshell/dynamic-island/` and `dynamic-island/` from it into `~/.config` —
+as symlinks by default, so a `git pull` in the clone
 applies right away. Whatever is already there is moved to `~/backups/` first;
 nothing is deleted. It also copies the bundled wallpapers to
 `~/Pictures/Wallpapers` (existing files are left alone) and generates the
@@ -68,8 +69,7 @@ hyprctl reload            # Hyprland reads the new config
 dynamic-island shell -d   # start the shell
 ```
 
-It doesn't matter where the clone lives. If you'd rather use the clone *as*
-`~/.config`, that works too — then there's nothing to place.
+It doesn't matter where the clone lives.
 
 ### Options
 
@@ -77,6 +77,7 @@ It doesn't matter where the clone lives. If you'd rather use the clone *as*
 | --- | --- |
 | `--install-deps` | also install missing packages with `paru`/`yay` |
 | `--copy` | copy instead of symlink (run again after `git pull`) |
+| `--extras` | also link my hyprlock layouts, nvim, spicetify and spotify-launcher configs (replaces yours, backed up to `~/backups/`) |
 | `--check` | only check, change nothing |
 | `--dry-run` | show what would happen |
 | `-y` | run without asking |
@@ -85,7 +86,7 @@ It doesn't matter where the clone lives. If you'd rather use the clone *as*
 
 The config is tailored to my machine. You'll almost certainly have to adjust
 a few things. Thanks to the symlinks, `~/.config/hypr` is the same folder as
-`hypr/` in the clone — wherever you edit, it's the same file. After every
+`config/hypr/` in the clone — wherever you edit, it's the same file. After every
 change: `hyprctl reload`. Hyprland reports typos as a red bar at the top.
 
 ### 1. Monitors (most important)
@@ -96,7 +97,7 @@ First check what your screens are called:
 hyprctl monitors    # names like HDMI-A-1, DP-1, eDP-1 + available resolutions
 ```
 
-The top of `hypr/hyprland.lua` has my three (`HDMI-A-1` left, `DP-2` right,
+The top of `config/hypr/hyprland.lua` has my three (`HDMI-A-1` left, `DP-2` right,
 `eDP-1` = laptop). Enter your names, resolution, refresh rate and position
 there and delete the extra blocks. Example for one monitor:
 
@@ -110,7 +111,7 @@ hl.monitor({
 ```
 
 Then enter the same names under `wsMonitorOffset` in
-`hypr/profiles/simple.lua`. Every monitor gets its own workspaces 1–10; the
+`config/hypr/profiles/simple.lua`. Every monitor gets its own workspaces 1–10; the
 first has offset `0`, a second one `10`. With a single monitor:
 
 ```lua
@@ -121,11 +122,11 @@ wsMonitorOffset = {
 
 ### 2. Keyboard
 
-`kbLayout = "de"` in `hypr/profiles/simple.lua` — `"us"` for a US keyboard.
+`kbLayout = "de"` in `config/hypr/profiles/simple.lua` — `"us"` for a US keyboard.
 
 ### 3. Programs
 
-The top of `hypr/profiles/simple.lua` (the `cfg` block) defines which apps the
+The top of `config/hypr/profiles/simple.lua` (the `cfg` block) defines which apps the
 keybinds launch: `kitty` (terminal), `zen-browser`, `codium` (editor),
 `dolphin` (files), `pavucontrol` (audio), `fuzzel` (launcher). Install what
 you're missing or replace it with your own program — otherwise the keybind
@@ -178,19 +179,19 @@ shows all keybinds — you can also rebind or disable them there.
 | `SUPER + ALT + D` | arrange desktop widgets (`Esc` = done) |
 | `CTRL + SUPER + ALT + R` | restart the shell |
 
-The defaults are at the bottom of `hypr/profiles/simple.lua` under
+The defaults are at the bottom of `config/hypr/profiles/simple.lua` under
 `Keybinds`; changes made in the overview are stored in
 `~/.config/dynamic-island/keybinds.json`.
 
 ## Desktop widgets and plugins
 
-The desktop widgets belong to the wallpaper: `dynamic-island/scenes.json`
+The desktop widgets belong to the wallpaper: `config/dynamic-island/scenes.json`
 maps each image (or a whole folder, keys ending in `/`) to a list of widgets
 with position and style. The bundled file is already arranged for the
 bundled wallpapers; for your own images, press `SUPER + ALT + D`, move
 widgets with the mouse and right-click to add new ones.
 
-Widgets and a few extras are plugins (`quickshell/dynamic-island/plugins/`),
+Widgets and a few extras are plugins (`config/quickshell/dynamic-island/plugins/`),
 turned on and off under Settings > Plugins:
 
 | Plugin | What it does |
@@ -204,7 +205,7 @@ turned on and off under Settings > Plugins:
 Plugins can be exported and imported as `.dip` packages, from the settings or
 with `dynamic-island plugin export|import`. To write your own: start with
 `dynamic-island plugin new <id>`; the format is documented in
-[`quickshell/dynamic-island/plugins/README.md`](quickshell/dynamic-island/plugins/README.md).
+[`config/quickshell/dynamic-island/plugins/README.md`](config/quickshell/dynamic-island/plugins/README.md).
 
 The shell itself is configured in the settings window (`>settings` in the
 app menu) — it writes `~/.config/dynamic-island/shell.json`.
@@ -229,17 +230,17 @@ own changes on GitHub: click **Fork** at the top right, then clone your fork.
 
 ## When something doesn't work
 
-* **What's missing?** `./dynamic-island/install.sh --check`
+* **What's missing?** `./install.sh --check`
 * **No bar / no wallpaper:** `hypr-profile status` shows what's running.
   Usually `hypr-profile simple` or `CTRL + SUPER + ALT + R` helps. Error
   messages: `qs -c dynamic-island log`.
 * **Profile switcher:** `CTRL + SUPER + SHIFT + P` cycles through
-  `caelestia`, `simple` and `shell2`. The other two are my tinkering profiles
+  `simple`, `shell2` and `caelestia`. The other two are my tinkering profiles
   and need shells that aren't in this repo — only `simple` makes sense for
   you. Switched by accident? `hypr-profile simple`.
-* **Error in `simple.lua`:** Hyprland then falls back to the `caelestia`
-  profile automatically (windows work, the bar is missing). Fix the error,
-  then run `hypr-profile simple`.
+* **Error in `simple.lua`:** for that session Hyprland falls back to the
+  full config of the `caelestia` profile (windows and keybinds work, the bar
+  is missing). Fix the error, then `hyprctl reload`.
 * **Empty boxes instead of icons:** the Material Symbols font is missing
   (`ttf-material-symbols-variable-git` from the AUR).
 * **Notifications don't arrive:** another daemon (mako, dunst, swaync) owns
@@ -266,7 +267,7 @@ own changes on GitHub: click **Fork** at the top right, then clone your fork.
 ## Requirements
 
 Hyprland **with the Lua config** (tested with 0.56) — the config is
-`hypr/hyprland.lua`, not a `hyprland.conf`. Plus Quickshell (tested with
+`config/hypr/hyprland.lua`, not a `hyprland.conf`. Plus Quickshell (tested with
 0.3.1), Python with `pillow` and `materialyoucolor`, the Material Symbols
 font and the usual Wayland tools.
 
@@ -277,23 +278,25 @@ media player), `ddcutil` (brightness via DDC/CI), `nordvpn` and `warp-cli`
 (selectable providers for the VPN tile) — without them only that particular
 feature is missing.
 
-`./dynamic-island/install.sh --check` tells you what's missing.
+`./install.sh --check` tells you what's missing.
 
 ## Profiles
 
 `~/.config/hypr/profile` decides which profile Hyprland loads:
 
-* `simple` — this rice with the dynamic-island shell
-* `caelestia` — the full config with the Caelestia shell (not in this repo)
-* `shell2` — test profile for a new shell (not in here either)
+* `simple` — this rice with the dynamic-island shell (default)
+* `shell2` — test profile for a new shell (not in this repo)
+* `caelestia` — the full config with the Caelestia shell (not in here
+  either). Separate from this rice; its caelestia-cli config lives in
+  `config/caelestia/cli.json`.
 
 Switch: `hypr-profile toggle` or `CTRL + SUPER + SHIFT + P`.
 
 ## Credits and license
 
-* The CLI in `dynamic-island/` is derived from
+* The CLI in `config/dynamic-island/` is derived from
   [caelestia-cli](https://github.com/caelestia-dots/cli) and, like it, is
-  licensed under the **GPL-3.0** ([`dynamic-island/LICENSE`](dynamic-island/LICENSE)).
+  licensed under the **GPL-3.0** ([`config/dynamic-island/LICENSE`](config/dynamic-island/LICENSE)).
 * The look of the notch is inspired by saneAspect's "Dynamite".
 * The wallpapers belong to their respective artists (collected among others
   from [wallhaven.cc](https://wallhaven.cc)), see

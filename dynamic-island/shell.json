@@ -1,0 +1,118 @@
+{
+    "appearance": {
+        "bounce": "mittel",
+        "clock": "24h",
+        "font": "SF Pro",
+        "language": "en",
+        "layout": "notch",
+        "opacity": 1,
+        "radius": 20,
+        "shadow": true,
+        "speed": 1
+    },
+    "bar": {
+        "battery": false,
+        "batteryDevice": "auto",
+        "batteryPulse": true,
+        "media": true,
+        "notifications": true,
+        "settings": true,
+        "stats": false,
+        "tray": true,
+        "workspaceCount": 5,
+        "workspaces": true
+    },
+    "battery": {
+        "history": "",
+        "kdeconnect": true,
+        "notifyFull": true,
+        "novabase": true,
+        "warnCritical": 5,
+        "warnLow": 15
+    },
+    "bluetooth": {
+        "adapter": "",
+        "autoConnect": [
+        ],
+        "lowBattery": 15,
+        "notify": true,
+        "scanSeconds": 60
+    },
+    "idle": {
+        "enabled": true,
+        "fullscreen": true,
+        "lockMinutes": 3,
+        "lockOnSleep": true,
+        "media": true,
+        "screenOffMinutes": 4,
+        "suspendMinutes": 0,
+        "warnSeconds": 10
+    },
+    "lock": {
+        "background": "wallpaper",
+        "blur": true,
+        "layout": {
+        },
+        "media": true,
+        "notifications": true,
+        "style": "karte"
+    },
+    "media": {
+        "cover": "rund",
+        "lyrics": true,
+        "queueOpen": false
+    },
+    "notch": {
+        "batteryPriority": "system",
+        "batteryStyle": "symbol",
+        "clockStyle": "digital",
+        "date": true,
+        "media": true,
+        "messages": true,
+        "visualizer": true,
+        "visualizerStyle": "spiegel",
+        "workspaceStyle": "staebchen",
+        "workspaces": true
+    },
+    "notifications": {
+        "dnd": true,
+        "peekSeconds": 5
+    },
+    "osd": {
+        "brightness": false,
+        "enabled": true,
+        "hideDelay": 2,
+        "hover": true
+    },
+    "quick": {
+        "columns": 4,
+        "rows": [
+            "wifi:2,bluetooth:2",
+            "vpn:2,nosleep:2",
+            "gamemode:2,settings:2",
+            "lock:2,dnd:2",
+            "monitors:2,record:2",
+            "volume:2,mic:2"
+        ]
+    },
+    "sounds": {
+        "bluetooth": true,
+        "enabled": false,
+        "library": "",
+        "lock": false,
+        "notifications": true,
+        "power": true,
+        "screenshot": true,
+        "volume": 60
+    },
+    "vpn": {
+        "provider": "nordvpn"
+    },
+    "wallpaper": {
+        "duration": 700,
+        "random": "aus",
+        "randomMinutes": 30,
+        "randomScope": "alle",
+        "transition": "kreis"
+    }
+}
