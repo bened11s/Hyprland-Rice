@@ -40,6 +40,10 @@ hl.window_rule({
 
 hl.window_rule({ match = { tag = "opaque_app" }, opaque = true })
 
+-- Kitty: native opacity and background image; keep the global 0.85 override
+-- from double-dimming the terminal.
+hl.window_rule({ match = { class = "kitty" }, opacity = "1 1 override" })
+
 -- Zen Browser: leicht transparent wie das Rice
 hl.window_rule({ match = { class = "zen" }, opacity = "0.92 0.88 override" })
 
