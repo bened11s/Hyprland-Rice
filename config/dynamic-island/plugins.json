@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "enabled": {},
+  "settings": {
+    "terminal": {
+      "folderLooks": true,
+      "theme": true
+    }
+  }
+}

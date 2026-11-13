@@ -1,0 +1,163 @@
+{
+    "account": {
+        "profile": ""
+    },
+    "appearance": {
+        "bounce": "mittel",
+        "clock": "24h",
+        "font": "SF Pro",
+        "language": "en",
+        "layout": "notch",
+        "opacity": 1,
+        "radius": 20,
+        "shadow": true,
+        "speed": 1,
+        "transparency": 0
+    },
+    "bar": {
+        "battery": true,
+        "batteryDevice": "auto",
+        "batteryPulse": true,
+        "media": true,
+        "notifications": true,
+        "settings": true,
+        "stats": false,
+        "tray": true,
+        "workspaceCount": 5,
+        "workspaces": true
+    },
+    "battery": {
+        "history": "",
+        "kdeconnect": true,
+        "notifyFull": true,
+        "novabase": true,
+        "warnCritical": 5,
+        "warnLow": 15
+    },
+    "bluetooth": {
+        "adapter": "",
+        "autoConnect": [
+        ],
+        "lowBattery": 15,
+        "notify": true,
+        "scanSeconds": 60
+    },
+    "idle": {
+        "enabled": true,
+        "fullscreen": true,
+        "lockMinutes": 3,
+        "lockOnSleep": true,
+        "media": true,
+        "screenOffMinutes": 4,
+        "suspendMinutes": 0,
+        "warnSeconds": 10
+    },
+    "keybinds": {
+        "editor": ""
+    },
+    "lock": {
+        "background": "wallpaper",
+        "blur": true,
+        "layout": {
+        },
+        "media": true,
+        "notifications": true,
+        "style": "karte"
+    },
+    "media": {
+        "cover": "rund",
+        "lyrics": true,
+        "queueOpen": false
+    },
+    "monitors": {
+        "editor": ""
+    },
+    "notch": {
+        "batteries": true,
+        "batteryPriority": "system",
+        "batteryStyle": "symbol",
+        "bell": true,
+        "calendar": true,
+        "clock": true,
+        "clockStyle": "digital",
+        "controlTray": true,
+        "date": true,
+        "hoverOpen": true,
+        "media": true,
+        "mediaControls": true,
+        "mediaCover": true,
+        "mediaProgress": true,
+        "mediaQueue": true,
+        "mediaRing": true,
+        "mediaSources": true,
+        "mediaTitle": true,
+        "messages": false,
+        "notifTools": true,
+        "nowPlaying": true,
+        "pageControl": true,
+        "pageMedia": true,
+        "pageNotifications": true,
+        "pageSystem": true,
+        "record": true,
+        "stats": true,
+        "sysCpu": true,
+        "sysDisk": true,
+        "sysGpu": true,
+        "sysRam": true,
+        "sysTemps": true,
+        "sysThrottle": true,
+        "sysVram": true,
+        "visualizer": true,
+        "visualizerStyle": "saeulen",
+        "workspaceStyle": "staebchen",
+        "workspaces": true
+    },
+    "notifications": {
+        "dnd": true,
+        "peekSeconds": 5
+    },
+    "osd": {
+        "brightness": false,
+        "enabled": true,
+        "hideDelay": 2,
+        "hover": true
+    },
+    "quick": {
+        "columns": 4,
+        "rows": [
+            "wifi:2,bluetooth:2",
+            "vpn:2,nosleep:2",
+            "gamemode:2,settings:2",
+            "lock:2,dnd:2",
+            "monitors:2,record:2",
+            "volume:2,mic:2"
+        ]
+    },
+    "sounds": {
+        "bluetooth": true,
+        "enabled": false,
+        "library": "",
+        "lock": false,
+        "notifications": true,
+        "power": true,
+        "screenshot": true,
+        "volume": 60
+    },
+    "system": {
+        "info": "",
+        "updateCheckHours": 12
+    },
+    "vpn": {
+        "custom": [
+        ],
+        "provider": "nordvpn"
+    },
+    "wallpaper": {
+        "duration": 700,
+        "hero": "",
+        "random": "aus",
+        "randomMinutes": 30,
+        "randomScope": "alle",
+        "transition": "kreis"
+    }
+}
