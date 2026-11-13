@@ -575,8 +575,12 @@ ColumnLayout {
                 id: wifiTap
 
                 onTapped: {
-                    if (wifiTile.compact || wifiTap.point.position.x < wifiTile.width - 46)
+                    // Ganze Kachel oeffnet die Liste; nur das Symbol links
+                    // schaltet den Funk (Fehlklicks schalteten sonst WLAN aus).
+                    if (!wifiTile.compact && wifiTap.point.position.x < 52)
                         root.toggleWifi();
+                    else
+                        root.openWifi();
                 }
             }
 

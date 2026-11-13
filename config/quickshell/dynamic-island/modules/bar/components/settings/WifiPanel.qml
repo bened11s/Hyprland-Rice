@@ -24,7 +24,9 @@ Item {
     // ist die Liste leer, die Karte waere winzig – und wer die Maus dorthin
     // bewegt, wo die Liste gleich auftaucht, waere schon draussen und haette
     // sie wieder zugeklappt.
-    readonly property real listHeight: 268
+    // Sechs Zeilen (6 × 50 + 5 × 4 Abstand) – so passen alle Netze eines
+    // normalen Scans ohne Scrollen. Mehr geht per Mausrad.
+    readonly property real listHeight: 320
 
     implicitHeight: header.height + 6 + listWrapper.height + (statusText.visible ? statusText.height + 6 : 0)
 

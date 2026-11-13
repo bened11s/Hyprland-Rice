@@ -433,6 +433,12 @@ Singleton {
                         if (f[1] !== "ethernet")
                             continue;
                         const state = f[2] ?? "";
+                        // `veth*` sind Docker-Container-Interfaces (unmanaged),
+                        // Karten ohne Kabel sind `unavailable`. Beides fuellt
+                        // die Karte, bis die WLAN-Liste keinen Platz mehr hat
+                        // (WifiPanel zieht die LAN-Hoehe von listHeight ab).
+                        if (state === "unmanaged" || state === "unavailable")
+                            continue;
                         wired.push({
                             device: f[0],
                             state,
