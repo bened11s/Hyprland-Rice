@@ -161,78 +161,17 @@ Column {
         font.pixelSize: 12
     }
 
-    // ---- Geraete ----
-    Flow {
-        width: root.width
-        spacing: 6
+    // ---- Geraet: Auswahl statt einer Chip-Reihe ----
+    SettingsDropdown {
         visible: root.devices.length > 1
-
-        Repeater {
-            model: root.devices
-
-            Rectangle {
-                id: chip
-
-                required property var modelData
-                readonly property bool selected: chip.modelData.key === (root.device?.key ?? "")
-                readonly property bool present: root.liveFor(chip.modelData) !== null
-
-                width: chipRow.implicitWidth + 22
-                height: 30
-                radius: 15
-                color: chip.selected ? Colors.primary
-                     : chipHover.hovered ? Colors.alpha(Colors.fgSurface, 0.09)
-                     : Colors.alpha(Colors.fgSurface, 0.05)
-
-                Behavior on color {
-                    ColorAnimation { duration: Appearance.fadeDuration }
-                }
-
-                Row {
-                    id: chipRow
-
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.iconFor(chip.modelData)
-                        color: chip.selected ? Colors.fgPrimary : Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 15
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.displayName(chip.modelData)
-                        color: chip.selected ? Colors.fgPrimary : Colors.fgSurface
-                        font.family: Config.font
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-
-                    // Punkt: gerade verbunden
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: chip.present
-                        width: 6
-                        height: 6
-                        radius: 3
-                        color: chip.selected ? Colors.fgPrimary : Colors.primary
-                    }
-                }
-
-                HoverHandler {
-                    id: chipHover
-
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                TapHandler {
-                    onTapped: root.selectedKey = chip.modelData.key
-                }
-            }
+        options: root.devices.map(d => d.key)
+        current: root.device?.key ?? ""
+        labelOf: k => {
+            const d = root.devices.find(x => x.key === k);
+            return d ? root.displayName(d) + (root.liveFor(d) !== null ? " ·  " + I18n.tr("verbunden") : "") : k;
         }
+        maxWidth: 380
+        onPicked: k => root.selectedKey = k
     }
 
     // ---- Kopf: Stand jetzt + Zeitraum ----

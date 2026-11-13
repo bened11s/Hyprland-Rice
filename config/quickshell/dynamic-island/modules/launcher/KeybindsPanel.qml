@@ -1,10 +1,12 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import Quickshell
 
 import qs
 import qs.modules.services.config
 import qs.modules.services.hypr
 import qs.modules.settings
+import qs.modules.launcher.clipboard
 
 // Tastenkuerzel-Uebersicht der Notch. Gleiche Schnittstelle wie PowerPanel
 // (topOffset, cardRadius, inset, active -> outerWidth/outerHeight).
@@ -13,7 +15,8 @@ import qs.modules.settings
 // Beschreibung "Gruppe|Text" in hypr/profiles/simple.lua landet hier, dazu
 // die Kuerzel aktiver Plugins (Manifest `keybinds`) und eigene. Oben ein
 // Suchfeld, darunter die Gruppen in drei Spalten (aufgefuellt nach Hoehe).
-// Klick auf eine Zeile (oder Enter: erster Treffer der Suche) schliesst die
+// Klick auf eine Zeile (oder Enter: per Pfeiltasten gewaehlte Zeile, sonst
+// erster Treffer der Suche) schliesst die
 // Uebersicht und fuehrt den Bind aus. Abgeschaltete Kuerzel fehlen.
 //
 // Nur Suchen und Ausfuehren – belegt, an/aus, eigene Kuerzel macht die
@@ -34,11 +37,14 @@ Item {
 
     readonly property int columnCount: 3
     readonly property real padding: 18
+    // Hover-Fläche ragt so weit über die Spalte hinaus (sonst vom clip angeschnitten)
+    readonly property real bleed: 6
     readonly property real columnGap: 22
     readonly property real rowHeight: 26
     readonly property real groupHeader: 30
     readonly property real groupGap: 14
-    readonly property real maxBodyHeight: 760
+    // Bis knapp unter den Bildschirmrand – 760 fest schnitt auf 1440p die letzten Zeilen ab
+    readonly property real maxBodyHeight: Math.max(400, (panel.QsWindow.window?.screen?.height ?? 1020) - 260)
 
     readonly property string query: search.text.trim().toLowerCase()
 
@@ -67,33 +73,93 @@ Item {
         return out;
     }
 
-    // Spalten fuellen: jede Gruppe kommt in die bisher niedrigste Spalte.
-    // Die Reihenfolge der Gruppen bleibt innerhalb einer Spalte erhalten.
+    // Spalten so gleich hoch wie moeglich: groesste Gruppen zuerst, Suche mit
+    // Abbruch (erster Durchlauf = "in die niedrigste Spalte"). In jeder Spalte
+    // bleibt die Gruppenreihenfolge, die Spalte mit der ersten Gruppe steht links.
     readonly property var columns: {
-        const cols = [];
-        const heights = [];
-        for (let i = 0; i < panel.columnCount; i++) {
-            cols.push([]);
-            heights.push(0);
-        }
-        for (const group of panel.filtered) {
-            const target = heights.indexOf(Math.min(...heights));
-            cols[target].push(group);
-            heights[target] += panel.groupHeight(group);
-        }
-        return cols;
+        const groups = panel.filtered;
+        const n = panel.columnCount;
+        const h = groups.map(g => panel.groupHeight(g));
+        const order = groups.map((g, i) => i).sort((a, b) => h[b] - h[a]);
+        const sums = new Array(n).fill(0);
+        const assign = [];
+        let best = null;
+        let bestMax = Infinity;
+        let budget = 20000;  // shortcut: Knoten-Grenze statt exakter Suche, reicht bis ~15 Gruppen
+        const place = k => {
+            if (--budget < 0)
+                return;
+            if (k === order.length) {
+                bestMax = Math.max(...sums);
+                best = assign.slice();
+                return;
+            }
+            const i = order[k];
+            const tried = [];
+            for (const c of [...sums.keys()].sort((a, b) => sums[a] - sums[b])) {
+                // Gleich hohe Spalten sind austauschbar
+                if (tried.includes(sums[c]) || sums[c] + h[i] >= bestMax)
+                    continue;
+                tried.push(sums[c]);
+                sums[c] += h[i];
+                assign[i] = c;
+                place(k + 1);
+                sums[c] -= h[i];
+            }
+        };
+        place(0);
+        const cols = Array.from({ length: n }, () => []);
+        groups.forEach((g, i) => cols[best ? best[i] : 0].push(g));
+        return cols.sort((a, b) => (a.length ? groups.indexOf(a[0]) : Infinity) - (b.length ? groups.indexOf(b[0]) : Infinity));
     }
 
-    // Was Enter ausloest: erster anklickbarer Treffer, nur waehrend gesucht wird
-    readonly property var firstHit: {
-        if (panel.query === "")
-            return null;
+    // Anklickbare Eintraege in Lesereihenfolge (Spalte fuer Spalte) – fuer die Pfeiltasten
+    readonly property var hits: {
+        const out = [];
         for (const col of panel.columns)
             for (const group of col)
                 for (const entry of group.entries)
                     if (entry.clickable)
-                        return entry;
-        return null;
+                        out.push(entry);
+        return out;
+    }
+
+    // Per Pfeiltaste gewaehlt; beim Tippen zurueck auf den ersten Treffer
+    property string pickedId: ""
+    onQueryChanged: panel.pickedId = ""
+
+    // Was Enter ausloest: die gewaehlte Zeile, sonst beim Suchen der erste Treffer
+    readonly property var selected: panel.hits.find(e => e.id === panel.pickedId)
+                                    ?? (panel.query !== "" ? panel.hits[0] ?? null : null)
+
+    function move(step: int): void {
+        if (panel.hits.length === 0)
+            return;
+        const at = panel.hits.findIndex(e => e.id === panel.selected?.id);
+        const next = at < 0 ? (step > 0 ? 0 : panel.hits.length - 1)
+                            : Math.max(0, Math.min(panel.hits.length - 1, at + step));
+        panel.pickedId = panel.hits[next].id;
+        panel.reveal(panel.hits[next]);
+    }
+
+    // Scrollt die Zeile in Sicht (Position aus denselben Hoehen wie das Layout)
+    function reveal(entry: var): void {
+        for (const col of panel.columns) {
+            let y = 0;
+            for (const group of col) {
+                const i = group.entries.findIndex(e => e.id === entry.id);
+                if (i >= 0) {
+                    const top = y + panel.groupHeader + i * panel.rowHeight;
+                    const view = panel.scrollTarget;
+                    if (top < view)
+                        panel.scrollTo(top - panel.groupHeader);
+                    else if (top + panel.rowHeight > view + flick.height)
+                        panel.scrollTo(top + panel.rowHeight + panel.groupGap - flick.height);
+                    return;
+                }
+                y += panel.groupHeight(group);
+            }
+        }
     }
 
     // Erst zu, dann ausfuehren: "Schliessen" & Co. sollen das Fenster unter
@@ -150,13 +216,20 @@ Item {
         }
     }
 
-    function scrollBy(dy: real): void {
+    // Ziel der laufenden Animation, sonst die aktuelle Position
+    readonly property real scrollTarget: scrollAnim.running ? scrollAnim.to : flick.contentY
+
+    function scrollTo(y: real): void {
         const max = Math.max(0, flick.contentHeight - flick.height);
-        const from = scrollAnim.running ? scrollAnim.to : flick.contentY;
+        const to = Math.max(0, Math.min(max, y));
         scrollAnim.stop();
         scrollAnim.from = flick.contentY;
-        scrollAnim.to = Math.max(0, Math.min(max, from + dy));
+        scrollAnim.to = to;
         scrollAnim.start();
+    }
+
+    function scrollBy(dy: real): void {
+        panel.scrollTo(panel.scrollTarget + dy);
     }
 
     // ---- Suchzeile ----
@@ -202,10 +275,10 @@ Item {
             clip: true
 
             Keys.onEscapePressed: LauncherState.close()
-            Keys.onReturnPressed: panel.run(panel.firstHit)
-            Keys.onEnterPressed: panel.run(panel.firstHit)
-            Keys.onUpPressed: panel.scrollBy(-panel.rowHeight * 3)
-            Keys.onDownPressed: panel.scrollBy(panel.rowHeight * 3)
+            Keys.onReturnPressed: panel.run(panel.selected)
+            Keys.onEnterPressed: panel.run(panel.selected)
+            Keys.onUpPressed: panel.move(-1)
+            Keys.onDownPressed: panel.move(1)
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_PageUp) {
                     panel.scrollBy(-flick.height * 0.8);
@@ -230,7 +303,8 @@ Item {
             }
         }
 
-        Row {
+        // Bearbeiten (Strg+E): oeffnet die Einstellungsseite
+        ClipIconButton {
             id: tools
 
             anchors {
@@ -238,25 +312,8 @@ Item {
                 rightMargin: 14
                 verticalCenter: parent.verticalCenter
             }
-            spacing: 6
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: {
-                    const n = panel.filtered.reduce((sum, g) => sum + g.entries.length, 0);
-                    return n === 1 ? I18n.tr("1 Kürzel") : I18n.tr("%1 Kürzel").arg(n);
-                }
-                color: Colors.fgSurfaceVariant
-                font.family: Config.font
-                font.pixelSize: 12
-                rightPadding: 6
-            }
-
-            ToolButton {
-                icon: "edit"
-                label: I18n.tr("Bearbeiten")
-                onClicked: panel.openEditor()
-            }
+            icon: "edit"
+            onClicked: panel.openEditor()
         }
     }
 
@@ -291,8 +348,8 @@ Item {
             anchors {
                 fill: parent
                 topMargin: panel.padding
-                leftMargin: panel.padding
-                rightMargin: panel.padding
+                leftMargin: panel.padding - panel.bleed
+                rightMargin: panel.padding - panel.bleed
             }
             clip: true
             contentWidth: width
@@ -326,7 +383,7 @@ Item {
             Row {
                 id: columnsRow
 
-                x: Math.max(0, (flick.width - width) / 2)
+                x: panel.bleed + Math.round(Math.max(0, (flick.width - 2 * panel.bleed - width) / 2))
                 spacing: panel.columnGap
 
                 Repeater {
@@ -337,7 +394,8 @@ Item {
 
                         required property var modelData
 
-                        width: (flick.width - panel.columnGap * (panel.columnCount - 1)) / panel.columnCount
+                        // Ganze Pixel: gebrochene Breiten kappten den Rand der rechten Tastenkappen
+                        width: Math.floor((flick.width - 2 * panel.bleed - panel.columnGap * (panel.columnCount - 1)) / panel.columnCount)
 
                         Repeater {
                             model: column.modelData
@@ -414,15 +472,16 @@ Item {
                 required property var modelData
 
                 readonly property bool clickable: row.modelData.clickable
-                readonly property bool isFirst: row.modelData === panel.firstHit
+                // Per id: modelData ist eine Kopie, === traf den Enter-Treffer nie
+                readonly property bool isFirst: row.modelData.id === panel.selected?.id
 
                 width: block.width
                 height: panel.rowHeight
 
                 Rectangle {
                     anchors.fill: parent
-                    anchors.leftMargin: -6
-                    anchors.rightMargin: -6
+                    anchors.leftMargin: -panel.bleed
+                    anchors.rightMargin: -panel.bleed
                     radius: 6
                     color: rowArea.pressed ? Colors.alpha(Colors.primary, 0.22)
                          : row.isFirst ? Colors.alpha(Colors.primary, 0.14)
@@ -438,8 +497,8 @@ Item {
                     id: rowArea
 
                     anchors.fill: parent
-                    anchors.leftMargin: -6
-                    anchors.rightMargin: -6
+                    anchors.leftMargin: -panel.bleed
+                    anchors.rightMargin: -panel.bleed
                     enabled: row.clickable
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -518,73 +577,17 @@ Item {
         width: Math.max(height, capText.implicitWidth + 12)
         height: 20
         radius: 5
-        color: cap.accent ? Colors.alpha(Colors.primary, 0.16) : Colors.alpha(Colors.fgSurface, 0.07)
-        border.width: 1
-        border.color: cap.accent ? Colors.alpha(Colors.primary, 0.6) : Colors.alpha(Colors.outline, 0.45)
+        color: cap.accent ? Colors.alpha(Colors.primary, 0.18) : Colors.alpha(Colors.fgSurface, 0.09)
 
         Text {
             id: capText
 
             anchors.centerIn: parent
             text: cap.modelData
-            color: cap.modelData === "Super" || cap.accent ? Colors.primary : Colors.fgSurfaceVariant
+            color: cap.accent ? Colors.primary : Colors.fgSurfaceVariant
             font.family: Config.font
             font.pixelSize: 11
             font.weight: Font.Medium
-        }
-    }
-
-    // Knopf in der Suchzeile (Chip mit Symbol und Text)
-    component ToolButton: Rectangle {
-        id: tb
-
-        property string icon
-        property string label
-        property bool checked: false
-
-        signal clicked
-
-        anchors.verticalCenter: parent?.verticalCenter
-        width: tbRow.implicitWidth + 20
-        height: 28
-        radius: 14
-        opacity: tb.enabled ? 1 : 0.45
-        color: tb.checked ? Colors.alpha(Colors.primary, tbArea.containsMouse ? 0.28 : 0.18)
-                          : Colors.alpha(Colors.fgSurface, tbArea.containsMouse ? 0.12 : 0.06)
-        border.width: 1
-        border.color: tb.checked ? Colors.alpha(Colors.primary, 0.5) : Colors.alpha(Colors.outline, 0.35)
-
-        Row {
-            id: tbRow
-
-            anchors.centerIn: parent
-            spacing: 5
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: tb.icon
-                color: tb.checked ? Colors.primary : Colors.fgSurfaceVariant
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 15
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: tb.label
-                color: tb.checked ? Colors.primary : Colors.fgSurface
-                font.family: Config.font
-                font.pixelSize: 12
-            }
-        }
-
-        MouseArea {
-            id: tbArea
-
-            anchors.fill: parent
-            enabled: tb.enabled
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tb.clicked()
         }
     }
 }

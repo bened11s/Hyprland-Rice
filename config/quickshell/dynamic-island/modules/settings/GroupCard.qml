@@ -4,83 +4,100 @@ import qs.modules.services.config
 
 import qs
 
-// Eine Karte der Einstellungsliste (SettingsCard): Titel und ihre Zeilen.
-// Der Titel ist die Gruppe aus Config.meta (`group`), bei "Alle"/Suche steht
-// der Bereich davor.
-Rectangle {
+// Eine Gruppe der Einstellungsliste (SettingsCard), im Stil von Caelestia:
+// kleine Ueberschrift ueber einem gerundeten Container, darin die Zeilen mit
+// feinen Trennlinien. Die Ueberschrift ist die Gruppe aus Config.meta
+// (`group`), sonst der Abschnitt; heisst sie wie die Seite, faellt sie weg.
+// Bei der Suche steht "Bereich · Gruppe".
+//
+// Grosse Editoren, die sich selbst zeichnen (`bare`, z. B. Monitore, Info),
+// stehen ohne Container, Ueberschrift und Titelzeile da.
+Item {
     id: gcard
 
-    // { section, group, rows, wide } aus SettingsCard.groupCards
+    // { section, page, group, rows, bare } aus SettingsCard.groupCards
     required property var group
     // SettingsCard.entries – rows sind Indizes darin
     property var entries: []
-    // Bereich vor dem Gruppentitel ("" = keiner)
+    // Suche: Bereich vor der Gruppe ("" = keine Suche)
     property string sectionLabel: ""
+    // Titel der Seite – eine Ueberschrift, die genauso heisst, entfaellt
+    property string pageTitle: ""
+    // Titel eines Abschnitts (SettingsCard.sectionTitle)
+    property var titleOf: s => s
 
     readonly property var rows: gcard.group?.rows ?? []
-    // Eine einzelne Zeile, die schon so heisst wie ihre Gruppe, braucht
-    // keinen Titel darueber
-    readonly property string groupLabel: {
-        const g = gcard.group?.group ?? "";
-        if (g === "" || (gcard.rows.length === 1 && gcard.entries[gcard.rows[0]]?.title === I18n.tr(g)))
+    readonly property bool bare: gcard.group?.bare ?? false
+    readonly property string heading: {
+        if (gcard.bare)
             return "";
-        return I18n.tr(g);
+        const g = gcard.group?.group ? I18n.tr(gcard.group.group) : "";
+        if (gcard.sectionLabel !== "")
+            return g !== "" && g !== gcard.sectionLabel ? `${gcard.sectionLabel} · ${g}` : gcard.sectionLabel;
+        const t = g !== "" ? g : gcard.titleOf(gcard.group?.page ?? "");
+        // Eine einzelne Zeile, die schon so heisst, braucht keine Ueberschrift
+        if (t === gcard.pageTitle || (gcard.rows.length === 1 && gcard.entries[gcard.rows[0]]?.title === t))
+            return "";
+        return t;
     }
-    readonly property bool titled: gcard.sectionLabel !== "" || gcard.groupLabel !== ""
 
-    height: cardColumn.implicitHeight + 8
-    radius: 16
-    color: Colors.alpha(Colors.fgSurface, 0.035)
-    border.width: 1
-    border.color: Colors.alpha(Colors.outline, 0.14)
+    implicitHeight: (gcard.heading !== "" ? headingText.implicitHeight + 8 : 0) + box.height
 
-    Column {
-        id: cardColumn
+    Text {
+        id: headingText
 
-        anchors {
-            left: parent.left
-            right: parent.right
-            top: parent.top
-            margins: 4
-        }
+        visible: gcard.heading !== ""
+        leftPadding: 4
+        text: gcard.heading
+        color: Colors.fgSurfaceVariant
+        font.family: Config.font
+        font.pixelSize: 13
+        font.weight: Font.DemiBold
+    }
 
-        Row {
-            visible: gcard.titled
-            height: gcard.titled ? 30 : 0
-            leftPadding: 14
-            spacing: 6
+    Rectangle {
+        id: box
 
-            Text {
-                anchors.bottom: parent.bottom
-                bottomPadding: 4
-                visible: gcard.sectionLabel !== ""
-                text: gcard.sectionLabel
-                color: Colors.fgSurface
-                font.family: Config.font
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-            }
+        y: gcard.heading !== "" ? headingText.implicitHeight + 8 : 0
+        width: parent.width
+        height: cardColumn.implicitHeight
+        radius: 16
+        color: gcard.bare ? "transparent" : Colors.alpha(Colors.fgSurface, 0.04)
 
-            Text {
-                anchors.bottom: parent.bottom
-                bottomPadding: 4
-                visible: gcard.groupLabel !== ""
-                text: (gcard.sectionLabel !== "" ? "· " : "") + gcard.groupLabel
-                color: Colors.fgSurfaceVariant
-                font.family: Config.font
-                font.pixelSize: 11
-                font.weight: gcard.sectionLabel !== "" ? Font.Normal : Font.DemiBold
-            }
-        }
+        Column {
+            id: cardColumn
 
-        Repeater {
-            model: gcard.rows
+            width: parent.width
 
-            SettingsRow {
-                required property int modelData
+            Repeater {
+                model: gcard.rows
 
-                width: cardColumn.width
-                entry: gcard.entries[modelData] ?? null
+                Item {
+                    id: slot
+
+                    required property int modelData
+                    required property int index
+
+                    width: cardColumn.width
+                    height: settingsRow.implicitHeight
+
+                    // Trennlinie zur Zeile davor
+                    Rectangle {
+                        visible: slot.index > 0 && !gcard.bare
+                        x: 16
+                        width: parent.width - 32
+                        height: 1
+                        color: Colors.alpha(Colors.outline, 0.15)
+                    }
+
+                    SettingsRow {
+                        id: settingsRow
+
+                        width: parent.width
+                        bare: gcard.bare
+                        entry: gcard.entries[slot.modelData] ?? null
+                    }
+                }
             }
         }
     }

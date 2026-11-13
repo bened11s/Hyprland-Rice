@@ -110,7 +110,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: search.text === ""
-                text: I18n.tr("Theme suchen…   %1 Schemata").arg(Themes.entries.length)
+                text: I18n.tr("Theme suchen…")
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: search.font
                 verticalAlignment: Text.AlignVCenter

@@ -7,14 +7,13 @@ import qs
 import qs.modules.services.config
 import qs.modules.services.desktop
 
-// Block in der Gruppe des Plugins `desktop` (Einstellung `scenes`, editor "desktop"): welche
+// Zeile in der Gruppe des Plugins `desktop` (Einstellung `scenes`, editor "desktop"): welche
 // Szene gerade gilt und der Knopf zum Bearbeiten. Das eigentliche Anordnen
 // passiert direkt auf dem Desktop (EditBar.qml).
-Column {
+Item {
     id: root
 
-    spacing: 8
-    bottomPadding: 8
+    implicitHeight: 30 + 8
 
     readonly property string sceneLabel: {
         const key = Scenes.currentKey;
@@ -26,42 +25,39 @@ Column {
     }
 
     Text {
-        width: parent.width
+        anchors {
+            left: parent.left
+            right: editButton.left
+            rightMargin: 12
+        }
+        height: 30
+        verticalAlignment: Text.AlignVCenter
         text: root.sceneLabel
         color: Colors.fgSurfaceVariant
         font.family: Config.font
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
+        font.pixelSize: 11
+        elide: Text.ElideMiddle
     }
 
+    // Aktion in Zeilen (docs/settings-style.md): Textknopf ohne Symbol
     Rectangle {
-        width: editLabel.implicitWidth + 40
+        id: editButton
+
+        anchors.right: parent.right
+        width: editLabel.implicitWidth + 24
         height: 30
-        radius: 15
+        radius: 8
         color: editHover.hovered ? Qt.lighter(Colors.primary, 1.1) : Colors.primary
 
-        Row {
+        Text {
+            id: editLabel
+
             anchors.centerIn: parent
-            spacing: 6
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "edit"
-                color: Colors.fgPrimary
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 15
-            }
-
-            Text {
-                id: editLabel
-
-                anchors.verticalCenter: parent.verticalCenter
-                text: I18n.tr("Auf dem Desktop anordnen")
-                color: Colors.fgPrimary
-                font.family: Config.font
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-            }
+            text: I18n.tr("Auf dem Desktop anordnen")
+            color: Colors.fgPrimary
+            font.family: Config.font
+            font.pixelSize: 12
+            font.weight: Font.Medium
         }
 
         HoverHandler {

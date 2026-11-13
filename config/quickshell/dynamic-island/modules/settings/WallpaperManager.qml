@@ -8,6 +8,7 @@ import qs.modules.services.plugins
 import qs.modules.services.theme
 import qs.modules.services.wallpaper
 import qs.modules.widgets
+import qs.modules.settings.wallpaper
 
 import qs
 
@@ -120,12 +121,16 @@ Item {
     readonly property var selectedLook: page.hasSelection ? WallManager.lookFor(page.selected) : ({ id: "scheme", source: "schema" })
     readonly property var folderLook: WallManager.folderLookFor(page.folder)
 
-    // Raster-Masse aus der Breite: Kacheln um 200 px (Bilder) bzw. 220 px
+    // Der Inhalt steht mittig, hoechstens 820 px breit
+    readonly property real side: Math.max(0, Math.round((page.width - 820) / 2))
+    readonly property real contentWidth: page.width - 2 * page.side
+
+    // Raster-Masse aus der Breite: Kacheln um 200 px (Bilder) bzw. 190 px
     // (Ordner), nie weniger als zwei Spalten
     readonly property int gridGap: 6
-    readonly property int gridColumns: Math.max(2, Math.floor((page.width + page.gridGap) / (200 + page.gridGap)))
+    readonly property int gridColumns: Math.max(2, Math.floor((page.contentWidth + page.gridGap) / (200 + page.gridGap)))
     readonly property int cardGap: 14
-    readonly property int cardColumns: Math.max(2, Math.floor((page.width + page.cardGap) / (220 + page.cardGap)))
+    readonly property int cardColumns: Math.max(2, Math.floor((page.contentWidth + page.cardGap) / (190 + page.cardGap)))
 
     function imagesOf(f: string): var {
         return f === "" ? page.loose : WallManager.imagesIn(f);
@@ -478,6 +483,8 @@ Item {
             left: parent.left
             right: parent.right
             top: parent.top
+            leftMargin: page.side
+            rightMargin: page.side
         }
         height: page.showGrid ? 34 : 0
         visible: page.showGrid
@@ -656,8 +663,8 @@ Item {
             left: parent.left
             right: parent.right
             top: header.bottom
-            leftMargin: 8
-            rightMargin: 4
+            leftMargin: page.side + 8
+            rightMargin: page.side + 4
         }
         height: page.error !== "" ? errorText.implicitHeight + 14 : 0
         visible: height > 0
@@ -698,27 +705,97 @@ Item {
         }
     }
 
+    // ================= Durchsuchen / Zufaellig =================
+    // Nur in der Ordner-Uebersicht: die zwei Knoepfe mittig, darunter die
+    // Ueberschrift des Rasters
+    Item {
+        id: topBar
+
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: errorRow.bottom
+            leftMargin: page.side
+            rightMargin: page.side
+        }
+        height: visible ? 112 : 0
+        visible: !page.showGrid
+
+        Row {
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                top: parent.top
+                topMargin: 8
+            }
+            spacing: 8
+
+            HeroButton {
+                filled: true
+                icon: "folder_open"
+                label: I18n.tr("Durchsuchen")
+                onClicked: {
+                    Wallpapers.openFolder("");
+                    // Das Fenster laege sonst ueber dem Dateimanager
+                    SettingsState.close();
+                }
+            }
+
+            HeroButton {
+                icon: "shuffle"
+                label: I18n.tr("Zufällig")
+                onClicked: Wallpapers.random()
+            }
+        }
+
+        Text {
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+                leftMargin: 4
+                bottomMargin: 10
+            }
+            font.family: Config.font
+            text: WallManager.folders.length > 0 ? I18n.tr("Ordner") : I18n.tr("Wallpaper")
+            color: Colors.fgSurfaceVariant
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+        }
+
+        Quiet {
+            anchors {
+                right: parent.right
+                bottom: parent.bottom
+                bottomMargin: 4
+            }
+            icon: "refresh"
+            tint: Colors.fgSurfaceVariant
+            enabled: !Wallpapers.loading
+            onClicked: Wallpapers.reload()
+        }
+    }
+
     // ================= Ordner-Karten =================
     GridView {
         id: cardGrid
 
         readonly property real tileWidth: cardGrid.cellWidth - page.cardGap
-        readonly property real coverHeight: Math.round(cardGrid.tileWidth * 10 / 16)
+        // Quadratische Karten
+        readonly property real coverHeight: cardGrid.tileWidth
 
         // Haengt rechts um einen Abstand ueber: so passen n Spalten mit
         // n-1 Luecken genau in die Seite
         anchors {
             left: parent.left
             right: parent.right
-            top: errorRow.bottom
+            top: topBar.bottom
             bottom: parent.bottom
-            topMargin: 4
-            rightMargin: -page.cardGap
+            leftMargin: page.side
+            rightMargin: page.side - page.cardGap
         }
         visible: !page.showGrid
         clip: true
         cellWidth: Math.floor(width / page.cardColumns)
-        cellHeight: cardGrid.coverHeight + 50
+        cellHeight: cardGrid.coverHeight + 44
         boundsBehavior: Flickable.StopAtBounds
         // Mausrad statt Ziehen (wie die Zeilenliste)
         interactive: false
@@ -768,7 +845,7 @@ Item {
                     }
                     height: cardGrid.coverHeight
                     name: card.modelData.cover
-                    cornerRadius: 10
+                    cornerRadius: 14
 
                     // Leicht aufhellen beim Hovern
                     Rectangle {
@@ -798,39 +875,22 @@ Item {
                 }
 
                 Text {
-                    id: cardTitle
-
                     anchors {
                         left: parent.left
                         right: parent.right
                         top: cover.bottom
                         topMargin: 8
-                        leftMargin: 2
                     }
                     font.family: Config.font
                     text: card.modelData.title
                     color: cardHover.hovered ? Colors.fgBackground : Colors.fgSurface
                     font.pixelSize: 12
-                    font.weight: Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideMiddle
 
                     Behavior on color {
                         ColorAnimation { duration: Appearance.fadeDuration }
                     }
-                }
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        right: parent.right
-                        top: cardTitle.bottom
-                        topMargin: 1
-                        leftMargin: 2
-                    }
-                    font.family: Config.font
-                    text: card.modelData.count === 0 ? I18n.tr("Leer") : page.plural(card.modelData.count, "1 Bild", "%1 Bilder")
-                    color: Colors.alpha(Colors.fgSurfaceVariant, 0.8)
-                    font.pixelSize: 10
                 }
 
                 HoverHandler {
@@ -854,38 +914,35 @@ Item {
                 }
                 height: cardGrid.coverHeight
                 visible: card.isNew
-                radius: 10
-                color: newHover.hovered || page.newFolderOpen ? Colors.alpha(Colors.fgSurface, 0.05) : "transparent"
-                border.width: 1
-                border.color: Colors.alpha(Colors.outline, newHover.hovered ? 0.4 : 0.22)
+                radius: 14
+                color: Colors.alpha(Colors.fgSurface, newHover.hovered || page.newFolderOpen ? 0.08 : 0.04)
 
                 Behavior on color {
                     ColorAnimation { duration: Appearance.fadeDuration }
                 }
-                Behavior on border.color {
-                    ColorAnimation { duration: Appearance.fadeDuration }
-                }
 
-                Column {
+                Text {
                     anchors.centerIn: parent
                     visible: !page.newFolderOpen
-                    spacing: 4
+                    text: "add"
+                    color: Colors.fgSurfaceVariant
+                    font.family: "Material Symbols Outlined"
+                    font.pixelSize: 28
+                }
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "add"
-                        color: Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 22
+                // Name unter der Karte, wie bei den Ordnern
+                Text {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.bottom
+                        topMargin: 8
                     }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        font.family: Config.font
-                        text: I18n.tr("Neuer Ordner")
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 11
-                    }
+                    font.family: Config.font
+                    text: I18n.tr("Neuer Ordner")
+                    color: Colors.fgSurfaceVariant
+                    font.pixelSize: 12
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Loader {
@@ -980,7 +1037,8 @@ Item {
             top: errorRow.bottom
             bottom: parent.bottom
             topMargin: 8
-            rightMargin: -page.gridGap
+            leftMargin: page.side
+            rightMargin: page.side - page.gridGap
             bottomMargin: page.hasSelection ? sheet.height + 10 : 0
         }
         visible: page.showGrid
@@ -1202,6 +1260,8 @@ Item {
             left: parent.left
             right: parent.right
             bottom: parent.bottom
+            leftMargin: page.side
+            rightMargin: page.side
         }
         height: 54
         radius: 14
@@ -1643,7 +1703,6 @@ Item {
                                      : row.current ? Colors.primary : Colors.fgSurfaceVariant
                                 font.family: "Material Symbols Outlined"
                                 font.pixelSize: 16
-                                font.variableAxes: ({ FILL: row.current ? 1 : 0 })
                             }
                         }
 

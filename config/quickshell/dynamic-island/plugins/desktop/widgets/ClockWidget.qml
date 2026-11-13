@@ -8,7 +8,7 @@ import qs.modules.services.config
 import qs.modules.widgets.clock
 
 // Uhr auf dem Desktop, in der Sprache der Notch: ruhige, monochrome
-// Typografie (Inter Display fuer die grossen Ziffern, Datum als kleine
+// Typografie (Config.displayFont fuer die grossen Ziffern, Datum als kleine
 // Versalien-Zeile), Akzent nur als Punkt. Stile:
 //
 //   insel            schwarze Pille wie die Notch, Zeit + Datum
@@ -39,7 +39,7 @@ Item {
     readonly property bool showDate: root.opts.date ?? true
     readonly property bool use12h: Config.appearance.clock === "12h"
 
-    readonly property string display: Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : Config.font
+    readonly property string display: Config.displayFont
     readonly property string hours: Qt.formatDateTime(clock.date, root.use12h ? "h" : "HH")
     readonly property string minutes: Qt.formatDateTime(clock.date, "mm")
     readonly property string dateLine: I18n.date(clock.date, "dddd · d. MMMM", "dddd · MMMM d")

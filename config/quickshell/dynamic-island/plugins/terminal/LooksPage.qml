@@ -823,9 +823,7 @@ Item {
                 { title: I18n.tr("Ordner öffnen"), icon: "folder_open", action: () => {
                     page.closeMenu();
                     Quickshell.execDetached(["xdg-open", page.info?.dir ?? page.fastfetchDir]);
-                } },
-                { title: I18n.tr("Look löschen"), icon: "delete", danger: true, enabled: page.lookId !== "miku",
-                  action: () => { page.closeMenu(); page.ask = "delete"; } }
+                } }
             ];
         }
         if (m === "rowmenu") {
@@ -1456,10 +1454,26 @@ Item {
 
             Quiet {
                 visible: page.dirty && page.ask === ""
-                icon: "save"
                 label: I18n.tr("Speichern")
                 filled: true
                 onClicked: page.save(false)
+            }
+
+            // Loeschen direkt (Rueckfrage in der Leiste darunter), nicht im Menue
+            Quiet {
+                visible: page.look !== null && page.lookId !== "miku"
+                icon: "delete"
+                tint: Colors.fgSurfaceVariant
+                active: page.ask === "delete"
+                // eine andere offene Rueckfrage (Speichern/Konflikt) nicht ueberschreiben
+                enabled: page.ask === "" || page.ask === "delete"
+                onClicked: {
+                    page.closeMenu();
+                    if (page.ask === "delete")
+                        page.cancelAsk();
+                    else
+                        page.ask = "delete";
+                }
             }
 
             Quiet {
@@ -1875,7 +1889,6 @@ Item {
                         spacing: 4
 
                         Quiet {
-                            icon: "add"
                             label: I18n.tr("Hinzufügen")
                             tint: Colors.fgSurfaceVariant
                             onClicked: page.addPaletteColor()
@@ -2060,7 +2073,6 @@ Item {
                         Quiet {
                             id: cardAddButton
 
-                            icon: "add"
                             label: I18n.tr("Neue Karte")
                             chevron: true
                             tint: Colors.fgSurfaceVariant
@@ -2090,7 +2102,6 @@ Item {
 
                         Quiet {
                             visible: page.cardSelected !== ""
-                            icon: page.cardArmed ? "check" : "delete"
                             label: page.cardArmed ? I18n.tr("Wirklich entfernen?") : I18n.tr("Entfernen")
                             tint: Colors.error
                             onClicked: {
@@ -2136,21 +2147,18 @@ Item {
 
                         Quiet {
                             visible: !page.rawOn && !page.rawEditing
-                            icon: "edit"
                             label: I18n.tr("Als eigene Datei bearbeiten")
                             onClicked: page.ensureSaved(() => page.rawLoad())
                         }
 
                         Quiet {
                             visible: page.rawOn && !page.rawEditing
-                            icon: "edit"
                             label: I18n.tr("Bearbeiten")
                             onClicked: page.rawLoad()
                         }
 
                         Quiet {
                             visible: page.rawEditing
-                            icon: "save"
                             label: I18n.tr("Datei speichern")
                             filled: true
                             enabled: page.rawText !== page.rawLoaded || !page.rawOn
@@ -2739,7 +2747,6 @@ Item {
                                     }
 
                                     Quiet {
-                                        icon: "add"
                                         label: I18n.tr("Abschnitt")
                                         tint: Colors.fgSurfaceVariant
                                         onClicked: page.addSeg()
@@ -2794,7 +2801,6 @@ Item {
                     Quiet {
                         id: addButton
 
-                        icon: "add"
                         label: I18n.tr("Hinzufügen")
                         chevron: true
                         tint: Colors.fgSurfaceVariant

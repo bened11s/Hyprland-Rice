@@ -26,7 +26,6 @@
         "scenes": {
             "default": "",
             "title": "Szene",
-            "desc": "Anordnung je Wallpaper in ~/.config/dynamic-island/scenes.json",
             "editor": "desktop"
         },
         "hidden": {

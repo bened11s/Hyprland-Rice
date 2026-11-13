@@ -25,30 +25,30 @@ local defaultProfile  = "simple"
 local rescueProfile   = "caelestia"
 local switchBind      = "CTRL + SUPER + SHIFT + P"
 
---------------------------------------------------------------------------------
--- Monitore (gelten fuer beide Profile)
---------------------------------------------------------------------------------
-hl.monitor({
-    output   = "eDP-1",
-    mode     = "1920x1080@60",
-    position = "0x0",
-    scale    = 1,
-    vrr      = false,
-})
+-- ~/.local/bin (dynamic-island, hypr-profile, theme-set) fuer alles, was
+-- Hyprland startet. Arch/EndeavourOS nehmen den Ordner nicht von selbst in
+-- den PATH, und Hyprland bekommt beim Start aus dem Display-Manager keine
+-- Shell-rc zu sehen; ohne das finden Autostart und Keybinds die CLI nicht.
+local localBin = home .. "/.local/bin"
+local path     = os.getenv("PATH") or "/usr/local/bin:/usr/bin"
+if not (":" .. path .. ":"):find(":" .. localBin .. ":", 1, true) then
+    hl.env("PATH", localBin .. ":" .. path)
+end
 
-hl.monitor({
-    output   = "HDMI-A-1",
-    mode     = "highres",
-    position = "auto-right",
-    scale    = 1,
-})
-
-hl.monitor({
-    output   = "",
-    mode     = "preferred",
-    position = "auto",
-    scale    = 1,
-})
+--------------------------------------------------------------------------------
+-- Monitore (gelten fuer alle Profile)
+--------------------------------------------------------------------------------
+-- Stehen pro Rechner in monitors.lua (git-ignoriert, Vorlage monitors.example.lua);
+-- ohne die Datei: bevorzugte Aufloesung, Workspace-Gruppen automatisch.
+package.loaded["monitor-setup"] = nil
+local monitors = require("monitor-setup")
+monitors.apply()
+if monitors.error then
+    hl.on("hyprland.start", function()
+        hl.exec_cmd("notify-send -u critical 'Hyprland: monitors.lua kaputt' "
+            .. "'Nehme die Standard-Monitore. ./install.sh --monitors legt sie neu an.'")
+    end)
+end
 
 --------------------------------------------------------------------------------
 -- Profil bestimmen
@@ -200,6 +200,20 @@ function sync_keybinds()
     end
     local overrides = data.overrides or {}
 
+    -- Binds der Shell zuerst weg: liegen beim remove() zwei Binds auf
+    -- derselben Taste (Config-Bind zurueckgelegt, Shell-Bind noch da),
+    -- crasht Hyprland 0.56 beim naechsten hl.bind auf diese Taste (SEGV in
+    -- CLuaKeybind::push, 02.11.2026: Farbschema weg von CTRL+SUPER+SHIFT+T,
+    -- OCR drauf, zurueck, wieder drauf)
+    for _, s in ipairs(shell_binds) do
+        pcall(s.handle.remove, s.handle)
+        -- Zusatztasten teilen die Aktion mit dem Config-Bind: die bleibt
+        if not s.extra then
+            keybind_actions[s.description] = nil
+        end
+    end
+    shell_binds = {}
+
     -- Binds der Config: neu belegen bzw. an/aus
     for _, b in ipairs(described_binds) do
         local o = overrides[b.ref] or {}
@@ -216,16 +230,6 @@ function sync_keybinds()
         end
         b.handle:set_enabled(not o.disabled)
     end
-
-    -- Binds der Shell: alle weg, dann neu aus der Datei
-    for _, s in ipairs(shell_binds) do
-        pcall(s.handle.remove, s.handle)
-        -- Zusatztasten teilen die Aktion mit dem Config-Bind: die bleibt
-        if not s.extra then
-            keybind_actions[s.description] = nil
-        end
-    end
-    shell_binds = {}
 
     -- Zusatztasten fuer Binds der Config: dieselbe Aktion und dieselben
     -- Optionen (auch die Beschreibung, so landen sie in derselben Zeile der

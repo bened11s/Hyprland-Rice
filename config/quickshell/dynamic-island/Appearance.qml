@@ -24,6 +24,9 @@ Singleton {
     // ---- Form ----
     // Eckenrundung der Karten. Flache Pillen deckeln ohnehin auf height / 2.
     readonly property real radius: Config.appearance.radius
+    // Deckkraft der Karten und Pillen (appearance.transparency in Prozent);
+    // die Notch und das Einstellungs-Fenster bleiben deckend
+    readonly property real surfaceAlpha: 1 - Math.max(0, Math.min(60, Config.appearance.transparency ?? 0)) / 100
     readonly property real borderWidth: 1
     // Der Rand ist bewusst halbtransparent: er zeichnet die Kante nach,
     // ohne auf hellen Wallpapern als grauer Ring zu stehen.

@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Hyprland
 
 import qs.modules.services.config
+import qs.modules.services.plugins
 import qs.modules.services.auth
 import qs.modules.services.audio
 import qs.modules.services.record
@@ -54,6 +55,8 @@ Item {
     readonly property real compactGap: 14    // Element -> Uhr
     readonly property real compactMinWidth: 196
     readonly property bool showWorkspaces: docked && Config.notch.workspaces
+    // Uhr eingeklappt (Config.notch.clock); aufgeklappt ist sie die Ueberschrift
+    readonly property bool clockHidden: docked && !open && !Config.notch.clock
     readonly property real compactLeft: showMedia ? mediaArtSize - (compactEdge - mediaEdge)
                                       : showWorkspaces ? compactWorkspaces.implicitWidth
                                       : 0
@@ -99,10 +102,16 @@ Item {
     // die Steuerung (Settings-Karte 520) plus Rand. So verschiebt sich beim
     // Blaettern seitlich nichts, nur die Hoehe aendert sich nach unten.
     readonly property real pageWidth: 548
-    readonly property real panelBottom: collapsedHeight + clockDropMax + panel.outerHeight
-    readonly property bool showNowPlaying: Media.available
+    // Uebersicht von oben nach unten: Kalender, Jetzt laeuft, Systemwerte,
+    // Akkus – jedes abschaltbar (Config.notch.*), Abgeschaltetes nimmt keinen Platz
+    readonly property bool showCalendar: !docked || Config.notch.calendar
+    readonly property real panelBottom: collapsedHeight + clockDropMax + (showCalendar ? panel.outerHeight : 0)
+    readonly property bool showNowPlaying: Media.available && Config.notch.nowPlaying
+    readonly property bool showStats: Config.notch.stats
     readonly property real overviewBottom: batteryGlance.visible ? batteryGlance.y + batteryGlance.height
-                                                                 : systemGlance.y + systemGlance.height
+                                         : showStats ? systemGlance.y + systemGlance.height
+                                         : showNowPlaying ? nowPlaying.y + nowPlaying.height
+                                         : panelBottom
     // Seiten-Indikator: Punkte fuer Uebersicht + Untermenues
     readonly property bool pagerShown: docked && (overviewShown || viewOpen)
     // Mitte der Kopfzeile: Uhr (Uebersicht) bzw. Titel (Untermenue) stehen
@@ -186,7 +195,7 @@ Item {
     // Was die Bar zentral einschaltet (Bar.qml): Visualiser, Systemwerte,
     // Medien-Position, Tastaturfokus fuers WLAN-Passwort in der Steuerung
     readonly property bool wantsVisualizer: (overviewShown && Media.available) || mediaOpen
-    readonly property bool wantsStats: overviewShown || systemOpen
+    readonly property bool wantsStats: (overviewShown && showStats) || systemOpen
     readonly property bool wantsMediaPosition: mediaOpen
     readonly property bool controlTyping: controlOpen && (controlView?.typing ?? false)
     // Steuerungs-Untermenue (nur gebaut, solange offen – sonst null)
@@ -212,6 +221,8 @@ Item {
     readonly property bool powerOpen: launcherOpen && LauncherState.mode === "power"
     readonly property bool keysOpen: launcherOpen && LauncherState.mode === "keys"
     readonly property bool clipboardOpen: launcherOpen && LauncherState.mode === "clipboard"
+    // Ansicht eines Plugins (Manifest `panels.notch`, LauncherState.pluginView)
+    readonly property bool pluginViewOpen: launcherOpen && LauncherState.mode === "plugin"
     // Untermenues (siehe oben)
     readonly property bool mediaOpen: launcherOpen && LauncherState.mode === "media"
     readonly property bool controlOpen: launcherOpen && LauncherState.mode === "control"
@@ -265,14 +276,21 @@ Item {
     readonly property real ringGrowX: batteryRingShown ? 12 : 0
     readonly property real ringGrowY: batteryRingShown ? 3 : 0
     readonly property real collapsedHeight: docked ? parent.height - 8 + ringGrowY : parent.height - verticalMargin
+    // Ohne Uhr gibt es keine Mitte zu halten: so breit wie der Inhalt links
+    // plus rechts (die Elemente haengen ohnehin an den Kanten)
+    readonly property real sideLeft: showBattery && batteryLeft ? compactLeft + batteryAddLeft : compactLeft
+    readonly property real sideRight: showBattery && !batteryLeft ? compactRight.implicitWidth + batteryAddRight : compactRight.implicitWidth
+    readonly property real clocklessWidth: sideLeft + sideRight + (sideLeft > 0 && sideRight > 0 ? 2 * compactGap : 0) + 2 * compactEdge
     readonly property real collapsedWidth: docked
-        ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge)) + ringGrowX
+        ? (clockHidden ? Math.max(2 * compactEdge + 24, clocklessWidth)
+                       : Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))) + ringGrowX
         : clock.implicitWidth + 50 + recordReserve
     readonly property real launcherWidth: wallpaperOpen ? wallpapers.outerWidth
                                         : themeOpen ? themes.outerWidth
                                         : powerOpen ? powerMenu.outerWidth
                                         : keysOpen ? keysView.outerWidth
                                         : clipboardOpen ? clipboardView.outerWidth
+                                        : pluginViewOpen ? pluginView.outerWidth
                                         : mediaOpen ? mediaView.outerWidth
                                         : controlOpen ? controlLoader.outerWidth
                                         : notificationsOpen ? notificationsView.outerWidth
@@ -283,6 +301,7 @@ Item {
                                          : powerOpen ? powerMenu.outerHeight
                                          : keysOpen ? keysView.outerHeight
                                          : clipboardOpen ? clipboardView.outerHeight
+                                         : pluginViewOpen ? pluginView.outerHeight
                                          : mediaOpen ? mediaView.outerHeight
                                          : controlOpen ? controlLoader.outerHeight
                                          : notificationsOpen ? notificationsView.outerHeight
@@ -314,7 +333,7 @@ Item {
     onContainsMouseChanged: {
         if (containsMouse) {
             closeTimer.stop();
-            if (!expanded && !launcherOpen)
+            if (!expanded && !launcherOpen && (Config.notch.hoverOpen || !docked))
                 openTimer.restart();
         } else {
             openTimer.stop();
@@ -363,7 +382,7 @@ Item {
         maxRadius: notch.cardRadius
         // Angedockt: schwarz, flach und ohne Rand – sie soll wie ein Teil
         // des Displayrahmens wirken, die Schultern muessen nahtlos passen.
-        baseColor: notch.docked ? Appearance.notchColor : Colors.background
+        baseColor: notch.docked ? Appearance.notchColor : Colors.alpha(Colors.background, Appearance.surfaceAlpha)
         lift: notch.docked ? 0 : Appearance.lift
         // Kontur nur, wenn sie sich sonst nicht vom Wallpaper abhebt
         borderWidth: notch.docked ? (Appearance.notchBorder ? 1 : 0) : notch.borderWidth
@@ -377,6 +396,16 @@ Item {
 
         Behavior on shadowStrength {
             NumberAnimation { duration: Appearance.morphDuration * 0.65; easing.type: Easing.OutCubic }
+        }
+
+        // Ohne Hover-Aufklappen (Config.notch.hoverOpen) oeffnet ein Klick
+        TapHandler {
+            enabled: notch.docked && !Config.notch.hoverOpen && !notch.open
+            // Die Workspace-Staebchen haben eigene Klicks (Handler sehen beide)
+            onTapped: point => {
+                if (!compactWorkspaces.visible || !compactWorkspaces.contains(compactWorkspaces.mapFromItem(pill, point.position)))
+                    notch.expanded = true;
+            }
         }
 
         // Nach unten ziehen öffnet den Launcher. Solange diese Geste läuft,
@@ -498,7 +527,7 @@ Item {
             scale: notch.docked && notch.expanded ? 1.3 : 1
             // Aufgeklappt nimmt die Uhr die Akzentfarbe an
             color: notch.open ? Colors.primary : Colors.fgBackground
-            opacity: notch.launcherOpen || notch.authOpen ? 0 : 1
+            opacity: notch.launcherOpen || notch.authOpen || notch.clockHidden ? 0 : 1
             visible: opacity > 0
 
             Behavior on color {
@@ -625,6 +654,8 @@ Item {
             visible: opacity > 0
             percent: Power.percent
             charging: Power.charging
+            // Schimmer nur beim echten Laden – "voll am Kabel" (Laptop) liefe sonst endlos
+            animate: Power.activelyCharging
             fg: Colors.alpha(Colors.fgBackground, 0.75)
 
             Fade on opacity {}
@@ -640,7 +671,8 @@ Item {
 
             anchors {
                 right: parent.right
-                rightMargin: (notch.showVisualizer ? notch.mediaEdge + 3 : notch.compactEdge) + notch.growth
+                // Schmaler Rand nur als Gegenstueck zum Cover links (mediaEdge), neben Workspaces symmetrisch
+                rightMargin: (notch.showVisualizer && notch.showMedia ? notch.mediaEdge + 3 : notch.compactEdge) + notch.growth
                 verticalCenter: clock.verticalCenter
             }
             spacing: 7
@@ -663,7 +695,7 @@ Item {
                 id: dockedRecordDot
 
                 anchors.verticalCenter: parent.verticalCenter
-                visible: notch.recording
+                visible: notch.recording && Config.notch.record
                 width: notch.recordDotSize
                 height: notch.recordDotSize
                 radius: width / 2
@@ -786,7 +818,7 @@ Item {
                 font.family: "Material Symbols Outlined"
                 font.pixelSize: 16
                 // Variable Font: Strichstaerke ueber die wght-Achse
-                font.variableAxes: ({ wght: button.active ? 700 : 500, FILL: button.active ? 1 : 0 })
+                font.variableAxes: ({ wght: button.active ? 700 : 500 })
 
                 Behavior on color {
                     ColorAnimation { duration: Appearance.fadeDuration }
@@ -865,7 +897,7 @@ Item {
             }
             width: 22
             height: 22
-            opacity: notch.overviewShown || notch.docked && notch.viewOpen ? 1 : 0
+            opacity: Config.notch.bell && (notch.overviewShown || notch.docked && notch.viewOpen) ? 1 : 0
             visible: opacity > 0
             scale: bellHover.hovered ? 1.12 : 1
 
@@ -954,7 +986,8 @@ Item {
             x: notch.overviewInset
             y: notch.showNowPlaying ? nowPlaying.y + nowPlaying.height + 8 : notch.panelBottom + 8
             width: parent.width - 2 * notch.overviewInset
-            opacity: notch.overviewShown ? 1 : 0
+            height: notch.showStats ? 30 : 0
+            opacity: notch.overviewShown && notch.showStats ? 1 : 0
             visible: opacity > 0
 
             Fade on opacity {}
@@ -966,8 +999,12 @@ Item {
             transform: Translate { x: notch.slide }
 
             x: notch.overviewInset
-            y: systemGlance.y + systemGlance.height + 6
+            y: notch.showStats ? systemGlance.y + systemGlance.height + 6
+             : notch.showNowPlaying ? nowPlaying.y + nowPlaying.height + 8
+             : notch.panelBottom + 8
             width: parent.width - 2 * notch.overviewInset
+            visible: Config.notch.batteries && batteries.length > 0
+            height: visible ? 30 : 0
             opacity: notch.overviewShown ? 1 : 0
             enabled: notch.overviewShown
 
@@ -1357,7 +1394,7 @@ Item {
             // Beim Wechsel zum Launcher (oder zur Steuerungs-Seite) sofort aus
             // dem Renderpfad nehmen. So wird der Datumsstreifen nicht auf die
             // neue Kartenbreite mitanimiert.
-            visible: notch.cardShown
+            visible: notch.cardShown && notch.showCalendar
 
             Behavior on opacity {
                 NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
@@ -1433,6 +1470,85 @@ Item {
                 topOffset: notch.launcherTop
                 cardRadius: notch.cardRadius
                 active: true
+            }
+        }
+
+        // Ansicht eines Plugins: dieselbe Huelle wie die eigenen Ansichten
+        // (topOffset, inset, outerWidth/-Height), der Inhalt kommt per URL aus
+        // dem Plugin-Ordner – dessen Dateien sind keine Typen hier (README,
+        // "Imports"). Vertrag: plugins/README.md, "Notch-Ansichten".
+        LazyPanel {
+            id: pluginView
+
+            open: notch.pluginViewOpen
+
+            sourceComponent: Item {
+                id: pluginPanel
+
+                property real topOffset: notch.launcherTop
+                property real inset: 2
+                property bool active: true
+
+                readonly property real outerWidth: implicitWidth + inset * 2
+                readonly property real outerHeight: implicitHeight + inset
+
+                // Eintrag aus Plugins.panels.notch; Plugin aus -> weg
+                readonly property var entry: (Plugins.panels.notch ?? []).find(p => p.pluginId === LauncherState.pluginView) ?? null
+                readonly property string url: pluginPanel.entry?.url ?? ""
+
+                implicitWidth: pluginLoader.item?.implicitWidth ?? 400
+                implicitHeight: pluginLoader.item?.implicitHeight ?? 0
+
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    leftMargin: pluginPanel.inset
+                    rightMargin: pluginPanel.inset
+                }
+                y: pluginPanel.topOffset
+
+                // Was die Ansicht von der Notch sieht
+                readonly property QtObject host: QtObject {
+                    readonly property var screen: notch.hostScreen
+                    readonly property real cardRadius: notch.cardRadius
+                    function close(): void {
+                        LauncherState.close();
+                    }
+                }
+
+                Loader {
+                    id: pluginLoader
+
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                    }
+                    focus: true
+
+                    function rebuild(): void {
+                        if (pluginPanel.url === "")
+                            pluginLoader.source = "";
+                        else
+                            pluginLoader.setSource(pluginPanel.url, { plugin: pluginPanel.entry.plugin, host: pluginPanel.host });
+                    }
+
+                    Component.onCompleted: pluginLoader.rebuild()
+                    onStatusChanged: {
+                        if (pluginLoader.status === Loader.Error)
+                            console.warn(`Notch-Ansicht ${LauncherState.pluginView}: ${pluginPanel.url} laedt nicht`);
+                    }
+                }
+
+                Connections {
+                    target: pluginPanel
+
+                    function onUrlChanged(): void {
+                        pluginLoader.rebuild();
+                    }
+                }
+
+                // Plugin weg (ausgeschaltet) -> Notch zu statt leerer Karte
+                onEntryChanged: if (pluginPanel.entry === null) LauncherState.close()
             }
         }
 

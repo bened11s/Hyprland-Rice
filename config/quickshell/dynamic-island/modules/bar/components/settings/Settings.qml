@@ -154,9 +154,7 @@ Surface {
         settings.wifiOpen = false;
         settings.bluetoothOpen = false;
         settings.audioOpen = false;
-        tiles.sleepMenuOpen = false;
-        tiles.vpnMenuOpen = false;
-        tiles.powerMenuOpen = false;
+        tiles.closeMenus();
     } else {
         settings.showBrightness = false;
         settings.peek = false;          // die Karte loest die Statuszeile ab
@@ -167,7 +165,7 @@ Surface {
     maxRadius: cardRadius
     clipContent: false   // muss offen sein: das Dropdown haengt unten raus
     // Eingebettet: keine eigene Karte, die Notch ist die Flaeche
-    baseColor: settings.embedded ? "transparent" : Colors.background
+    baseColor: settings.embedded ? "transparent" : Colors.alpha(Colors.background, Appearance.surfaceAlpha)
     lift: settings.embedded ? 0 : Appearance.lift
     shadow: !settings.embedded && Appearance.shadow && !settings.nested
 

@@ -7,7 +7,7 @@ import qs.modules.services.config
 import qs.modules.widgets
 
 // Sektion des Plugins in der Wallpaper-Auswahl (Manifest panels.wallpaper):
-// eigene Suchzeile mit Sortier-Chips und darunter das Treffer-Karussell
+// eigene Suchzeile mit Sortierung und darunter das Treffer-Karussell
 // (WallhavenList). Entsteht beim Aufklappen und wird beim Zuklappen wieder
 // zerstoert – Suchtext und Treffer liegen im Dienst (plugin.main, Main.qml).
 //
@@ -81,15 +81,18 @@ Item {
         }
     }
 
-    // Sortierung als Chips – dieselben Werte wie die Einstellung `sorting`
+    // Sortierung – dieselben Werte wie die Einstellung `sorting`. Zugeklappt
+    // steht nur die gewaehlte da; ein Klick klappt die Reihe in der Zeile auf
+    // (kein Popup: ausserhalb der Notch-Karte waere es nicht klickbar)
     readonly property var sortings: [
-        { name: "relevanz", label: I18n.tr("Relevanz"), icon: "manage_search" },
-        { name: "neu", label: I18n.tr("Neu"), icon: "schedule" },
-        { name: "zufall", label: I18n.tr("Zufall"), icon: "casino" },
-        { name: "views", label: "Views", icon: "visibility" },
-        { name: "favoriten", label: "Favs", icon: "favorite" },
-        { name: "top", label: "Top", icon: "trending_up" }
+        { name: "relevanz", label: I18n.tr("Relevanz") },
+        { name: "neu", label: I18n.tr("Neu") },
+        { name: "zufall", label: I18n.tr("Zufall") },
+        { name: "views", label: I18n.tr("Aufrufe") },
+        { name: "favoriten", label: I18n.tr("Favoriten") },
+        { name: "top", label: "Top" }
     ]
+    property bool sortOpen: false
 
     // Kurzer Stand rechts neben dem Suchfeld; die leeren Zustaende
     // (Suche, keine Treffer, Fehler) stehen gross im Karussellbereich
@@ -100,11 +103,7 @@ Item {
             return I18n.tr("HQ-Vorschau lädt…");
         if (section.wh.error !== "" && section.wh.items.count > 0)
             return section.wh.error;
-        if (section.wh.items.count === 0)
-            return "";
-        const pages = Math.min(section.wh.lastPage, section.wh.maxPages);
-        return I18n.tr("%1 Treffer · Seite %2/%3").arg(section.wh.total).arg(section.wh.page).arg(pages)
-            + (section.wh.searching ? I18n.tr(" · lädt…") : "");
+        return section.wh.searching && section.wh.items.count > 0 ? I18n.tr("lädt…") : "";
     }
 
     Item {
@@ -182,7 +181,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: whSearch.text === ""
-                text: I18n.tr("Wallhaven durchsuchen…   tag, -tag, like:ID")
+                text: I18n.tr("Wallhaven durchsuchen") + "…"
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: whSearch.font
                 verticalAlignment: Text.AlignVCenter
@@ -198,6 +197,7 @@ Item {
                 rightMargin: 14
                 verticalCenter: parent.verticalCenter
             }
+            visible: !section.sortOpen
             text: section.status
             font.family: Config.font
             font.pixelSize: 11
@@ -212,7 +212,7 @@ Item {
                 rightMargin: 14
                 verticalCenter: parent.verticalCenter
             }
-            spacing: 4
+            spacing: 2
 
             Repeater {
                 model: section.sortings
@@ -224,37 +224,33 @@ Item {
 
                     readonly property bool selected: section.plugin.settings.sorting === sortChip.modelData.name
 
+                    visible: section.sortOpen || sortChip.selected
                     implicitWidth: sortContent.implicitWidth + 18
-                    implicitHeight: 26
-                    radius: height / 2
-                    color: sortChip.selected ? Colors.primary
-                        : sortArea.containsMouse ? Colors.alpha(Colors.fgSurface, 0.08)
-                        : Colors.alpha(Colors.fgSurface, 0.04)
-
-                    Behavior on color {
-                        ColorAnimation { duration: 120 }
-                    }
+                    implicitHeight: 28
+                    radius: 8
+                    color: sortArea.containsMouse || !section.sortOpen ? Colors.alpha(Colors.fgSurface, 0.08) : "transparent"
 
                     Row {
                         id: sortContent
 
                         anchors.centerIn: parent
-                        spacing: 4
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: sortChip.modelData.icon
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 13
-                            color: sortChip.selected ? Colors.fgPrimary : Colors.fgSurfaceVariant
-                        }
+                        spacing: 2
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: sortChip.modelData.label
                             font.family: Config.font
-                            font.pixelSize: 11
-                            color: sortChip.selected ? Colors.fgPrimary : Colors.fgSurface
+                            font.pixelSize: 12
+                            color: section.sortOpen && sortChip.selected ? Colors.primary : Colors.fgSurface
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: !section.sortOpen
+                            text: "expand_more"
+                            font.family: "Material Symbols Outlined"
+                            font.pixelSize: 16
+                            color: Colors.fgSurfaceVariant
                         }
                     }
 
@@ -264,7 +260,11 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: section.wh.setSorting(sortChip.modelData.name)
+                        onClicked: {
+                            if (section.sortOpen)
+                                section.wh.setSorting(sortChip.modelData.name);
+                            section.sortOpen = !section.sortOpen;
+                        }
                     }
                 }
             }

@@ -18,11 +18,10 @@ jedes Wallpaper kann eigene Desktop-Widgets haben. Dazu kommt die CLI
 `dynamic-island` fuer Farbschemata, Wallpaper, Screenshots und Aufnahmen.
 
 Das ist die Config genau so, wie sie auf meinen Rechnern laeuft — inklusive
-meiner Monitornamen und zwei Profilen, die Shells brauchen, die hier nicht
-drin sind (siehe [Profile](#profile)).
+zwei Profilen, die Shells brauchen, die hier nicht drin sind (siehe [Profile](#profile)).
 
 Die Oberflaeche spricht **Englisch** (Vorgabe) und **Deutsch** — umschalten
-unter Einstellungen > Darstellung > Sprache.
+unter Einstellungen > Sprache & Region.
 
 ![Desktop mit Notch, Uhr- und Visualiser-Widget](docs/screenshots/desktop.jpg)
 
@@ -42,7 +41,7 @@ unter Einstellungen > Darstellung > Sprache.
 </table>
 
 ![Tastenkuerzel-Uebersicht](docs/screenshots/tastenkuerzel.jpg)
-<sub><b>Tastenkuerzel-Uebersicht</b> (<code>SUPER + K</code>) — live aus Hyprland, Klick fuehrt aus, Kuerzel lassen sich dort neu belegen</sub>
+<sub><b>Tastenkuerzel-Uebersicht</b> (<code>SUPER + K</code>) — live aus Hyprland, Klick fuehrt aus, <code>Strg + E</code> oeffnet den Editor in den Einstellungen</sub>
 
 ## Installieren
 
@@ -58,7 +57,10 @@ standardmaessig als Symlinks, damit ein
 `git pull` im Klon sofort gilt. Was dort schon liegt, wandert vorher nach
 `~/backups/`, nichts wird geloescht. Ausserdem kopiert es die mitgelieferten
 Wallpaper nach `~/Pictures/Wallpapers` (vorhandene Dateien bleiben) und
-erzeugt daraus das erste Farbschema.
+erzeugt daraus das erste Farbschema. Fuer das durchsichtige Terminal legt es
+`config/kitty/dynamic-island.conf` nach `~/.config/kitty/` und haengt an deine
+`kitty.conf` einen markierten `include`-Block an (deine Datei bleibt sonst
+unangetastet; eigene Werte unter dem Block gewinnen).
 
 Danach:
 
@@ -77,6 +79,7 @@ Wo der Klon liegt, ist egal.
 | `--copy` | kopieren statt verlinken (nach `git pull` erneut ausfuehren) |
 | `--extras` | auch meine hyprlock-Layouts, nvim-, spicetify- und spotify-launcher-Configs verlinken (ersetzt deine, Sicherung in `~/backups/`) |
 | `--check` | nur pruefen, nichts aendern |
+| `--monitors` | nur `~/.config/hypr/monitors.lua` aus den angeschlossenen Monitoren (neu) schreiben |
 | `--dry-run` | zeigen, was passieren wuerde |
 | `-y` | ohne Rueckfrage durchlaufen |
 
@@ -88,36 +91,48 @@ wie `config/hypr/` im Klon — egal wo du bearbeitest, es ist dieselbe Datei.
 Nach jeder Aenderung: `hyprctl reload`. Tippfehler meldet Hyprland oben als
 rote Leiste.
 
-### 1. Monitore (wichtigster Punkt)
+### 1. Monitore
 
-Erst nachschauen, wie deine Bildschirme heissen:
+Die Monitore stehen in `~/.config/hypr/monitors.lua` — eine Datei pro Rechner,
+die nicht zum Repo gehoert (steht in `.gitignore`, `git pull` fasst sie also nie
+an). `install.sh` schreibt sie aus den gerade angeschlossenen Monitoren, wenn
+Hyprland laeuft. Aus einem TTY installiert? Dann einmal in Hyprland:
 
 ```sh
-hyprctl monitors    # Namen wie HDMI-A-1, DP-1, eDP-1 + moegliche Aufloesungen
+./install.sh --monitors   # schreibt monitors.lua aus `hyprctl monitors`
+hyprctl reload
 ```
 
-In `config/hypr/hyprland.lua` stehen oben meine drei (`HDMI-A-1` links, `DP-2`
-rechts, `eDP-1` = Laptop). Trag dort deine Namen, Aufloesung, Hz-Zahl und
-Position ein, ueberzaehlige Bloecke loeschen. Beispiel fuer einen Monitor:
+Einstellungen > Monitore schreibt dieselbe Datei: Anordnung, Aufloesung,
+Bildrate und Skalierung, mit Countdown, der eine Einstellung mit schwarzem
+Bild von selbst zuruecknimmt.
+
+Ohne die Datei geht trotzdem alles: jeder Monitor bekommt seine bevorzugte
+Aufloesung, die Workspace-Gruppen werden von links nach rechts vergeben.
+
+So sieht die Datei aus (Vorlage mit allen Optionen:
+`config/hypr/monitors.example.lua`):
 
 ```lua
-hl.monitor({
-    output   = "DP-1",            -- Name aus `hyprctl monitors`
-    mode     = "1920x1080@144",   -- oder "preferred"
-    position = "0x0",
-    scale    = 1,
-})
+return {
+    {
+        output     = "DP-1",            -- Name aus `hyprctl monitors`
+        mode       = "1920x1080@144",   -- oder "preferred"
+        position   = "0x0",
+        scale      = 1,
+        workspaces = 0,                 -- dieser Monitor hat Workspaces 1-10
+    },
+    {
+        output     = "HDMI-A-1",
+        mode       = "preferred",
+        position   = "1920x0",
+        scale      = 1,
+        workspaces = 10,                -- 11-20 (SUPER+1 springt hier nach 11)
+    },
+}
 ```
 
-Dann in `config/hypr/profiles/simple.lua` bei `wsMonitorOffset` dieselben Namen
-eintragen. Jeder Monitor bekommt seine eigenen Workspaces 1–10; der erste
-hat Offset `0`, ein zweiter `10`. Bei nur einem Monitor:
-
-```lua
-wsMonitorOffset = {
-    ["DP-1"] = 0,
-},
-```
+Jeder Monitor bekommt seine eigenen Workspaces 1–10 (in der Leiste als 1–10).
 
 ### 2. Tastatur
 
@@ -143,7 +158,8 @@ Unterordner) und per `>wallpaper` im App-Menue,
 ## Tastenkuerzel
 
 `SUPER` ist die Windows-Taste. Gilt fuer das Profil `simple`. Alle Kuerzel
-zeigt `SUPER + K` — dort kann man sie auch neu belegen oder abschalten.
+zeigt `SUPER + K`; neu belegen oder abschalten unter Einstellungen > Tastenkuerzel
+(`Strg + E` in der Uebersicht).
 
 | Kuerzel | Was passiert |
 | --- | --- |
@@ -160,6 +176,7 @@ zeigt `SUPER + K` — dort kann man sie auch neu belegen oder abschalten.
 | `SUPER + 1…0` | Workspace 1–10 (des Monitors unter dem Fokus) |
 | `SUPER + ALT + 1…0` | Fenster auf Workspace 1–10 schieben |
 | `CTRL + SUPER + ←/→` | vorheriger / naechster Workspace |
+| `SUPER + Tab` | Workspace-Uebersicht |
 | `SUPER + S` | Scratchpad-Workspace ein/aus |
 | `SUPER + M` | Spotify-Workspace (startet Spotify bei Bedarf) |
 | `SUPER + D` | Discord-Workspace |
@@ -179,7 +196,7 @@ zeigt `SUPER + K` — dort kann man sie auch neu belegen oder abschalten.
 | `CTRL + SUPER + ALT + R` | Shell neu starten |
 
 Die Vorgaben stehen unten in `config/hypr/profiles/simple.lua` unter `Keybinds`;
-Aenderungen aus der Uebersicht landen in `~/.config/dynamic-island/keybinds.json`.
+Aenderungen aus den Einstellungen landen in `~/.config/dynamic-island/keybinds.json`.
 
 ## Desktop-Widgets und Plugins
 
@@ -197,6 +214,7 @@ an- und abschalten unter Einstellungen > Plugins:
 | Desktop-Widgets | die Widget-Ebene selbst, dazu Uhr, Visualiser und Songtext |
 | Kalender, Wetter, Systemmonitor, Jetzt laeuft | weitere Desktop-Widgets (Wetter von open-meteo, ohne API-Key) |
 | Matrix-Regen, Bonsai, Terminal-Widget | Deko: Matrix als GPU-Shader, ASCII-Bonsai, beliebiges Terminal-Programm (cmatrix, cava, btop …) in einem durchsichtigen kitty-Panel |
+| Workspace-Uebersicht | alle Workspaces als Kacheln, je Monitor ein Tab — als Vollbild oder in der Notch (`SUPER + Tab`) |
 | Wallhaven | wallhaven.cc direkt in der Wallpaper-Auswahl durchsuchen, mit Live-Vorschau |
 | Terminal-Looks | starship-Prompt und fastfetch folgen dem Farbschema oder dem Look des Wallpaper-Ordners (standardmaessig aus) |
 
@@ -206,7 +224,10 @@ mit `dynamic-island plugin new <id>` anfangen, das Format steht (englisch) in
 [`config/quickshell/dynamic-island/plugins/README.md`](config/quickshell/dynamic-island/plugins/README.md).
 
 Die Shell selbst stellt man im Einstellungsfenster ein (`>settings` im
-App-Menue) — das schreibt `~/.config/dynamic-island/shell.json`.
+App-Menue): Aussehen und Wallpaper-Bibliothek, die Notch (jeder Teil laesst
+sich abschalten), Leiste, Schnelleinstellungs-Kacheln, Benachrichtigungen,
+Bluetooth & VPN, Akku, Sperren & Standby, Monitore, Tastenkuerzel, Sprache.
+Das schreibt `~/.config/dynamic-island/shell.json`.
 
 ## Updates holen
 
@@ -216,12 +237,15 @@ git pull
 hyprctl reload
 ```
 
-Hast du selbst Dateien geaendert (z. B. die Monitore), kann `git pull`
+Hast du selbst Dateien geaendert (z. B. das Tastaturlayout), kann `git pull`
 meckern. Dann so:
 
 ```sh
 git stash && git pull && git stash pop
 ```
+
+Oder unter Einstellungen > Info > Updates: holt die Aenderungen, legt eigene
+Commits obendrauf und startet die Shell neu.
 
 Pushen geht nicht, das Repo ist fuer andere nur lesbar. Wenn du deine
 Aenderungen selbst auf GitHub sichern willst: oben rechts auf **Fork**, dann
@@ -296,6 +320,8 @@ Umschalten: `hypr-profile toggle` oder `CTRL + SUPER + SHIFT + P`.
 * Die CLI in `config/dynamic-island/` ist von
   [caelestia-cli](https://github.com/caelestia-dots/cli) abgeleitet und steht
   wie diese unter der **GPL-3.0** ([`config/dynamic-island/LICENSE`](config/dynamic-island/LICENSE)).
+* Der Rest des Repos steht ebenfalls unter der **GPL-3.0** ([`LICENSE`](LICENSE)),
+  ausgenommen die Wallpaper (siehe unten) und `config/nvim/` (Apache-2.0, aus dem LazyVim-Starter).
 * Die Optik der Notch ist von saneAspects "Dynamite" inspiriert.
 * Die Wallpaper gehoeren ihren jeweiligen Kuenstlerinnen und Kuenstlern
   (gesammelt u. a. auf [wallhaven.cc](https://wallhaven.cc)), siehe

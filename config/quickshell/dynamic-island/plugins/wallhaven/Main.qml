@@ -268,7 +268,7 @@ Scope {
                 else if (msg.type === "thumb")
                     root.patch(msg.id, { thumb: msg.thumb });
                 else if (msg.type === "error") {
-                    root.error = msg.message ?? I18n.tr("Fehler");
+                    root.error = I18n.tr(msg.message ?? "Fehler");
                     root.searching = false;
                 }
             }
@@ -328,7 +328,10 @@ Scope {
     readonly property bool prefetching: fetchProc.alive
     // So breit wird das Vorschau-JPEG: der Monitor, auf dem die Auswahl
     // offen ist (gleiche Breite = gleicher Cache-Eintrag)
-    readonly property int screenWidth: LauncherState.screen?.width ?? 2560
+    // Echte Pixel (skalierte Monitore): darin wird heruntergeladen
+    readonly property real screenScale: LauncherState.screen?.devicePixelRatio ?? 1
+    readonly property int screenWidth: Math.round((LauncherState.screen?.width ?? 2560) * root.screenScale)
+    readonly property int screenHeight: Math.round((LauncherState.screen?.height ?? 1440) * root.screenScale)
 
     function prefetch(wid: string): void {
         if (!root.cfg.fullPreview)
@@ -441,7 +444,8 @@ Scope {
         root.items.setProperty(at, "phase", "downloading");
         downloadProc.wid = wid;
         downloadProc.apply = apply;
-        downloadProc.command = ["python3", "-I", root.script, "download", wid, "--url", item.full];
+        downloadProc.command = ["python3", "-I", root.script, "download", wid, "--url", item.full,
+            "--size", `${root.screenWidth}x${root.screenHeight}`];
         downloadProc.running = true;
     }
 
@@ -477,7 +481,7 @@ Scope {
                 if (msg.type === "done")
                     downloadProc.path = msg.path ?? "";
                 else if (msg.type === "error")
-                    root.error = msg.message ?? I18n.tr("Download fehlgeschlagen");
+                    root.error = I18n.tr(msg.message ?? "Download fehlgeschlagen");
             }
         }
 

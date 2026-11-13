@@ -337,14 +337,12 @@ Item {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: panel.wipeArmed ? I18n.tr("Verlauf leeren?")
-                    : Clipboard.entries.length === 1 ? I18n.tr("1 Eintrag")
-                    : I18n.tr("%1 Einträge").arg(Clipboard.entries.length)
-                visible: panel.wipeArmed || Clipboard.loaded
-                color: panel.wipeArmed ? Colors.error : Colors.fgSurfaceVariant
+                text: I18n.tr("Verlauf leeren?")
+                visible: panel.wipeArmed
+                color: Colors.error
                 font.family: Config.font
                 font.pixelSize: 12
-                font.weight: panel.wipeArmed ? Font.DemiBold : Font.Normal
+                font.weight: Font.DemiBold
                 rightPadding: 4
             }
 

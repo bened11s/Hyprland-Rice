@@ -76,14 +76,14 @@
 /* ---------- Typografie ------------------------------------------------------ */
 /* Die --encore-*-font-stack-Variablen setzt theme.js inline (!important), weil
    Spotify sie in einem @layer mit !important definiert und eine Stylesheet-
-   Regel dagegen verliert. Hier nur Fallback + Feinschliff. Inter ueberall,
+   Regel dagegen verliert. Hier nur Fallback + Feinschliff. Rubik ueberall (Inter als Rueckfall),
    auch fuer Zahlen (tabular-nums statt Mono). */
 :root,
 .encore-dark-theme,
 .encore-light-theme {
-  --encore-body-font-stack: "Inter Variable", "Inter", "Noto Sans", var(--fallback-fonts, sans-serif);
-  --encore-title-font-stack: "Inter Display", "Inter Variable", "Inter", var(--fallback-fonts, sans-serif);
-  --encore-variable-font-stack: "Inter Display", "Inter Variable", "Inter", var(--fallback-fonts, sans-serif);
+  --encore-body-font-stack: "Rubik", "Inter Variable", "Inter", "Noto Sans", var(--fallback-fonts, sans-serif);
+  --encore-title-font-stack: "Rubik", "Inter Display", "Inter Variable", "Inter", var(--fallback-fonts, sans-serif);
+  --encore-variable-font-stack: "Rubik", "Inter Display", "Inter Variable", "Inter", var(--fallback-fonts, sans-serif);
 }
 body {
   font-feature-settings: "cv11", "ss01", "calt";

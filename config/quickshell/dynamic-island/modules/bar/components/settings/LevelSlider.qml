@@ -30,7 +30,10 @@ Rectangle {
     signal detailsRequested()
     signal iconClicked()
 
-    readonly property real fillWidth: width * Math.max(0, Math.min(1, root.value))
+    // Nie schmaler als ein Kreis unter dem Symbol (Android-Stil): sonst wird
+    // die Fuellung bei kleinen Werten ein Strich mit Kachel-Radius, der aus
+    // der Rundung ragt. Von dort waechst sie bis zum rechten Rand.
+    readonly property real fillWidth: height + (width - height) * Math.max(0, Math.min(1, root.value))
     readonly property real detailsReserve: root.detailsAvailable ? 40 : 0
     readonly property real iconReserve: root.iconClickable ? 50 : 0
 
@@ -40,8 +43,8 @@ Rectangle {
     clip: true
 
     function adjustAt(x: real): void {
-        // x ist lokal zur Eingabeflaeche, ohne Symbol-/Detail-Schaltflaechen.
-        root.adjusted(Math.max(0, Math.min(1, x / Math.max(1, inputArea.width))));
+        // Umkehrung von fillWidth: die Kante der Fuellung folgt dem Zeiger
+        root.adjusted(Math.max(0, Math.min(1, (x - root.height) / (root.width - root.height))));
     }
 
     // ---- Fuellung ----
@@ -99,9 +102,10 @@ Rectangle {
 
         Text {
             font.family: Config.font
+            // Beginnt hinter dem Mindestkreis der Fuellung, nie halb darauf
             anchors {
-                left: labelIcon.right
-                leftMargin: 12
+                left: parent.left
+                leftMargin: root.height + 2
                 verticalCenter: parent.verticalCenter
             }
             text: root.title

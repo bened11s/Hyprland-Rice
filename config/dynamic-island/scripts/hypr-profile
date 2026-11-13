@@ -8,6 +8,12 @@
 
 set -uo pipefail
 
+# SHELL_START ruft die CLI ohne Pfad auf; ~/.local/bin ist nicht ueberall im PATH
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
 HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 PROFILE_FILE="$HYPR_DIR/profile"
 DEFAULT_PROFILE="simple"

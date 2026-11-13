@@ -177,6 +177,69 @@ Singleton {
         return "";
     }
 
+    // ---- Anzeige des aktuellen Bilds (Kopfzeile der Auswahl) ----
+    // Das kleine Vorschaubild, das die CLI beim Setzen ablegt (Symlink in
+    // ihren Cache, 128x72). Rueckfall fuer ein gesetztes Bild ausserhalb des
+    // Wallpaper-Ordners – das hat kein Vorschaubild von thumbs.sh.
+    readonly property string stateThumbPath: Quickshell.env("HOME") + "/.local/state/dynamic-island/wallpaper/thumbnail.jpg"
+    // Haengt als Zaehler an der URL: der Pfad bleibt bei jedem Wechsel gleich,
+    // Qt zeigte sonst das alte Bild aus dem Cache
+    property int stateThumbSerial: 0
+    onActualCurrentChanged: root.stateThumbSerial++
+
+    // Pfad relativ zum Wallpaper-Ordner, "" ausserhalb
+    function nameFor(path: string): string {
+        const prefix = root.wallsDir + "/";
+        return path.startsWith(prefix) ? path.slice(prefix.length) : "";
+    }
+
+    // Anzeigename: Dateiname ohne Endung
+    function titleFor(path: string): string {
+        const base = path.slice(path.lastIndexOf("/") + 1);
+        const dot = base.lastIndexOf(".");
+        return dot > 0 ? base.slice(0, dot) : base;
+    }
+
+    // Unterordner relativ zum Wallpaper-Ordner ("" direkt darin); ausserhalb
+    // der ganze Ordner, mit ~ abgekuerzt
+    function folderFor(path: string): string {
+        if (path === "")
+            return "";
+        const name = root.nameFor(path);
+        if (name !== "")
+            return name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : "";
+        const dir = path.slice(0, path.lastIndexOf("/"));
+        const home = Quickshell.env("HOME");
+        return dir.startsWith(home) ? "~" + dir.slice(home.length) : dir;
+    }
+
+    // Vorschaubild zum Anzeigen: das aus thumbs.sh, beim gesetzten Bild
+    // notfalls das der CLI. Leer, solange keins da ist – nie das Original.
+    function displayThumbFor(path: string): string {
+        if (path === "")
+            return "";
+        const name = root.nameFor(path);
+        const thumb = name !== "" ? root.thumbFor(name) : "";
+        if (thumb !== "")
+            return thumb;
+        if (path === root.actualCurrent)
+            return `file://${root.stateThumbPath}?v=${root.stateThumbSerial}`;
+        return "";
+    }
+
+    readonly property string currentName: root.titleFor(root.actualCurrent)
+    readonly property string currentFolder: root.folderFor(root.actualCurrent)
+    // Absoluter Ordner des gesetzten Bilds, wenn es in einem Unterordner des
+    // Wallpaper-Ordners liegt – sonst "" (fuer "Zufall aus diesem Ordner")
+    readonly property string currentDir: {
+        const name = root.nameFor(root.actualCurrent);
+        return name.includes("/") ? root.actualCurrent.slice(0, root.actualCurrent.lastIndexOf("/")) : "";
+    }
+    // Bilder der Liste in currentDir – die CLI laesst das aktuelle aus, unter
+    // zwei gibt es also nichts zu wuerfeln
+    readonly property int currentDirCount: root.currentDir === "" ? 0
+        : root.list.filter(w => w.path.startsWith(root.currentDir + "/")).length
+
     function search(needle: string): var {
         const query = needle.trim().toLowerCase();
         if (query === "")
@@ -197,6 +260,20 @@ Singleton {
     function random(): void {
         root.stopPreview();
         Quickshell.execDetached([root.cli, "wallpaper", "-r"]);
+    }
+
+    // Zufallsbild aus einem bestimmten Ordner (Kopfzeile der Auswahl). Hat
+    // der nur das aktuelle Bild, tut die CLI nichts.
+    function randomIn(dir: string): void {
+        if (dir === "")
+            return;
+        root.stopPreview();
+        Quickshell.execDetached([root.cli, "wallpaper", "-r", dir]);
+    }
+
+    // Ordner im Dateimanager zeigen (leer = der ganze Wallpaper-Ordner)
+    function openFolder(dir: string): void {
+        Quickshell.execDetached(["xdg-open", dir !== "" ? dir : root.wallsDir]);
     }
 
     // ---- Zufallsmodus ----

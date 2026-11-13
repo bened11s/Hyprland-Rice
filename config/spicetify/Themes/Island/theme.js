@@ -20,8 +20,8 @@
   // --- Schrift ----------------------------------------------------------------
   // Spotify setzt --encore-*-font-stack in einem @layer mit !important; das
   // schlaegt jede Regel aus user.css. Nur ein Inline-Style mit !important gewinnt.
-  const body = '"Inter Variable", "Inter", "Noto Sans", sans-serif';
-  const title = '"Inter Display", "Inter Variable", "Inter", sans-serif';
+  const body = '"Rubik", "Inter Variable", "Inter", "Noto Sans", sans-serif';
+  const title = '"Rubik", "Inter Display", "Inter", sans-serif';
   root.style.setProperty("--encore-body-font-stack", body, "important");
   root.style.setProperty("--encore-title-font-stack", title, "important");
   root.style.setProperty("--encore-variable-font-stack", title, "important");

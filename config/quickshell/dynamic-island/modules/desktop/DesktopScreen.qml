@@ -190,8 +190,9 @@ PanelWindow {
                     const x = point.position.x, y = point.position.y;
                     // Klicks auf Leiste/Auswahl sind kein Klick ins Leere –
                     // sonst schloesse "Widget" seine Auswahl gleich wieder
-                    // und jeder Knopf hoebe die Auswahl auf
-                    if (stage.onUi(x, y))
+                    // und jeder Knopf hoebe die Auswahl auf. overUi deckt auch
+                    // offene Listen (Popups ausserhalb der Grenzen) ab
+                    if (stage.overUi || stage.onUi(x, y))
                         return;
                     for (const child of stage.children)
                         if (typeof child.owns === "function" && child.owns(x, y))

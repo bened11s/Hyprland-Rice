@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Shapes
 
 import qs
+import qs.modules.services.system
 import qs.modules.widgets
 
 // Akku-Ring fuer die angedockte Notch (notch.batteryStyle "ring") – das
@@ -178,6 +179,7 @@ Item {
         bodyHeight: 7
         percent: ring.percent
         charging: ring.charging
+        animate: Power.activelyCharging
         fg: Colors.alpha(Colors.fgBackground, 0.75)
     }
 }

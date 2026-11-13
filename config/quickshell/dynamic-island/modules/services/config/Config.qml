@@ -37,9 +37,12 @@ Singleton {
     readonly property alias sounds: adapter.sounds
     readonly property alias bluetooth: adapter.bluetooth
     readonly property alias battery: adapter.battery
+    readonly property alias system: adapter.system
 
     // Schrift fuer alle Texte der Shell (Icons behalten Material Symbols)
     readonly property string font: adapter.appearance.font
+    // Grosse Ziffern (Desktop-Widgets): Inter hat dafuer einen eigenen Schnitt
+    readonly property string displayFont: font === "Inter" && Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : font
 
     // Klartext zu den Schluesseln. Steht hier neben den Vorgaben, damit eine
     // neue Einstellung an einer einzigen Stelle entsteht: Default eintragen,
@@ -78,27 +81,57 @@ Singleton {
             title: "Akku von", group: "Anzeige", page: "battery", source: "batteries", requires: "bar.battery",
             desc: "Automatisch = Systemakku, sonst der schwächste Geräte-Akku"
         },
-        // Anzeigen in der eingeklappten Notch (nur Notch-Layout)
-        "notch.workspaces": {
-            group: "Anzeigen",
-            title: "Workspaces in der Notch",
-            requires: { "appearance.layout": "notch" }
+        // Welche Elemente die Leiste zeigt. "insel": alle Pillen. "notch": nur
+        // die Notch, angedockt an der Oberkante (Bar.qml und Notch.qml lesen das).
+        // Steht auf der Seite der Notch (page), gespeichert unter appearance.
+        "appearance.layout": {
+            page: "notch",
+            title: "Layout",
+            desc: "Insel: alle Pillen. Notch: nur die angedockte Notch oben in der Mitte",
+            options: ["insel", "notch"]
         },
-        "notch.date": {
-            group: "Anzeigen",
-            title: "Datum in der Notch",
-            requires: { "appearance.layout": "notch" }
-        },
-        "notch.media": {
-            group: "Anzeigen",
-            title: "Cover in der Notch",
-            requires: { "appearance.layout": "notch" }
-        },
-        "notch.visualizer": {
-            group: "Anzeigen",
-            title: "Visualiser in der Notch",
-            requires: { "appearance.layout": "notch" }
-        },
+        // Was die Notch zeigt (nur Notch-Layout). Titel ohne "in der Notch":
+        // die Seite heisst schon so
+        "notch.clock": { title: "Uhr", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.workspaces": { title: "Workspaces", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.date": { title: "Datum", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.media": { title: "Cover", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.visualizer": { title: "Visualiser", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.messages": { title: "Nachrichten-Zähler", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.record": { title: "Aufnahme-Punkt", group: "Eingeklappt", requires: { "appearance.layout": "notch" } },
+        // Aufgeklappte Uebersicht (Hover-Karte)
+        "notch.hoverOpen": { title: "Beim Hovern aufklappen", group: "Aufgeklappt", requires: { "appearance.layout": "notch" }, desc: "Sonst per Klick" },
+        "notch.calendar": { title: "Kalender", group: "Aufgeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.nowPlaying": { title: "Jetzt läuft", group: "Aufgeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.stats": { title: "Systemwerte", group: "Aufgeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.batteries": { title: "Geräte-Akkus", group: "Aufgeklappt", requires: { "appearance.layout": "notch" } },
+        "notch.bell": { title: "Glocke", group: "Aufgeklappt", requires: { "appearance.layout": "notch" } },
+        // Seiten zum Blaettern (LauncherState.views): Schalter fuer die ganze
+        // Karte, › oeffnet ihre Unterseite (meta.sub, Titel in
+        // SettingsCard.pageTitles) mit den einzelnen Teilen. Die Medien- und
+        // System-Karte teilen sich die Insel-Pillen; dort gelten die
+        // Teil-Schalter nicht (MediaViewPanel/SystemPanel reichen sie durch).
+        // Eine Seite ohne sichtbaren Teil faellt aus dem Blaettern
+        "notch.pageMedia": { title: "Medien", group: "Seiten", sub: "notch-media", requires: { "appearance.layout": "notch" } },
+        "notch.pageControl": { title: "Steuerung", group: "Seiten", sub: "notch-control", requires: { "appearance.layout": "notch" } },
+        "notch.pageNotifications": { title: "Benachrichtigungen", group: "Seiten", sub: "notch-notifications", requires: { "appearance.layout": "notch" } },
+        "notch.pageSystem": { title: "System", group: "Seiten", sub: "notch-system", requires: { "appearance.layout": "notch" } },
+        "notch.mediaSources": { title: "Quellenwahl", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.mediaCover": { title: "Cover", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.mediaRing": { title: "Visualiser-Ring", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true, "notch.mediaCover": true } },
+        "notch.mediaTitle": { title: "Titel", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.mediaProgress": { title: "Fortschritt", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.mediaControls": { title: "Bedienknöpfe", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.mediaQueue": { title: "Warteschlange", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
+        "notch.controlTray": { title: "Tray-Symbole", group: "Anzeigen", page: "notch-control", requires: { "appearance.layout": "notch", "notch.pageControl": true } },
+        "notch.notifTools": { title: "Werkzeugleiste", desc: "Nicht stören, Alle löschen", group: "Anzeigen", page: "notch-notifications", requires: { "appearance.layout": "notch", "notch.pageNotifications": true } },
+        "notch.sysCpu": { title: "CPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysGpu": { title: "GPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysVram": { title: "VRAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysRam": { title: "RAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysDisk": { title: "Platte", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysTemps": { title: "Weitere Temperaturen", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysThrottle": { title: "Drosselungs-Hinweis", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
         // Akku in der eingeklappten Notch: Batterie neben der Uhr oder Ring
         // innen am Rand mit Batterie unten in der Mitte (NotchBatteryRing)
         "notch.batteryStyle": {
@@ -120,37 +153,36 @@ Singleton {
             labels: { "system": "Nur Systemakku vor Visualiser", "akku": "Akku vor Visualiser", "visualiser": "Visualiser vor Akku" },
             requires: { "appearance.layout": "notch" }
         },
-        "notch.messages": {
-            group: "Anzeigen",
-            title: "Nachrichten-Zaehler",
-            requires: { "appearance.layout": "notch" }
-        },
         // Stil-Varianten der Notch-Anzeigen. `preview` zeigt im Menue statt
         // Text-Chips eine kleine Vorschau der Variante (SettingsRow -> StylePreview)
         "notch.clockStyle": {
             group: "Stile",
             title: "Uhr-Stil",
             options: ["digital", "split", "analog"], preview: "clock",
-            requires: { "appearance.layout": "notch" }
+            requires: "notch.clock"
         },
         "notch.workspaceStyle": {
             group: "Stile",
             title: "Workspace-Stil",
             options: ["staebchen", "punkte", "zahlen"], preview: "workspaces",
+            labels: { "staebchen": "Stäbchen" },
             requires: "notch.workspaces"
         },
         "notch.visualizerStyle": {
             group: "Stile",
             title: "Visualiser-Stil",
             options: ["spiegel", "saeulen", "punkte", "welle"], preview: "visualizer",
+            labels: { "saeulen": "Säulen" },
             requires: "notch.visualizer"
         },
         // Medienansicht (MediaPanel)
         "media.cover": {
-            title: "Cover",
+            group: "Darstellung", page: "notch-media",
+            title: "Cover-Stil",
             options: ["rund", "vinyl"]
         },
         "media.lyrics": {
+            group: "Darstellung", page: "notch-media",
             title: "Songtexte", desc: "Spotify-Extension, sonst lrclib.net"
         },
         // Sperrbildschirm (modules/lock)
@@ -173,7 +205,7 @@ Singleton {
         // Sichtbarkeit von Uhr/Karte steht im Anordnungs-Editor (lock.layout
         // hidden); der alte Schalter gilt nur noch als Vorgabe dafuer
         "lock.media": { title: "Medien-Karte", hidden: true },
-        "lock.notifications": { title: "Nachrichten-Zaehler" },
+        "lock.notifications": { title: "Nachrichten-Zähler" },
         "lock.layout": { title: "Anordnung", editor: "lock" },
         // Inaktivitaet (services/idle), ersetzt hypridle
         "idle.enabled": { title: "Automatisch sperren", group: "Sperren" },
@@ -211,24 +243,40 @@ Singleton {
         "sounds.lock": { title: "Sperren und Entsperren", group: "Anlässe", requires: "sounds.enabled" },
         "sounds.bluetooth": { title: "Bluetooth verbunden/getrennt", group: "Anlässe", requires: "sounds.enabled" },
         "sounds.library": { title: "Eigene Klänge", group: "Eigene Klänge", editor: "sounds" },
+        // Seite System (SystemEditor): Rechnerdaten, Auslastung und Updates
+        // aus services/system/SystemInfo.qml – `info` ist nur der Anker
+        "system.info": { title: "System", desc: "Shell-Version, Updates und Rechner", editor: "system" },
+        // Konto (AccountEditor): Profilbild, Name, Passwort ueber AccountsService
+        "account.profile": { title: "Konto", editor: "account" },
+        "system.updateCheckHours": {
+            title: "Im Hintergrund nach Shell-Updates suchen alle", group: "Update-Suche", desc: "git fetch im Repo der Shell; 0 = nur bei offener Ansicht",
+            min: 0, max: 24, step: 1, unit: "h"
+        },
         "battery.history": { title: "Akkuverlauf", editor: "battery" },
         // Tastenkuerzel (KeybindsEditor): Daten in keybinds.json, siehe
         // services/hypr/Keybinds.qml – hier nur der Anker der Seite
         "keybinds.editor": { title: "Tastenkürzel", editor: "keybinds" },
+        // Monitore (MonitorsEditor): Regeln in monitors.json/.lua, siehe
+        // services/hypr/Monitors.qml – hier nur der Anker der Seite
+        "monitors.editor": { title: "Monitore", editor: "monitors" },
         "battery.warnLow": { title: "Warnung bei schwachem Akku", group: "Meldungen", min: 0, max: 50, step: 5, unit: "%", desc: "0 = aus" },
         "battery.warnCritical": { title: "Warnung bei fast leerem Akku", group: "Meldungen", min: 0, max: 20, step: 1, unit: "%", desc: "0 = aus" },
         "battery.notifyFull": { title: "Meldung bei vollem Akku", group: "Meldungen" },
         "battery.kdeconnect": { title: "Handy über KDE Connect", group: "Quellen" },
         "battery.novabase": { title: "Headset über novabase", group: "Quellen" },
         "media.queueOpen": {
+            group: "Darstellung", page: "notch-media",
             title: "Warteschlange offen", desc: "Die ganze Spotify-Warteschlange zeigen statt nur vorigem und nächstem Titel"
         },
         "bar.batteryPulse": { title: "Akku-Ladeimpuls", group: "Anzeige", page: "battery", requires: "bar.battery" },
         "notifications.dnd": { title: "Nicht stören" },
+        // Anbieter-Register (VpnEditor): eingebaute plus eigene aus vpn.custom
         "vpn.provider": {
             title: "VPN-Anbieter",
-            options: ["nordvpn", "cloudflare"]
+            desc: "Eingebaute Anbieter oder eigene Befehle",
+            editor: "vpn"
         },
+        "vpn.custom": { hidden: true },
         "notifications.peekSeconds": {
             title: "Anzeigedauer",
             min: 2, max: 15, step: 1, unit: "s", requires: "bar.notifications"
@@ -236,7 +284,7 @@ Singleton {
         // Sprache der Oberflaeche (I18n.qml). `labels` zeigt statt des Werts
         // einen Namen – Sprachnamen stehen immer in ihrer eigenen Sprache
         "appearance.language": {
-            group: "Sprache und Schrift",
+            page: "region",
             title: "Sprache",
             options: ["en", "de"],
             labels: { "en": "English", "de": "Deutsch" }
@@ -244,45 +292,46 @@ Singleton {
         // `options` macht aus der Zeile eine Auswahl. Nicht installierte
         // Schriften blendet das Menue aus.
         "appearance.font": {
-            group: "Sprache und Schrift",
+            group: "Oberfläche",
             title: "Schriftart",
-            options: ["SF Pro", "SF Pro Rounded", "Inter", "Noto Sans", "Adwaita Sans", "Fira Sans", "Cantarell"]
-        },
-        // Welche Elemente die Leiste zeigt. "insel": alle Pillen. "notch": nur
-        // die Notch, angedockt an der Oberkante (Bar.qml und Notch.qml lesen das).
-        "appearance.layout": {
-            group: "Form",
-            title: "Layout",
-            desc: "Insel: alle Pillen. Notch: nur die angedockte Notch oben in der Mitte",
-            options: ["insel", "notch"]
+            options: ["Rubik", "Inter", "SF Pro", "SF Pro Rounded", "Adwaita Sans", "Open Sans", "Fira Sans", "Noto Sans", "Cantarell"]
         },
         // Nachschwingen der Pillen beim Aufklappen (siehe Appearance.qml)
         "appearance.bounce": {
-            group: "Animation",
+            group: "Bewegung",
             title: "Nachschwingen",
             options: ["aus", "leicht", "mittel", "stark"]
         },
         "appearance.speed": {
-            group: "Animation",
+            group: "Bewegung",
             title: "Animationstempo",
             min: 0.5, max: 2, step: 0.1, unit: "x"
         },
+        // Deckkraft der Karten und Pillen (Surface.qml); die Notch bleibt schwarz
+        "appearance.transparency": {
+            group: "Oberfläche",
+            title: "Transparenz",
+            min: 0, max: 60, step: 5, unit: "%"
+        },
         "appearance.radius": {
-            group: "Form",
+            group: "Oberfläche",
             title: "Eckenrundung",
             min: 8, max: 28, step: 1, unit: "px"
         },
-        "appearance.shadow": { title: "Schatten", group: "Form" },
-        "appearance.opacity": { title: "Deckkraft", desc: "Transparenz der Shell-Flaechen, Text bleibt deckend", group: "Form", min: 0.65, max: 1, step: 0.05 },
-        "appearance.clock": { title: "Uhrzeit", group: "Sprache und Schrift", options: ["24h", "12h"] },
+        "appearance.shadow": { title: "Schatten", group: "Oberfläche" },
+        "appearance.opacity": { title: "Deckkraft", desc: "Transparenz der Shell-Flaechen, Text bleibt deckend", group: "Oberfläche", min: 0.65, max: 1, step: 0.05 },
+        "appearance.clock": { title: "Uhrzeit", page: "region", options: ["24h", "12h"], labels: { "24h": "24 Stunden", "12h": "12 Stunden" } },
+        // Kopf der Seite Aussehen (modules/settings/wallpaper/WallpaperHero.qml):
+        // das gesetzte Bild gross, Knoepfe Wallpaper/Farben – nur Anker
+        "wallpaper.hero": { title: "Wallpaper", editor: "wallpaperhero" },
         // Uebergang beim Wallpaperwechsel (modules/window/WallpaperStage.qml)
         "wallpaper.transition": {
-            group: "Animation",
+            group: "Wechsel",
             title: "Übergang",
             options: ["blende", "wischen", "schieben", "kreis", "zoom", "aus", "zufall"]
         },
         "wallpaper.duration": {
-            group: "Animation",
+            group: "Wechsel",
             title: "Dauer",
             min: 200, max: 2000, step: 100, unit: "ms"
         },
@@ -328,7 +377,7 @@ Singleton {
 
     // Reihenfolge und Symbole der Gruppen im Menue (Material-Symbols-Namen).
     // Gruppen, die hier fehlen, haengt das Menue hinten an.
-    readonly property var sectionOrder: ["bar", "battery", "quick", "bluetooth", "osd", "notch", "media", "lock", "idle", "sounds", "keybinds", "appearance", "wallpaper", "notifications", "vpn"]
+    readonly property var sectionOrder: ["bar", "battery", "quick", "bluetooth", "osd", "notch", "media", "lock", "idle", "sounds", "keybinds", "monitors", "system", "account", "appearance", "wallpaper", "notifications", "vpn"]
     readonly property var sectionIcons: ({
         "bar": "space_dashboard",
         "battery": "battery_horiz_075",
@@ -341,10 +390,13 @@ Singleton {
         "idle": "bedtime",
         "sounds": "notifications_active",
         "keybinds": "keyboard",
+        "monitors": "desktop_windows",
+        "system": "monitoring",
         "appearance": "palette",
         "wallpaper": "wallpaper_slideshow",
         "notifications": "notifications",
-        "vpn": "vpn_key"
+        "vpn": "vpn_key",
+        "account": "account_circle"
     })
 
     readonly property var sectionMeta: ({
@@ -362,7 +414,10 @@ Singleton {
         "lock": "Sperrbildschirm",
         "idle": "Inaktivität",
         "sounds": "Klänge",
-        "keybinds": "Tastenkürzel"
+        "keybinds": "Tastenkürzel",
+        "monitors": "Monitore",
+        "system": "System",
+        "account": "Konto"
     })
 
     // Die Datei als einfaches Objekt – daraus baut das Einstellungs-Fenster
@@ -577,7 +632,7 @@ Singleton {
             property JsonObject appearance: JsonObject {
                 // "en" oder "de" (I18n.qml); install.sh setzt es beim Einrichten
                 property string language: "en"
-                property string font: "SF Pro"
+                property string font: "Rubik"
                 property string bounce: "mittel"
                 property string layout: "insel"
                 // Faktor auf Appearance.morphDuration (2 = doppelt so schnell)
@@ -585,16 +640,23 @@ Singleton {
                 property real opacity: 1.0
                 property int radius: 20
                 property bool shadow: true
+                // 0 = deckend, 60 = stark durchscheinend (Prozent)
+                property int transparency: 0
                 property string clock: "24h"
             }
 
             property JsonObject vpn: JsonObject {
                 property string provider: "nordvpn"
+                // Eigene Anbieter (services/vpn/Vpn.qml), je Eintrag
+                // { id, name, icon, connect, disconnect, status, connectedRegex }
+                property var custom: []
             }
 
             // Wallpaperwechsel: Animation und ihre Dauer in ms, dazu der
             // Zufallsmodus (aus | start | timer) samt Abstand und Auswahl
             property JsonObject wallpaper: JsonObject {
+                // Nur Anker fuer den Kopf der Seite (WallpaperHero)
+                property string hero: ""
                 property string transition: "kreis"
                 property int duration: 800
                 property string random: "aus"
@@ -619,10 +681,38 @@ Singleton {
 
             // Was die eingeklappte Notch im Notch-Layout zeigt
             property JsonObject notch: JsonObject {
+                property bool clock: true
                 property bool workspaces: true
                 property bool date: true
                 property bool media: true
                 property bool visualizer: true
+                property bool record: true
+                property bool hoverOpen: true
+                property bool calendar: true
+                property bool nowPlaying: true
+                property bool stats: true
+                property bool batteries: true
+                property bool bell: true
+                property bool pageMedia: true
+                property bool pageControl: true
+                property bool pageNotifications: true
+                property bool pageSystem: true
+                property bool mediaSources: true
+                property bool mediaCover: true
+                property bool mediaRing: true
+                property bool mediaTitle: true
+                property bool mediaProgress: true
+                property bool mediaControls: true
+                property bool mediaQueue: true
+                property bool controlTray: true
+                property bool notifTools: true
+                property bool sysCpu: true
+                property bool sysGpu: true
+                property bool sysVram: true
+                property bool sysRam: true
+                property bool sysDisk: true
+                property bool sysTemps: true
+                property bool sysThrottle: true
                 // "symbol" | "ring"
                 property string batteryStyle: "symbol"
                 // "system" | "akku" | "visualiser"
@@ -697,6 +787,12 @@ Singleton {
                 property string editor: ""
             }
 
+            // Seite "Monitore": nur Anker fuer den Editor (MonitorsEditor);
+            // die Regeln liegen in ~/.local/state/dynamic-island/monitors.json
+            property JsonObject monitors: JsonObject {
+                property string editor: ""
+            }
+
             // Seite "Akku": nur Anker fuer den Verlauf (BatteryHistoryEditor);
             // die Daten schreibt upowerd nach /var/lib/upower
             property JsonObject battery: JsonObject {
@@ -713,6 +809,18 @@ Singleton {
             // Aufbau der Schnelleinstellungen (Settings-Karte): je Eintrag eine
             // Reihe, Kachel-IDs mit Komma getrennt (siehe QuickLayout.qml).
             // Was hier fehlt, ist ausgeblendet.
+            // Seite "System": Anker fuer den Editor (SystemEditor) und die
+            // Update-Pruefung der Shell selbst (services/system/ShellUpdate.qml)
+            property JsonObject account: JsonObject {
+                property string profile: ""
+            }
+
+            property JsonObject system: JsonObject {
+                property string info: ""
+                // Stunden zwischen Hintergrund-Pruefungen (git fetch), 0 = aus
+                property int updateCheckHours: 12
+            }
+
             // Regler am rechten Bildschirmrand (modules/osd/Osd.qml)
             property JsonObject osd: JsonObject {
                 property bool enabled: true

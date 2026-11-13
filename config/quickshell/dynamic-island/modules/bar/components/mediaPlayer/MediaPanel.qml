@@ -26,6 +26,14 @@ Item {
     // Themes mit einer vom Cover eingefaerbten Karte.
     property color tint: Colors.background
     property real padding: 14
+    // Teile ein-/ausblenden (Notch-Medienseite: Config.notch.media*)
+    property bool showSources: true
+    property bool showCover: true
+    property bool showRing: true
+    property bool showTitle: true
+    property bool showProgress: true
+    property bool showControls: true
+    property bool showQueue: true
 
     // Cover samt Ring fuellen die Karte bis auf den Rand. Die Rechnung laeuft
     // von aussen nach innen: das Aussenmass steht fest (Kartenbreite minus
@@ -69,96 +77,53 @@ Item {
         // Eigene Karte mit abgesetztem Grund und Rand: das ist der einzige
         // Teil, der den Zustand des Players aendert, statt ihn nur
         // anzuzeigen – das darf man sehen.
-        Rectangle {
+        // Im Layout steht nur die Kopfzeile; die aufgeklappte Liste legt sich
+        // ueber das Cover, statt alles darunter nach unten zu schieben.
+        Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: sources.implicitHeight + 8
+            Layout.preferredHeight: 32
+            visible: panel.showSources
+            z: 1
 
-            radius: 10
-            color: Colors.shade(panel.tint, 0.05)
-            border.width: 1
-            border.color: Colors.alpha(Colors.outline, 0.4)
+            Rectangle {
+                width: parent.width
+                height: sources.implicitHeight + 8
 
-            ColumnLayout {
-                id: sources
+                radius: 10
+                // offen deckend, sonst scheint das Cover durch die Liste
+                color: Colors.alpha(Colors.shade(panel.tint, 0.05), sources.open ? 1 : panel.tint.a)
+                border.width: 1
+                border.color: Colors.alpha(Colors.outline, 0.4)
 
-                property bool open: false
-
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    margins: 4
-                }
-                spacing: 0
-
-                // Kopfzeile: zeigt die aktuelle Quelle, klappt die Liste auf
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 24
-
-                    radius: 8
-                    color: sourceHover.hovered ? Colors.shade(panel.tint, 0.11) : "transparent"
-
-                    Behavior on color {
-                        ColorAnimation { duration: 140 }
-                    }
-
-                    Text {
-                        font.family: Config.font
-                        anchors {
-                            left: parent.left
-                            leftMargin: 8
-                            verticalCenter: parent.verticalCenter
-                        }
-                        width: parent.width - 32
-
-                        text: Media.source || I18n.tr("Keine Quelle")
-                        color: Colors.fgBackground
-                        font.pixelSize: 10
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        anchors {
-                            right: parent.right
-                            rightMargin: 8
-                            verticalCenter: parent.verticalCenter
-                        }
-
-                        text: sources.open ? "keyboard_arrow_up" : "keyboard_arrow_down"
-                        color: Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 14
-                    }
-
-                    HoverHandler {
-                        id: sourceHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: sources.open = !sources.open
-                    }
+                // schluckt Klicks, damit nichts unter der Liste reagiert
+                MouseArea {
+                    anchors.fill: parent
                 }
 
-                // Die Liste. Sie zaehlt in die implicitHeight, dadurch
-                // waechst die Karte beim Aufklappen von selbst mit.
-                Repeater {
-                    model: sources.open ? Media.players : null
+                ColumnLayout {
+                    id: sources
 
-                    delegate: Rectangle {
-                        id: entry
+                    property bool open: false
 
-                        required property var modelData
-                        readonly property bool current: Media.active === entry.modelData
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        margins: 4
+                    }
+                    spacing: 0
 
+                    // Kopfzeile: zeigt die aktuelle Quelle, klappt die Liste auf
+                    Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 22
+                        Layout.preferredHeight: 24
 
                         radius: 8
-                        color: entryHover.hovered ? Colors.shade(panel.tint, 0.11) : "transparent"
+                        color: sourceHover.hovered ? Colors.shade(panel.tint, 0.11) : "transparent"
+
+                        Behavior on color {
+                            ColorAnimation { duration: 140 }
+                        }
 
                         Text {
                             font.family: Config.font
@@ -167,40 +132,98 @@ Item {
                                 leftMargin: 8
                                 verticalCenter: parent.verticalCenter
                             }
-                            width: parent.width - 30
+                            width: parent.width - 32
 
-                            text: Media.identityOf(entry.modelData)
-                            color: entry.current ? Colors.primary : Colors.fgSurfaceVariant
+                            text: Media.source || I18n.tr("Keine Quelle")
+                            color: Colors.fgBackground
                             font.pixelSize: 10
-                            font.weight: Font.Medium
+                            font.weight: Font.DemiBold
                             elide: Text.ElideRight
                         }
 
-                        // Punkt = spielt gerade
-                        Rectangle {
+                        Text {
                             anchors {
                                 right: parent.right
-                                rightMargin: 10
+                                rightMargin: 8
                                 verticalCenter: parent.verticalCenter
                             }
-                            visible: entry.modelData.isPlaying
 
-                            width: 5
-                            height: 5
-                            radius: 2.5
-                            color: Colors.primary
+                            text: sources.open ? "keyboard_arrow_up" : "keyboard_arrow_down"
+                            color: Colors.fgSurfaceVariant
+                            font.family: "Material Symbols Outlined"
+                            font.pixelSize: 14
                         }
 
                         HoverHandler {
-                            id: entryHover
+                            id: sourceHover
 
                             cursorShape: Qt.PointingHandCursor
                         }
 
                         TapHandler {
-                            onTapped: {
-                                Media.select(entry.modelData);
-                                sources.open = false;
+                            onTapped: sources.open = !sources.open
+                        }
+                    }
+
+                    // Die Liste. Sie zaehlt in die implicitHeight, dadurch
+                    // waechst die Karte beim Aufklappen von selbst mit.
+                    Repeater {
+                        model: sources.open ? Media.players : null
+
+                        delegate: Rectangle {
+                            id: entry
+
+                            required property var modelData
+                            readonly property bool current: Media.active === entry.modelData
+
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+
+                            radius: 8
+                            color: entryHover.hovered ? Colors.shade(panel.tint, 0.11) : "transparent"
+
+                            Text {
+                                font.family: Config.font
+                                anchors {
+                                    left: parent.left
+                                    leftMargin: 8
+                                    verticalCenter: parent.verticalCenter
+                                }
+                                width: parent.width - 30
+
+                                text: Media.identityOf(entry.modelData)
+                                color: entry.current ? Colors.primary : Colors.fgSurfaceVariant
+                                font.pixelSize: 10
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                            }
+
+                            // Punkt = spielt gerade
+                            Rectangle {
+                                anchors {
+                                    right: parent.right
+                                    rightMargin: 10
+                                    verticalCenter: parent.verticalCenter
+                                }
+                                visible: entry.modelData.isPlaying
+
+                                width: 5
+                                height: 5
+                                radius: 2.5
+                                color: Colors.primary
+                            }
+
+                            HoverHandler {
+                                id: entryHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                onTapped: {
+                                    Media.select(entry.modelData);
+                                    sources.open = false;
+                                }
                             }
                         }
                     }
@@ -213,12 +236,14 @@ Item {
             Layout.preferredWidth: (panel.ringRadius + panel.ringMax) * 2
             Layout.preferredHeight: (panel.ringRadius + panel.ringMax) * 2
             Layout.alignment: Qt.AlignHCenter
+            visible: panel.showCover
 
             // Der Ring: ein Balken je cava-Band, im Kreis angeordnet.
             // Jeder sitzt auf seinem Winkel und waechst nach aussen,
             // deshalb liegt der Mittelpunkt bei Radius + halbe Laenge.
             Repeater {
-                model: Cava.bars
+                // Aus: keine Balken, statt unsichtbare weiterzurechnen
+                model: panel.showRing ? Cava.bars : 0
 
                 delegate: Rectangle {
                     id: spike
@@ -340,6 +365,7 @@ Item {
         Text {
             font.family: Config.font
             Layout.fillWidth: true
+            visible: panel.showTitle
 
             text: Media.title || I18n.tr("Nichts")
             color: Colors.fgBackground
@@ -353,7 +379,7 @@ Item {
             font.family: Config.font
             Layout.fillWidth: true
             Layout.topMargin: -8
-            visible: text !== ""
+            visible: panel.showTitle && text !== ""
 
             text: Media.artist
             color: Colors.fgSurfaceVariant
@@ -367,6 +393,7 @@ Item {
         // Abgelaufene Zeit links, Gesamtlaenge rechts, der Slider dazwischen.
         RowLayout {
             Layout.fillWidth: true
+            visible: panel.showProgress
             spacing: 8
 
             Text {
@@ -443,6 +470,7 @@ Item {
         // ---- Transport ----
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
+            visible: panel.showControls
             spacing: 14
 
             MediaButton {
@@ -537,7 +565,7 @@ Item {
         Item {
             id: queue
 
-            readonly property bool shown: MediaQueue.valid
+            readonly property bool shown: panel.showQueue && MediaQueue.valid
                                           && (!!MediaQueue.previous || !!MediaQueue.upcoming)
             // Weitere Titel nach "Als Naechstes"
             readonly property int more: Math.max(0, MediaQueue.next.length - 1)

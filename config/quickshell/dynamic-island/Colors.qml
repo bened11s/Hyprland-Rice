@@ -187,6 +187,6 @@ Singleton {
     // Farbe aufhellen (f > 0) bzw. abdunkeln (f < 0), z.B. Colors.shade(Colors.background, 0.06)
     function shade(c: color, f: real): color {
         return Qt.hsla(c.hslHue, c.hslSaturation,
-                       Math.max(0, Math.min(1, c.hslLightness + f)), 1);
+                       Math.max(0, Math.min(1, c.hslLightness + f)), c.a);
     }
 }

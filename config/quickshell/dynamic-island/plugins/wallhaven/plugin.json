@@ -7,7 +7,7 @@
     "author": "Gamecat",
     "icon": "travel_explore",
     "homepage": "https://wallhaven.cc",
-    "description": "Wallhaven-Suche in der Wallpaper-Auswahl, Download nach Wallpapers/Wallhaven. SUPER+ALT+W oder Strg+W in der Auswahl.",
+    "description": "Wallhaven-Suche in der Wallpaper-Auswahl",
     "defaultEnabled": true,
     "main": "Main.qml",
     "migrateFrom": "wallhaven",
@@ -26,7 +26,8 @@
         "sorting": {
             "default": "top",
             "title": "Sortierung",
-            "options": ["relevanz", "neu", "zufall", "views", "favoriten", "top"]
+            "options": ["relevanz", "neu", "zufall", "views", "favoriten", "top"],
+            "labels": { "views": "Aufrufe" }
         },
         "topRange": {
             "default": "1 Monat",
@@ -37,23 +38,26 @@
         "purity": {
             "default": "sfw",
             "title": "Inhalt",
-            "desc": "sfw: nur jugendfrei. sketchy: dazu Grenzfälle (NSFW nur mit API-Key: python3 -I wallhaven.py key <KEY> im Plugin-Ordner)",
-            "options": ["sfw", "sfw+sketchy"]
+            "options": ["sfw", "sfw+sketchy"],
+            "labels": { "sfw": "Jugendfrei", "sfw+sketchy": "Mit Grenzfällen" }
         },
         "categories": {
             "default": "alle",
             "title": "Kategorien",
-            "options": ["alle", "general", "anime", "people", "general+anime"]
+            "options": ["alle", "general", "anime", "people", "general+anime"],
+            "labels": { "general": "Allgemein", "anime": "Anime", "people": "Personen", "general+anime": "Allgemein + Anime" }
         },
         "atleast": {
             "default": "aus",
             "title": "Mindestauflösung",
-            "options": ["aus", "1920x1080", "2560x1440", "3840x2160"]
+            "options": ["aus", "1920x1080", "2560x1440", "3840x2160"],
+            "labels": { "1920x1080": "1920 × 1080", "2560x1440": "2560 × 1440", "3840x2160": "3840 × 2160" }
         },
         "ratios": {
             "default": "alle",
             "title": "Seitenverhältnis",
-            "options": ["alle", "16x9", "16x10", "21x9"]
+            "options": ["alle", "16x9", "16x10", "21x9"],
+            "labels": { "16x9": "16:9", "16x10": "16:10", "21x9": "21:9" }
         }
     }
 }

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 import qs
+import qs.modules.services.config
 import qs.modules.bar.components.stats
 
 // Untermenue "System" der Notch: dieselbe Karte wie die System-Pille.
@@ -19,5 +20,12 @@ ViewPanel {
         id: card
 
         width: parent.width
+        showCpu: Config.notch.sysCpu
+        showGpu: Config.notch.sysGpu
+        showVram: Config.notch.sysVram
+        showRam: Config.notch.sysRam
+        showDisk: Config.notch.sysDisk
+        showTemps: Config.notch.sysTemps
+        showThrottle: Config.notch.sysThrottle
     }
 }

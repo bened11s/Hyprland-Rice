@@ -113,7 +113,7 @@ Item {
         borderColor: root.borderColor
         // Eingeklappt der normale Theme-Grund, ausgeklappt der Ton des Covers
         // (und darueber dessen unscharfes Bild, siehe unten).
-        baseColor: root.expanded ? root.cardColor : Colors.background
+        baseColor: root.expanded ? root.cardColor : Colors.alpha(Colors.background, Appearance.surfaceAlpha)
 
         Behavior on baseColor {
             ColorAnimation { duration: 400 }

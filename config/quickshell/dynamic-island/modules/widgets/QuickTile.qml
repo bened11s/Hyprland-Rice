@@ -46,6 +46,8 @@ Rectangle {
     property color accent: Colors.primary
     property color onAccent: Colors.fgPrimary
 
+    // Ein Kachel-Menue liegt darueber (SettingsTiles setzt das)
+    property bool blocked: false
     // false = die Kachel togglet nicht selbst (eigener TapHandler im Plugin)
     property bool tapEnabled: true
     signal toggled()
@@ -131,7 +133,7 @@ Rectangle {
     }
 
     TapHandler {
-        enabled: tile.tapEnabled
+        enabled: tile.tapEnabled && !tile.blocked
         onTapped: tile.toggled()
     }
 

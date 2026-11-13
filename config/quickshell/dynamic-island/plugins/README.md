@@ -88,8 +88,9 @@ the tile editor under "Hidden". Component contract: see "Tiles" below.
 ```
 
 Adds a section to one of the shell's views, at most one per view per plugin.
-The only view so far: `wallpaper`, the notch's wallpaper picker (expands below
-the local row and the style row). `icon` (default: plugin icon) becomes a
+Views: `wallpaper`, the notch's wallpaper picker (expands below the local row
+and the style row), and `notch`, a whole view of its own in the notch (see
+"Notch views" below). `icon` (default: plugin icon) becomes a
 button in its search bar. If the plugin has a service (`main`), the section
 only appears once it is running. Component contract: "Sections" below.
 
@@ -398,6 +399,37 @@ preview back. So a section never calls `Wallpapers.stopPreview()` itself – at
 most the service does in `onDisable()`, if the background is currently
 showing one of its images. When the section sets a wallpaper, it closes the
 picker with `LauncherState.close()` (or `host.close()`).
+
+## Notch views
+
+`panels.notch` gives a plugin a view of its own in the notch card, next to
+the built-in ones (launcher, wallpaper picker, power menu …). Open it with
+
+```qml
+LauncherState.showPluginView(LauncherState.focusedScreen(), plugin.id)   // or togglePluginView
+```
+
+(`LauncherState.mode` is then `"plugin"`, `LauncherState.pluginView` the
+plugin id). The notch builds the component only while it is open, gives it
+the keyboard (exclusive) and closes on a click beside the card. Reference:
+`plugins/overview/NotchView.qml`.
+
+```qml
+Item {
+    required property var plugin
+    required property var host          // screen, cardRadius, close()
+
+    implicitWidth: 640                  // the card morphs to this size
+    implicitHeight: 220
+    focus: true
+    Component.onCompleted: forceActiveFocus()
+    Keys.onEscapePressed: host.close()
+}
+```
+
+Note: while the notch (or any layer surface) holds the keyboard exclusively,
+Hyprland ignores focus changes – close first, then dispatch a frame later
+(`plugins/overview/Main.qml`, `closeThen`).
 
 ## Exchange formats
 

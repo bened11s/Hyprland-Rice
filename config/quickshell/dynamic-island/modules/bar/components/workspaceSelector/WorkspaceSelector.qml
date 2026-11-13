@@ -29,7 +29,7 @@ Item {
     property real padding: 14
 
     // Größe einer Monitor-Gruppe. `wsMonitorOffset` in der Hypr-Config vergibt
-    // je 10 am Stück (HDMI-A-1 ab 1, DP-1 ab 11).
+    // je 10 am Stück (erster Monitor ab 1, zweiter ab 11; hypr/monitors.lua).
     property int workspacesPerMonitor: Math.max(1, Math.min(10, Config.bar.workspaceCount))
 
     // Der Monitor, auf dem DIESE Leiste sitzt – bewusst nicht der fokussierte.

@@ -11,7 +11,9 @@ Die Shell ruft das per Process auf und liest NDJSON von stdout:
   fetch    -> {"type": "preview", "id": …, "path": JPG}: Vollbild in den Cache,
               auf Bildschirmbreite verkleinert (Vorschau in voller Qualitaet)
   download -> {"type": "done", "id": …, "path": PFAD} bzw. {"type": "error", …};
-              nimmt das Original aus dem fetch-Cache, wenn es schon da ist
+              nimmt das Original aus dem fetch-Cache, wenn es schon da ist, und
+              speichert es mit --size in Bildschirmgroesse (fuellend, mittig
+              zugeschnitten) als JPEG
 
 Kein Key noetig (SFW/Sketchy). Ein Key fuer NSFW/eigene Filter kommt aus
 $WALLHAVEN_API_KEY oder ~/.local/state/dynamic-island/plugins/wallhaven/apikey - nicht
@@ -76,15 +78,19 @@ def fetch(url: str, timeout: float = 15) -> bytes:
 
 
 def describe(err: Exception) -> str:
-    from urllib.error import HTTPError
+    """Feste deutsche Meldung – die Shell uebersetzt sie per I18n.tr."""
+    from urllib.error import HTTPError, URLError
 
     if isinstance(err, HTTPError):
         return {
-            401: "API-Key ungueltig",
+            401: "API-Key ungültig",
             404: "Nicht gefunden",
-            429: "Zu viele Anfragen (max. 45/min) - kurz warten",
+            429: "Zu viele Anfragen – kurz warten",
         }.get(err.code, f"HTTP {err.code}")
-    return str(getattr(err, "reason", err))
+    # DNS, Verbindungsabbruch, Timeout: fuer den Nutzer alles dasselbe
+    if isinstance(err, (URLError, TimeoutError, ConnectionError)):
+        return "Keine Verbindung"
+    return str(err)
 
 
 def local_path(item_id: str) -> str | None:
@@ -136,6 +142,29 @@ def shrink(src: Path, dest: Path, width: int) -> Path:
             return dest
     tmp.unlink(missing_ok=True)
     return src
+
+
+def fit(src: Path, dest: Path, size: str) -> bool:
+    """Bringt `src` auf genau `size` (BxH): fuellend skalieren (auch hoch),
+    mittig zuschneiden – der Ausschnitt, den der Bildschirm ohnehin zeigt.
+    Schreibt JPEG nach `dest`; False, wenn weder vips noch magick da sind."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f"{dest.stem}.{os.getpid()}.part.jpg")
+    cmds = [
+        ["vipsthumbnail", str(src), "--size", size, "--smartcrop", "centre", "-o", f"{tmp}[Q=92,strip]"],
+        ["magick", f"{src}[0]", "-resize", f"{size}^", "-gravity", "center", "-extent", size,
+         "-quality", "92", "-strip", str(tmp)],
+    ]
+    for cmd in cmds:
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        if tmp.exists():
+            os.replace(tmp, dest)
+            return True
+    tmp.unlink(missing_ok=True)
+    return False
 
 
 def prune() -> None:
@@ -292,16 +321,19 @@ class Command:
         item_id = self.args.id
         if not (path := local_path(item_id)):
             download_dir.mkdir(parents=True, exist_ok=True)
-            if cached := cached_full(item_id):
-                # Vom fetch schon da: nur umziehen (gleiches Dateisystem = sofort)
+            if not (cached := cached_full(item_id)):
+                url = self.full_url()
+                cached = full_dir / full_name(item_id, url)
+                write_atomic(cached, fetch(url, timeout=120))
+            # In Bildschirmgroesse speichern; ohne vips/magick das Original
+            target = download_dir / f"wallhaven-{item_id}.jpg"
+            if self.args.size and fit(cached, target, self.args.size):
+                cached.unlink(missing_ok=True)
+            else:
                 target = download_dir / cached.name
                 tmp = target.with_name(f"{target.name}.{os.getpid()}.part")
                 shutil.move(cached, tmp)
                 os.replace(tmp, target)
-            else:
-                url = self.full_url()
-                target = download_dir / full_name(item_id, url)
-                write_atomic(target, fetch(url, timeout=120))
             path = str(target)
 
         emit({"type": "done", "id": item_id, "path": path})
@@ -331,6 +363,7 @@ def parse_args() -> Namespace:
     p = cmd.add_parser("download", help="download a wallpaper into the Wallhaven folder")
     p.add_argument("id", help="wallhaven id, e.g. w533px")
     p.add_argument("--url", help="full image url (skips the lookup)")
+    p.add_argument("--size", help="screen size WxH: scale to cover and centre-crop (e.g. 2560x1440)")
 
     p = cmd.add_parser("key", help="store the API key (empty removes it)")
     p.add_argument("value", nargs="?", default="")

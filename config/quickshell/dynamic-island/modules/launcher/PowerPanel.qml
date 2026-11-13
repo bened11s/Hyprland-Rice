@@ -19,21 +19,22 @@ Item {
     readonly property real outerHeight: implicitHeight + inset
     readonly property alias maxOuterHeight: panel.outerHeight
 
+    // `danger`: markiert in der Fehlerfarbe statt in der Akzentfarbe
     readonly property var actions: [
-        { label: "Sperren", icon: "lock", hue: Colors.primary,
+        { label: "Sperren", icon: "lock",
           command: [Quickshell.env("HOME") + "/.config/hypr/scripts/lock.sh"] },
-        { label: "Abmelden", icon: "logout", hue: Colors.secondary,
+        { label: "Abmelden", icon: "logout",
           command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "logout"] },
-        { label: "Standby", icon: "bedtime", hue: Colors.tertiary,
+        { label: "Standby", icon: "bedtime",
           command: ["systemctl", "suspend"] },
-        { label: "Neustart", icon: "restart_alt",
-          hue: Colors.mix(Colors.tertiary, Colors.error, 0.42),
+        { label: "Neustart", icon: "restart_alt", danger: true,
           command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "reboot"] },
-        { label: "Ausschalten", icon: "power_settings_new", hue: Colors.error,
+        { label: "Ausschalten", icon: "power_settings_new", danger: true,
           command: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "poweroff"] }
     ]
 
-    implicitWidth: 760
+    // Etwas breiter als die Blaetter-Seiten (548): Kacheln mit Luft
+    implicitWidth: 660
     implicitHeight: actionArea.height
 
     anchors {
@@ -81,6 +82,9 @@ Item {
         Quickshell.execDetached(command);
     }
 
+    // Eine Gruppe wie die Leiste des Einstellungsfensters: Kacheln 2 px
+    // auseinander, aussen rund, innen fast eckig; markiert = Akzentgrund
+    // mit gefuelltem Symbolkreis.
     Item {
         id: actionArea
 
@@ -89,12 +93,12 @@ Item {
             left: parent.left
             right: parent.right
         }
-        height: 116
+        height: 120
 
         Row {
             anchors.fill: parent
             anchors.margins: 10
-            spacing: 8
+            spacing: 2
 
             Repeater {
                 model: panel.actions
@@ -106,60 +110,58 @@ Item {
                     required property int index
 
                     readonly property bool hovered: panel.current === action.index
+                    readonly property color hue: action.modelData.danger ? Colors.error : Colors.primary
+                    readonly property real outer: Math.min(panel.cardRadius - 4, 16)
 
-                    width: (actionArea.width - 20 - 8 * 4) / 5
+                    width: (actionArea.width - 20 - 2 * (panel.actions.length - 1)) / panel.actions.length
                     height: actionArea.height - 20
-                    radius: Math.min(panel.cardRadius - 5, 13)
-                    color: action.hovered ? Colors.alpha(action.modelData.hue, 0.16)
-                                          : Colors.alpha(Colors.surfaceContainer, 0.55)
-                    border.width: action.hovered ? 1 : 0
-                    border.color: Colors.alpha(action.modelData.hue, 0.62)
-                    scale: action.hovered ? 1.025 : 1
+                    topLeftRadius: action.index === 0 ? action.outer : 6
+                    bottomLeftRadius: action.index === 0 ? action.outer : 6
+                    topRightRadius: action.index === panel.actions.length - 1 ? action.outer : 6
+                    bottomRightRadius: action.index === panel.actions.length - 1 ? action.outer : 6
+                    color: action.hovered ? Colors.alpha(action.hue, 0.18) : Colors.alpha(Colors.fgSurface, 0.04)
 
                     Behavior on color {
                         ColorAnimation { duration: 130 }
                     }
-                    Behavior on border.color {
-                        ColorAnimation { duration: 130 }
-                    }
-                    Behavior on scale {
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-                    }
 
                     Column {
                         anchors.centerIn: parent
-                        spacing: 8
+                        spacing: 10
 
-                        Text {
+                        Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: action.modelData.icon
-                            color: action.hovered ? action.modelData.hue : Colors.fgSurfaceVariant
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 25
-                            font.variableAxes: ({ wght: action.hovered ? 650 : 500 })
+                            width: 38
+                            height: 38
+                            radius: 19
+                            color: action.hovered ? action.hue : Colors.alpha(Colors.fgSurface, 0.06)
 
                             Behavior on color {
                                 ColorAnimation { duration: 130 }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: action.modelData.icon
+                                color: action.hovered ? (action.modelData.danger ? Colors.fgError : Colors.fgPrimary)
+                                                      : Colors.fgSurfaceVariant
+                                font.family: "Material Symbols Outlined"
+                                // Kein FILL-Umschalten: gefuellt rendern bedtime/lock
+                                // mit Loechern (Qt + variable Material Symbols)
+                                font.pixelSize: 20
                             }
                         }
 
                         Text {
-                            font.family: Config.font
                             anchors.horizontalCenter: parent.horizontalCenter
+                            font.family: Config.font
                             text: I18n.tr(action.modelData.label)
-                            color: action.hovered ? action.modelData.hue : Colors.fgSurfaceVariant
-                            font.pixelSize: 11
-                            font.weight: action.hovered ? Font.DemiBold : Font.Normal
-
-                            Behavior on color {
-                                ColorAnimation { duration: 130 }
-                            }
+                            color: action.hovered ? Colors.fgSurface : Colors.fgSurfaceVariant
+                            font.pixelSize: 12
                         }
                     }
 
                     MouseArea {
-                        id: actionMouse
-
                         anchors.fill: parent
                         hoverEnabled: true
                         onContainsMouseChanged: if (containsMouse) panel.current = action.index

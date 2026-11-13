@@ -293,7 +293,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: search.text === ""
-                text: I18n.tr("Wallpaper suchen…   %1 Bilder").arg(Wallpapers.list.length)
+                text: I18n.tr("Wallpaper suchen…")
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: search.font
                 verticalAlignment: Text.AlignVCenter

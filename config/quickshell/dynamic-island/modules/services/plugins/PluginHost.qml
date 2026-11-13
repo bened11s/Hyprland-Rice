@@ -65,6 +65,7 @@ Scope {
             title: m.title ?? key,
             desc: m.desc ?? "",
             options: m.options,
+            labels: m.labels,
             min: m.min,
             max: m.max,
             step: m.step,

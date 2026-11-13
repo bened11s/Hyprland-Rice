@@ -30,7 +30,7 @@ Item {
     default property alias content: card.data
 
     // Grundton; der Verlauf hellt ihn oben leicht auf
-    property color baseColor: Colors.background
+    property color baseColor: Colors.alpha(Colors.background, Appearance.surfaceAlpha)
     property real maxRadius: Appearance.radius
     property real borderWidth: Appearance.borderWidth
     property color borderColor: Appearance.borderColor

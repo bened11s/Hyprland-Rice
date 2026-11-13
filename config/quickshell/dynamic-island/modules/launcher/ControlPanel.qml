@@ -4,6 +4,7 @@ import Quickshell.Services.SystemTray
 
 import qs
 import qs.modules.bar.components.settings
+import qs.modules.services.config
 import qs.modules.bar.components.statusBar
 import qs.modules.services.network
 
@@ -18,7 +19,7 @@ ViewPanel {
     // Fuer Bar.qml: Tastaturfokus beim WLAN-Passwort/BT-PIN, Pairing-Anfragen
     readonly property alias settings: embeddedSettings
     readonly property bool typing: embeddedSettings.typingPassword || embeddedSettings.typingPin
-    readonly property bool hasTray: SystemTray.items.values.length > 0
+    readonly property bool hasTray: Config.notch.controlTray && SystemTray.items.values.length > 0
     // Tray-Kacheln plus Abstand zu den Schnelleinstellungen
     readonly property real trayHeight: root.hasTray ? trayGrid.implicitHeight + 10 : 0
 

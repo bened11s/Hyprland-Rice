@@ -17,7 +17,7 @@ import qs.modules.services.media
 // Schritte), + / - aendern die Groesse, Entf loescht ein Widget bzw. blendet
 // Uhr/Karte aus und ein, Strg+Z / Strg+Umschalt+Z machen rueckgaengig / wieder
 // her, Esc schliesst erst die Auswahl, hebt dann die Markierung auf und
-// bricht zuletzt ab, Enter ist Fertig. Rechtsklick auf freie Flaeche: Widget
+// bricht zuletzt ab (davor: schliesst die Rueckfrage der Leiste), Enter ist Fertig. Rechtsklick auf freie Flaeche: Widget
 // an dieser Stelle hinzufuegen.
 Item {
     id: stage
@@ -36,6 +36,8 @@ Item {
         return out;
     }
     property int handleRevision: 0
+    // Rueckfrage der Leiste ("Uhr und Medien zuruecksetzen?")
+    property alias confirmReset: bar.confirmReset
     readonly property Item selectedHandle: stage.handles.find(h => h.name === LockLayout.selected && LockLayout.selected !== "") ?? null
     // Maus ueber Leiste, Optionsfeld oder Auswahl: Griffe darunter nehmen nichts an
     readonly property bool overUi: bar.hovered || (options.item?.hovered ?? false) || (picker.item?.hovered ?? false)
@@ -86,6 +88,8 @@ Item {
         } else if (event.key === Qt.Key_Escape) {
             if (LockLayout.adding)
                 LockLayout.adding = false;
+            else if (bar.confirmReset)
+                bar.confirmReset = false;
             else if (LockLayout.selected !== "")
                 LockLayout.selected = "";
             else
@@ -147,8 +151,11 @@ Item {
             // Rechtsklick dort: Widget an dieser Stelle hinzufuegen
             onPressed: mouse => {
                 const x = mouse.x, y = mouse.y;
-                if (stage.onUi(x, y) || stage.handles.some(h => h.owns(x, y)))
+                // overUi deckt auch offene Listen ab (Popups ausserhalb
+                // der Grenzen von Leiste und Optionsfeld)
+                if (stage.overUi || stage.onUi(x, y) || stage.handles.some(h => h.owns(x, y)))
                     return;
+                bar.confirmReset = false;
                 LockLayout.selected = "";
                 if (mouse.button === Qt.RightButton)
                     LockLayout.openPicker({ x: x / stage.width, y: y / stage.height });
@@ -332,7 +339,6 @@ Item {
         LockElementOptions {
             name: LockLayout.selected
             title: LockLayout.selected === "clock" ? I18n.tr("Uhr") : I18n.tr("Medien")
-            icon: LockLayout.selected === "clock" ? "schedule" : "music_note"
         }
     }
 

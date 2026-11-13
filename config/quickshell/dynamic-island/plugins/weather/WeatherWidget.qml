@@ -6,7 +6,7 @@ import qs
 import qs.modules.services.config
 
 // Wetter auf dem Desktop, in der Sprache der Notch: frei stehende, monochrome
-// Typografie direkt auf dem Wallpaper (keine Karte), Inter Display fuer die
+// Typografie direkt auf dem Wallpaper (keine Karte), Config.displayFont fuer die
 // grosse Temperatur, Ort als kleine Versalien-Kopfzeile mit Akzentpunkt,
 // Symbole aus Material Symbols. Stile (opts.style):
 //
@@ -58,7 +58,7 @@ Item {
         return isNaN(d.getTime()) ? "" : Qt.formatTime(d, "HH:mm");
     }
 
-    readonly property string display: Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : Config.font
+    readonly property string display: Config.displayFont
     readonly property color dim: Colors.alpha(root.color, 0.72)
     readonly property color faint: Colors.alpha(root.color, 0.45)
 

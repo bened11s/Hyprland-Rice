@@ -106,9 +106,7 @@ ColumnLayout {
         function onEditingChanged(): void {
             if (!root.edit.editing)
                 return;
-            root.sleepMenuOpen = false;
-            root.vpnMenuOpen = false;
-            root.powerMenuOpen = false;
+            root.closeMenus();
         }
     }
 
@@ -157,6 +155,14 @@ ColumnLayout {
     property bool powerMenuOpen: false
     property Item powerMenu: null
     property bool powerMenuHovered: false
+    // Zeiger ueber einem offenen Kachel-Menue: alle Kachel-Handler aus.
+    // Qt 6 reicht einen Druck auch an die Pointer-Handler der Items DARUNTER
+    // weiter (handlersOnly), selbst wenn das Menue ihn angenommen hat – sonst
+    // schaltet ein Klick in die Liste die Kachel darunter.
+    readonly property bool menuOver: root.sleepMenuOpen && root.sleepMenuHovered
+        || root.vpnMenuOpen && root.vpnMenuHovered
+        || root.powerMenuOpen && root.powerMenuHovered
+
 
     // Kachel-ID -> Component (siehe QuickLayout.tiles fuer die IDs)
     readonly property var tileComponents: ({
@@ -209,21 +215,17 @@ ColumnLayout {
         SessionModes.toggleNoSleep();
     }
 
-    function pickDuration(sec: int): void {
-        root.sleepMenuOpen = false;
-        SessionModes.pickDuration(sec);
+    // Klappt das Menue einer Kachel auf oder zu; es ist immer nur eines offen
+    function toggleMenu(name: string): void {
+        const open = !root[name + "MenuOpen"];
+        root.closeMenus();
+        root[name + "MenuOpen"] = open;
     }
 
-    function durationLabel(sec: int): string {
-        if (sec === 1800)
-            return "30m";
-        if (sec === 3600)
-            return "1h";
-        if (sec === 14400)
-            return "4h";
-        if (sec === 0)
-            return "∞";
-        return "–";
+    function closeMenus(): void {
+        root.sleepMenuOpen = false;
+        root.vpnMenuOpen = false;
+        root.powerMenuOpen = false;
     }
 
     function toggleGameMode(): void {
@@ -340,6 +342,8 @@ ColumnLayout {
     // ---------- Kacheln ----------
     component Tile: Rectangle {
         id: tile
+        // Kachel-Menue darueber (root.menuOver, vom Loader bzw. Verwender gesetzt)
+        property bool blocked: false
 
         property string icon
         property string title
@@ -354,7 +358,8 @@ ColumnLayout {
         // false = die Kachel togglet nicht selbst (No-Sleep hat einen
         // eigenen Guard, damit Dropdown-Klicks nicht doppelt ausloesen)
         property bool tapEnabled: true
-        property real trailingSpace: 0
+        // Platz rechts fuer einen Zusatzknopf – Titel und Unterzeile enden davor
+        property real trailing: 0
         signal toggled()
 
         // Schmale Zelle (eine Rasterspalte): nur das Symbol, mittig; Texte,
@@ -391,8 +396,8 @@ ColumnLayout {
         RowLayout {
             anchors.fill: parent
             anchors.margins: 10
+            anchors.rightMargin: tile.compact ? 10 : 10 + tile.trailing
             anchors.leftMargin: tile.compact ? (tile.width - 28) / 2 : 16
-            anchors.rightMargin: 10 + tile.trailingSpace
             spacing: 12
 
             Item {
@@ -441,7 +446,7 @@ ColumnLayout {
         }
 
         TapHandler {
-            enabled: tile.tapEnabled
+            enabled: !tile.blocked && (tile.tapEnabled)
             onTapped: tile.toggled()
         }
 
@@ -457,6 +462,8 @@ ColumnLayout {
     // stehen und beide gleich aussehen sollen.
     component MiniButton: Rectangle {
         id: mini
+        // Kachel-Menue darueber (root.menuOver, vom Loader bzw. Verwender gesetzt)
+        property bool blocked: false
 
         property string icon
         // Farben der Kachel, auf der der Knopf sitzt (tile.controlColor usw.)
@@ -495,6 +502,7 @@ ColumnLayout {
         }
 
         TapHandler {
+            enabled: !mini.blocked
             gesturePolicy: TapHandler.ReleaseWithinBounds   // exklusiv: kein Kachel-Toggle
             onTapped: mini.tapped()
         }
@@ -502,6 +510,8 @@ ColumnLayout {
 
     component CircleToggle: Rectangle {
         id: circle
+        // Kachel-Menue darueber (root.menuOver, vom Loader bzw. Verwender gesetzt)
+        property bool blocked: false
 
         property string icon
         property bool active
@@ -530,6 +540,7 @@ ColumnLayout {
         }
 
         TapHandler {
+            enabled: !circle.blocked
             onTapped: circle.toggled()
         }
 
@@ -549,6 +560,7 @@ ColumnLayout {
             id: wifiTile
 
             tapEnabled: false   // Toggle macht der bewachte TapHandler unten
+            trailing: 38
 
             icon: !root.wifiOn ? "wifi_off" : WifiStatus.connecting ? WifiStatus.icon : "wifi"
             title: "Wi-Fi"
@@ -559,6 +571,7 @@ ColumnLayout {
             // Links schaltet den Funk, rechts fuehrt der Pfeil in die Liste
             // (dasselbe Muster wie bei der No-Sleep-Pille)
             TapHandler {
+                enabled: !root.menuOver
                 id: wifiTap
 
                 onTapped: {
@@ -612,6 +625,7 @@ ColumnLayout {
             id: bluetoothTile
 
             tapEnabled: false
+            trailing: 38
             icon: root.btOn ? "bluetooth" : "bluetooth_disabled"
             title: "Bluetooth"
             subtitle: !root.btOn ? I18n.tr("Aus")
@@ -620,6 +634,7 @@ ColumnLayout {
             onToggled: root.toggleBt()
 
             TapHandler {
+                enabled: !root.menuOver
                 id: bluetoothTap
 
                 onTapped: {
@@ -715,6 +730,7 @@ ColumnLayout {
             id: vpnTile
 
             tapEnabled: false
+            trailing: 38
             icon: Vpn.connected ? "vpn_key" : "vpn_key_off"
             title: Vpn.providerName
             subtitle: Vpn.statusText
@@ -722,6 +738,7 @@ ColumnLayout {
             onToggled: Vpn.toggle()
 
             TapHandler {
+                enabled: !root.menuOver
                 id: vpnTap
 
                 onTapped: {
@@ -730,40 +747,23 @@ ColumnLayout {
                 }
             }
 
-            Rectangle {
+            MiniButton {
+
+                blocked: root.menuOver
                 anchors {
                     right: parent.right
                     rightMargin: 8
                     verticalCenter: parent.verticalCenter
                 }
                 visible: !vpnTile.compact
-                width: 34
-                height: 34
-                radius: 17
-                color: root.vpnMenuOpen ? vpnTile.controlHover
-                                        : vpnTile.controlColor
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.vpnMenuOpen ? "expand_less" : "expand_more"
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 18
-                    color: vpnTile.fg
-                }
-
-                TapHandler {
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: {
-                        root.vpnMenuOpen = !root.vpnMenuOpen;
-                        if (root.vpnMenuOpen) {
-                            root.sleepMenuOpen = false;
-                            root.powerMenuOpen = false;
-                        }
-                    }
-                }
+                bg: root.vpnMenuOpen ? vpnTile.controlHover : vpnTile.controlColor
+                bgHover: vpnTile.controlHover
+                fg: vpnTile.fg
+                icon: root.vpnMenuOpen ? "expand_less" : "expand_more"
+                onTapped: root.toggleMenu("vpn")
             }
 
-            Rectangle {
+            TileMenu {
                 id: vpnMenuPanel
 
                 Component.onCompleted: root.vpnMenu = vpnMenuPanel
@@ -780,81 +780,18 @@ ColumnLayout {
                     left: parent.left
                     leftMargin: 10
                 }
-                width: 180
-                height: 72
-                z: 200
-                radius: 16
-                color: Colors.shade(Colors.background, 0.08)
-                border.width: 1
-                border.color: Colors.outlineVariant
-
-                // Eigene Trefferflaeche, damit Klicks nicht zur darunter
-                // liegenden Aufnahme-Kachel durchfallen.
-                MouseArea {
-                    anchors.fill: parent
-                }
-
-                HoverHandler {
-                    onHoveredChanged: root.vpnMenuHovered = hovered
-                }
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 2
-
-                    Repeater {
-                        model: [
-                            { id: "nordvpn", label: "NordVPN" },
-                            { id: "cloudflare", label: "Cloudflare WARP" }
-                        ]
-
-                        Rectangle {
-                            id: providerOption
-
-                            required property var modelData
-
-                            Layout.fillWidth: true
-                            implicitHeight: 30
-                            radius: 15
-                            color: Vpn.provider === providerOption.modelData.id ? Colors.primary : "transparent"
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 6
-
-                                Text {
-                                    font.family: Config.font
-                                    text: providerOption.modelData.label
-                                    font.pixelSize: 12
-                                    color: Vpn.provider === providerOption.modelData.id ? Colors.fgPrimary : Colors.fgBackground
-                                }
-
-                                Text {
-                                    text: "check"
-                                    font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 16
-                                    visible: Vpn.provider === providerOption.modelData.id
-                                    color: Colors.fgPrimary
-                                }
-                            }
-
-                            MouseArea {
-                                id: providerMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    Vpn.selectProvider(providerOption.modelData.id);
-                                    root.vpnMenuOpen = false;
-                                }
-                            }
-                        }
-                    }
-                }
+                width: 250
+                entries: Vpn.providers.map(p => ({
+                    text: p.name,
+                    icon: p.icon,
+                    current: Vpn.provider === p.id,
+                    action: () => Vpn.selectProvider(p.id)
+                })).concat([
+                    { separator: true },
+                    { text: I18n.tr("Eigenen Anbieter hinzufügen…"), icon: "add", action: () => SettingsState.openPage("vpn", {}) }
+                ])
+                onHoveredChanged: root.vpnMenuHovered = hovered
+                onPicked: root.vpnMenuOpen = false
             }
         }
     }
@@ -866,6 +803,7 @@ ColumnLayout {
             id: noSleepTile
 
             tapEnabled: false   // Toggle macht der bewachte TapHandler unten
+            trailing: 38
 
             icon: "coffee"
             title: "No Sleep"
@@ -877,73 +815,35 @@ ColumnLayout {
             onToggled: root.toggleNoSleep()
 
             TapHandler {
+                enabled: !root.menuOver
                 id: pillTap
 
-                // Taps im Dropdown-Bereich (rechts) gehoeren dem Dropdown
+                // Taps auf den Pfeil (rechts) gehoeren dem Menue
                 onTapped: {
-                    if (noSleepTile.compact || pillTap.point.position.x < noSleepDropdown.x)
+                    if (noSleepTile.compact || pillTap.point.position.x < noSleepTile.width - 46)
                         root.toggleNoSleep();
                 }
             }
 
-            // Dropdown-Knopf: zeigt "–", solange keine Dauer gewaehlt ist
-            Rectangle {
-                id: noSleepDropdown
+            MiniButton {
 
+                blocked: root.menuOver
                 anchors {
                     right: parent.right
-                    rightMargin: 10
+                    rightMargin: 8
                     verticalCenter: parent.verticalCenter
                 }
                 visible: !noSleepTile.compact
-                implicitWidth: dropdownLabel.implicitWidth + arrow.implicitWidth + 22
-                implicitHeight: 34
-                radius: 17
-                color: root.sleepMenuOpen ? noSleepTile.controlHover : noSleepTile.controlColor
-
-                Behavior on color {
-                    ColorAnimation { duration: 140 }
-                }
-
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        id: dropdownLabel
-                        font.family: Config.font
-
-                        text: root.durationLabel(root.sleepDurationSec)
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        color: noSleepTile.fg
-                    }
-
-                    Text {
-                        id: arrow
-
-                        text: root.sleepMenuOpen ? "expand_less" : "expand_more"
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 16
-                        color: noSleepTile.fgDim
-                    }
-                }
-
-                TapHandler {
-                    gesturePolicy: TapHandler.ReleaseWithinBounds   // exklusiv: kein Pillen-Toggle
-                    onTapped: {
-                        root.sleepMenuOpen = !root.sleepMenuOpen;
-                        if (root.sleepMenuOpen) {
-                            root.vpnMenuOpen = false;
-                            root.powerMenuOpen = false;
-                        }
-                    }
-                }
+                bg: root.sleepMenuOpen ? noSleepTile.controlHover : noSleepTile.controlColor
+                bgHover: noSleepTile.controlHover
+                fg: noSleepTile.fg
+                icon: root.sleepMenuOpen ? "expand_less" : "expand_more"
+                onTapped: root.toggleMenu("sleep")
             }
 
-            // Das Menue haengt schmal unter dem Dropdown-Knopf und ragt aus
-            // der Karte heraus – Bar.qml haengt es in die Eingabe-Maske
-            Rectangle {
+            // Das Menue haengt unter dem Pfeil und ragt aus der Karte heraus –
+            // Bar.qml haengt es in die Eingabe-Maske
+            TileMenu {
                 id: sleepMenuPanel
 
                 Component.onCompleted: root.sleepMenu = sleepMenuPanel
@@ -961,91 +861,18 @@ ColumnLayout {
                     rightMargin: 10
                 }
                 width: 150
-                height: 140
-                // Ueber den Kacheln der Zeile darunter (wie VPN/Power)
-                z: 200
-                radius: 16
-                color: Colors.shade(Colors.background, 0.08)
-                border.width: 1
-                border.color: Colors.outlineVariant
-
-                // Eigene Trefferflaeche, damit Klicks nicht zu den Kacheln
-                // darunter durchfallen
-                MouseArea {
-                    anchors.fill: parent
-                }
-
-                HoverHandler {
-                    onHoveredChanged: root.sleepMenuHovered = hovered
-                }
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 2
-
-                    Repeater {
-                        model: [
-                            { label: "30m", sec: 1800 },
-                            { label: "1h", sec: 3600 },
-                            { label: "4h", sec: 14400 },
-                            { label: "---", sec: 0 }
-                        ]
-
-                        Rectangle {
-                            id: option
-
-                            required property var modelData
-
-                            Layout.fillWidth: true
-                            implicitHeight: 30
-                            radius: 15
-                            color: root.sleepDurationSec === option.modelData.sec ? Colors.primary : "transparent"
-                            border.width: 1
-                            border.color: optionHover.hovered
-                                          ? Colors.alpha(Colors.fgSurfaceVariant, 0.55)
-                                          : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation { duration: 140 }
-                            }
-
-                            Behavior on border.color {
-                                ColorAnimation { duration: 100 }
-                            }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 6
-
-                                Text {
-                                    font.family: Config.font
-                                    text: option.modelData.label
-                                    font.pixelSize: 12
-                                    color: root.sleepDurationSec === option.modelData.sec ? Colors.fgPrimary : Colors.fgBackground
-                                }
-
-                                Text {
-                                    text: "check"
-                                    font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 16
-                                    visible: root.sleepDurationSec === option.modelData.sec
-                                    color: Colors.fgPrimary
-                                }
-                            }
-
-                            TapHandler {
-                                onTapped: root.pickDuration(option.modelData.sec)
-                            }
-
-                            HoverHandler {
-                                id: optionHover
-                            }
-                        }
-                    }
-                }
+                entries: [
+                    { sec: 1800, text: "30 min" },
+                    { sec: 3600, text: "1 h" },
+                    { sec: 14400, text: "4 h" },
+                    { sec: 0, text: I18n.tr("Unendlich") }
+                ].map(d => ({
+                    text: d.text,
+                    current: root.sleepDurationSec === d.sec,
+                    action: () => SessionModes.pickDuration(d.sec)
+                }))
+                onHoveredChanged: root.sleepMenuHovered = hovered
+                onPicked: root.sleepMenuOpen = false
             }
         }
     }
@@ -1067,6 +894,7 @@ ColumnLayout {
             id: recordTile
 
             tapEnabled: false   // Toggle macht der bewachte TapHandler unten
+            trailing: 78
 
             icon: Recorder.active ? "stop_circle" : "screen_record"
             title: I18n.tr("Aufnahme")
@@ -1080,12 +908,12 @@ ColumnLayout {
             onToggled: Recorder.toggle()
 
             // Links schaltet die Aufnahme, rechts sitzen die beiden Schalter
-            // (dasselbe Muster wie bei der Wi-Fi-Pille)
             TapHandler {
+                enabled: !root.menuOver
                 id: recordTap
 
                 onTapped: {
-                    if (recordTile.compact || recordTap.point.position.x < recordTile.width - 90)
+                    if (recordTile.compact || recordTap.point.position.x < recordTile.width - 86)
                         Recorder.toggle();
                 }
             }
@@ -1103,9 +931,11 @@ ColumnLayout {
                 spacing: 6
 
                 MiniButton {
-                bg: recordTile.controlColor
-                bgHover: recordTile.controlHover
-                fg: recordTile.fg
+
+                    blocked: root.menuOver
+                    bg: recordTile.controlColor
+                    bgHover: recordTile.controlHover
+                    fg: recordTile.fg
                     // Vollbild = fokussierter Monitor, Bereich = Rahmen mit slurp
                     enabled: !Recorder.active
                     icon: Recorder.region ? "screenshot_region" : "fullscreen"
@@ -1113,9 +943,11 @@ ColumnLayout {
                 }
 
                 MiniButton {
-                bg: recordTile.controlColor
-                bgHover: recordTile.controlHover
-                fg: recordTile.fg
+
+                    blocked: root.menuOver
+                    bg: recordTile.controlColor
+                    bgHover: recordTile.controlHover
+                    fg: recordTile.fg
                     // Desktop-Ton (default_output), nicht das Mikrofon
                     enabled: !Recorder.active
                     icon: Recorder.sound ? "volume_up" : "volume_off"
@@ -1269,13 +1101,8 @@ ColumnLayout {
             active: usable && Power.profile !== PowerProfile.Balanced
             tapEnabled: usable
             opacity: usable ? 1 : 0.45
-            onToggled: {
-                root.powerMenuOpen = !root.powerMenuOpen;
-                if (root.powerMenuOpen) {
-                    root.sleepMenuOpen = false;
-                    root.vpnMenuOpen = false;
-                }
-            }
+            trailing: usable ? 38 : 0
+            onToggled: root.toggleMenu("power")
 
             // Pfeil als Hinweis aufs Dropdown – die ganze Kachel oeffnet es
             Rectangle {
@@ -1303,7 +1130,7 @@ ColumnLayout {
                 }
             }
 
-            Rectangle {
+            TileMenu {
                 id: powerMenuPanel
 
                 Component.onCompleted: root.powerMenu = powerMenuPanel
@@ -1320,95 +1147,14 @@ ColumnLayout {
                     right: parent.right
                     rightMargin: 10
                 }
-                width: 170
-                height: powerTile.choices.length * 32 + 8
-                z: 200
-                radius: 16
-                color: Colors.shade(Colors.background, 0.08)
-                border.width: 1
-                border.color: Colors.outlineVariant
-
-                // Eigene Trefferflaeche, damit Klicks nicht zu den darunter
-                // liegenden Reglern durchfallen
-                MouseArea {
-                    anchors.fill: parent
-                }
-
-                HoverHandler {
-                    onHoveredChanged: root.powerMenuHovered = hovered
-                }
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 2
-
-                    Repeater {
-                        model: powerTile.choices
-
-                        Rectangle {
-                            id: profileOption
-
-                            required property var modelData
-                            readonly property bool chosen: Power.profile === profileOption.modelData.value
-
-                            Layout.fillWidth: true
-                            implicitHeight: 30
-                            radius: 15
-                            color: profileOption.chosen ? Colors.primary : "transparent"
-                            border.width: 1
-                            border.color: profileMouse.containsMouse && !profileOption.chosen
-                                          ? Colors.alpha(Colors.fgSurfaceVariant, 0.55)
-                                          : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation { duration: 140 }
-                            }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 12
-                                spacing: 8
-
-                                Text {
-                                    text: profileOption.modelData.icon
-                                    font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 16
-                                    color: profileOption.chosen ? Colors.fgPrimary : Colors.fgSurfaceVariant
-                                }
-
-                                Text {
-                                    font.family: Config.font
-                                    text: profileOption.modelData.label
-                                    font.pixelSize: 12
-                                    color: profileOption.chosen ? Colors.fgPrimary : Colors.fgBackground
-                                    Layout.fillWidth: true
-                                }
-
-                                Text {
-                                    text: "check"
-                                    font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 16
-                                    visible: profileOption.chosen
-                                    color: Colors.fgPrimary
-                                }
-                            }
-
-                            MouseArea {
-                                id: profileMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    Power.setProfile(profileOption.modelData.value);
-                                    root.powerMenuOpen = false;
-                                }
-                            }
-                        }
-                    }
-                }
+                entries: powerTile.choices.map(p => ({
+                    text: p.label,
+                    icon: p.icon,
+                    current: Power.profile === p.value,
+                    action: () => Power.setProfile(p.value)
+                }))
+                onHoveredChanged: root.powerMenuHovered = hovered
+                onPicked: root.powerMenuOpen = false
             }
         }
     }
@@ -1461,7 +1207,7 @@ ColumnLayout {
 
         // Tippen neben die Kacheln hebt die Wahl auf
         TapHandler {
-            enabled: root.edit.editing
+            enabled: !root.menuOver && (root.edit.editing)
             onTapped: root.edit.selectedId = ""
         }
 
@@ -1572,6 +1318,8 @@ ColumnLayout {
                             onTileIdChanged: Qt.callLater(slot.rebuild)
                             onPluginUrlChanged: slot.rebuild()
                             onLoaded: {
+                                if (slot.item && "blocked" in slot.item)
+                                    slot.item.blocked = Qt.binding(() => root.menuOver);
                                 if (slot.pluginUrl !== "" && slot.item && "tileId" in slot.item)
                                     slot.item.tileId = slot.tileId.slice(slot.tileId.indexOf(".") + 1);
                             }

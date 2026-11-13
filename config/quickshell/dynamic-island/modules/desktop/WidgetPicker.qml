@@ -96,7 +96,7 @@ Rectangle {
     implicitHeight: body.implicitHeight + picker.pad * 2
     width: implicitWidth
     height: implicitHeight
-    radius: 20
+    radius: 16
     color: Colors.alpha(Colors.background, 0.96)
     border.width: 1
     border.color: Colors.alpha(Colors.outline, 0.5)
@@ -116,8 +116,9 @@ Rectangle {
     component Section: Text {
         color: Colors.fgSurfaceVariant
         font.family: Config.font
-        font.pixelSize: 10
+        font.pixelSize: 12
         font.weight: Font.DemiBold
+        topPadding: 4
     }
 
     component Tile: Rectangle {
@@ -130,7 +131,7 @@ Rectangle {
 
         width: picker.tileW
         height: 52
-        radius: 14
+        radius: 12
         color: tileHover.hovered ? Colors.alpha(Colors.fgSurface, 0.12)
              : tile.current ? Colors.alpha(Colors.primary, 0.12)
              : Colors.alpha(Colors.fgSurface, 0.05)
@@ -227,30 +228,16 @@ Rectangle {
             width: parent.width
             height: 28
 
-            Row {
+            Text {
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: picker.here ? "add_location_alt" : "add_circle"
-                    color: Colors.primary
-                    font.family: "Material Symbols Outlined"
-                    font.pixelSize: 20
-                    font.variableAxes: ({ FILL: 1 })
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: picker.here ? I18n.tr("Widget hier einfügen") : I18n.tr("Widget hinzufügen")
-                    color: Colors.fgBackground
-                    font.family: Config.font
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                }
+                text: picker.here ? I18n.tr("Widget hier einfügen") : I18n.tr("Widget hinzufügen")
+                color: Colors.fgBackground
+                font.family: Config.font
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
             }
 
-            EditChip {
+            EditButton {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 icon: "close"
@@ -262,7 +249,7 @@ Rectangle {
         Rectangle {
             width: parent.width
             height: 34
-            radius: 11
+            radius: 8
             color: Colors.alpha(Colors.fgSurface, input.activeFocus ? 0.09 : 0.06)
             border.width: 1
             border.color: input.activeFocus ? Colors.alpha(Colors.primary, 0.5) : "transparent"

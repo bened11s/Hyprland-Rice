@@ -10,7 +10,8 @@
 # config/ im Repo spiegelt ~/.config. Das Skript verteilt daraus hypr/,
 # quickshell/dynamic-island/ und dynamic-island/ nach ~/.config
 # (standardmaessig als Symlinks, damit ein `git pull` im Klon durchschlaegt),
-# mit --extras auch die optionalen Configs, und richtet danach alles Weitere ein.
+# mit --extras auch die optionalen Configs, und richtet danach alles Weitere ein
+# (u. a. kitty-Transparenz: config/kitty/dynamic-island.conf + include-Block).
 #
 # Idempotent: mehrfach ausfuehren schadet nicht.
 #
@@ -21,6 +22,7 @@
 #   ./install.sh --extras        auch hyprlock, nvim, spicetify, spotify-launcher
 #   ./install.sh --install-deps  fehlende Pakete gleich mitinstallieren
 #   ./install.sh --check         nur pruefen, nichts aendern
+#   ./install.sh --monitors      nur ~/.config/hypr/monitors.lua neu erzeugen
 #   ./install.sh --dry-run       zeigen was passieren wuerde
 #   ./install.sh -y              ohne Rueckfrage durchlaufen
 set -uo pipefail
@@ -37,13 +39,17 @@ BIN_DIR="$HOME/.local/bin"
 BACKUP_DIR="$HOME/backups/dynamic-island-install-$(date +%Y%m%d-%H%M%S)"
 
 SHELL_NAME="dynamic-island"
+# Welche Pfade unter ~/.config per --copy aus diesem Repo kamen (einer je Zeile)
+COPY_MARKER="$STATE_DIR/$SHELL_NAME/install-copied"
 CHECK_ONLY=0
 DRY_RUN=0
 INSTALL_DEPS=0
 ASSUME_YES=0
 COPY=0
 EXTRAS=0
+MONITORS_ONLY=0
 FAILED=0
+PATH_HINT=0
 
 # Was aus config/ nach ~/.config gehoert (Pfade relativ zu beiden)
 DEPLOY_PATHS=(hypr quickshell/dynamic-island dynamic-island)
@@ -79,6 +85,7 @@ install.sh — richtet den Dynamic-Island-Rice auf diesem Rechner ein.
   ./install.sh --extras        auch hyprlock, nvim, spicetify, spotify-launcher
   ./install.sh --install-deps  fehlende Pakete gleich mitinstallieren
   ./install.sh --check         nur pruefen, nichts aendern
+  ./install.sh --monitors      nur ~/.config/hypr/monitors.lua neu erzeugen
   ./install.sh --dry-run       zeigen was passieren wuerde
   ./install.sh -y              ohne Rueckfrage durchlaufen
 EOF
@@ -91,6 +98,7 @@ while [ $# -gt 0 ]; do
         --install-deps) INSTALL_DEPS=1 ;;
         --copy) COPY=1 ;;
         --extras) EXTRAS=1 ;;
+        --monitors) MONITORS_ONLY=1 ;;
         -y|--yes) ASSUME_YES=1 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unbekannte Option: $1" >&2; usage; exit 1 ;;
@@ -126,6 +134,8 @@ EOF
     - erzeugt ein Farbschema, falls keines da ist — das schreibt auch
       Farben nach Hyprland, GTK, Qt, btop, cava und Discord
     - legt ~/.config/hypr/profile an, falls es fehlt
+    - schreibt die angeschlossenen Monitore nach ~/.config/hypr/monitors.lua,
+      falls es die Datei nicht gibt (nur wenn Hyprland laeuft)
 EOF
     [ "$INSTALL_DEPS" = 1 ] && printf '    - installiert fehlende Pakete per paru/yay (fragt selbst nochmal)\n'
     printf '\n  Echte Dateien werden vorher nach ~/backups/ gesichert.\n'
@@ -160,12 +170,41 @@ backup_move() {  # backup_move <pfad> — aus dem Weg raeumen, nicht loeschen
     warn "~${target#$HOME} liegt jetzt unter ~${BACKUP_DIR#$HOME}/$rel"
 }
 
+backup_copy() {  # backup_copy <pfad> — Stand sichern, das Original bleibt liegen
+    local target="$1" rel
+    rel="${target#$HOME/}"
+    run mkdir -p "$BACKUP_DIR/$(dirname "$rel")"
+    run cp -a "$target" "$BACKUP_DIR/$rel"
+    warn "Stand von ~${target#$HOME} gesichert nach ~${BACKUP_DIR#$HOME}/$rel"
+}
+
 backup() {  # backup <datei> — echte Datei (kein Symlink) wegsichern
     local target="$1"
     [ -e "$target" ] && [ ! -L "$target" ] || return 0
     run mkdir -p "$BACKUP_DIR"
     run cp -a "$target" "$BACKUP_DIR/"
     warn "$(basename "$target") gesichert nach ~${BACKUP_DIR#$HOME}"
+}
+
+copy_tracked() {  # copy_tracked <rel> <ziel> — config/<rel> nach <ziel> kopieren
+    # Nur was Git versioniert: Im Klon koennen gitignorte Dateien liegen
+    # (eigene shell.json, Build-Ordner rust/target), die sonst die des Ziels
+    # ueberschreiben oder es aufblaehen. Ohne Git (z. B. Zip) alles kopieren.
+    local rel="$1" dst="$2" f n=0
+    if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        run cp -a "$SRC_DIR/$rel/." "$dst/"
+        return
+    fi
+    while IFS= read -r -d '' f; do
+        f="${f#config/$rel/}"
+        n=$((n + 1))
+        [ "$DRY_RUN" = 1 ] && continue
+        mkdir -p "$dst/$(dirname "$f")"
+        cp -a "$SRC_DIR/$rel/$f" "$dst/$f"
+    done < <(git -C "$REPO_DIR" ls-files -z -- "config/$rel")
+    [ "$DRY_RUN" = 1 ] && printf '  %s[dry-run]%s %s Dateien aus config/%s nach %s\n' \
+        "$c_dim" "$c_reset" "$n" "$rel" "$(short "$dst")"
+    return 0
 }
 
 link() {  # link <ziel> <linkname>
@@ -204,6 +243,19 @@ deploy() {
             continue
         fi
 
+        # Erneuter Lauf mit --copy (z. B. nach einem `git pull`): die fruehere
+        # Kopie NICHT wegraeumen, sonst landen die gitignorten Dateien, die erst
+        # hier entstanden sind (shell.json, keybinds.json, scenes.json,
+        # hypr/profile, hypr/scheme/*), im Backup und die Einstellungen sind
+        # scheinbar weg. Stattdessen nur die Repo-Dateien drueberlegen.
+        if [ "$COPY" = 1 ] && [ -d "$src" ] && [ -d "$dst" ] && [ ! -L "$dst" ] \
+           && grep -qxF "$rel" "$COPY_MARKER" 2>/dev/null; then
+            backup_copy "$dst"
+            copy_tracked "$rel" "$dst"
+            ok "$(short "$dst") aktualisiert (eigene Dateien bleiben)"
+            continue
+        fi
+
         # Auch kaputte Symlinks muessen weg, deshalb -L dazu
         if [ -e "$dst" ] || [ -L "$dst" ]; then
             backup_move "$dst"
@@ -211,8 +263,20 @@ deploy() {
 
         run mkdir -p "$(dirname "$dst")"
         if [ "$COPY" = 1 ]; then
-            run cp -a "$src" "$dst"
+            if [ -d "$src" ]; then
+                run mkdir -p "$dst"
+                copy_tracked "$rel" "$dst"
+            else
+                run cp -a "$src" "$dst"
+            fi
             ok "$(short "$dst") kopiert"
+            # Merken, dass diese Kopie von uns stammt: Nur dann darf ein
+            # spaeterer Lauf sie zusammenfuehren statt sie wegzuraeumen. Eine
+            # fremde Config wuerde sonst mit dem Repo vermischt.
+            if [ "$DRY_RUN" = 0 ] && ! grep -qxF "$rel" "$COPY_MARKER" 2>/dev/null; then
+                mkdir -p "$(dirname "$COPY_MARKER")"
+                printf '%s\n' "$rel" >> "$COPY_MARKER"
+            fi
         else
             run ln -sfn "$src" "$dst"
             ok "$(short "$dst") -> $(short "$src")"
@@ -269,6 +333,12 @@ declare -A NEEDED=(
     # Cover-Bilder der Medien-Karte: laden und die Grundfarbe ziehen
     [curl]=curl
     [magick]=imagemagick
+    # Medien-Karte und Medientasten
+    [playerctl]=playerctl
+    # Lautstaerketasten (hypr/hyprland/keybinds.lua, Profile)
+    [wpctl]=wireplumber
+    # Lockscreen-Screenshot (Lock.qml) und hypr/scripts/session-exit.sh
+    [jq]=jq
 )
 
 # Ohne die laeuft alles weiter, nur eine Einzelheit fehlt.
@@ -278,12 +348,31 @@ declare -A OPTIONAL=(
     # Helligkeit ueber DDC/CI (Brightness.qml). Am Laptop meist unnoetig,
     # dort regelt brightnessctl die interne Anzeige.
     [ddcutil]=ddcutil
+    # Helligkeit des internen Laptop-Panels und die Helligkeitstasten
+    [brightnessctl]=brightnessctl
+    # Audio-Profile (A2DP/HFP) bei Bluetooth-Kopfhoerern
+    [pactl]=libpulse
+    # Screenshot -> Text erkennen (OCR), braucht dazu tesseract-data-deu/-eng
+    [tesseract]=tesseract
     # Die VPN-Kachel kann zwischen NordVPN und Cloudflare WARP wechseln
     [nordvpn]=nordvpn-bin
     [warp-cli]=cloudflare-warp-bin
     # Baut die Rust-Helfer (dynamic-island/rust), ohne cargo laufen die Python-Fassungen
     [cargo]=rust
+    # Papierkorb beim Hyprland-Start aufraeumen (aelter als 30 Tage)
+    [trash-empty]=trash-cli
+    # Mein Terminal; fehlt es, nimmt SUPER + Q das erste andere (hypr/apps.lua)
+    [kitty]=kitty
 )
+
+# Nur melden, nie per --install-deps mitinstallieren: fremde Dienste mit
+# eigenem Konto, die niemand nebenbei auf dem Rechner haben will.
+NO_AUTO_INSTALL=(nordvpn warp-cli)
+
+sorted_keys() {  # sorted_keys <name des assoziativen Arrays> — stabile Ausgabe
+    local -n _arr="$1"
+    printf '%s\n' "${!_arr[@]}" | sort
+}
 
 # Systemdienste, an denen die Shell ueber DBus haengt
 declare -A SERVICES=(
@@ -300,7 +389,8 @@ declare -A SERVICE_PKG=(
 check_deps() {
     step "Abhaengigkeiten"
     local missing=()
-    for bin in "${!NEEDED[@]}"; do
+    local bin
+    for bin in $(sorted_keys NEEDED); do
         if command -v "$bin" >/dev/null 2>&1; then
             ok "$bin"
         else
@@ -319,9 +409,11 @@ check_deps() {
     done
 
     # Kuerbare Extras: melden, aber nicht als Fehler zaehlen
-    for bin in "${!OPTIONAL[@]}"; do
+    for bin in $(sorted_keys OPTIONAL); do
         if command -v "$bin" >/dev/null 2>&1; then
             ok "$bin"
+        elif [[ " ${NO_AUTO_INSTALL[*]} " == *" $bin "* ]]; then
+            skip "$bin fehlt (${OPTIONAL[$bin]}, nur fuer die VPN-Kachel, wird nie automatisch installiert)"
         else
             warn "$bin fehlt (Paket: ${OPTIONAL[$bin]}) — nur diese Einzelheit faellt aus"
             [ "$INSTALL_DEPS" = 1 ] && missing+=("${OPTIONAL[$bin]}")
@@ -334,20 +426,46 @@ check_deps() {
         warn "Material Symbols nicht gefunden — die Bar zeigt sonst leere Kaestchen"
         missing+=(ttf-material-symbols-variable-git)
     fi
+    # Voreingestellte Schrift der Shell; fehlt sie, nimmt Qt die Systemschrift.
+    if fc-list : family 2>/dev/null | grep -i "Rubik" >/dev/null; then  # kein -q: pipefail + SIGPIPE
+        ok "Schrift: Rubik"
+    else
+        warn "Rubik nicht gefunden — die Shell nimmt sonst die Systemschrift"
+        missing+=(ttf-rubik-vf)
+    fi
 
     if [ ${#missing[@]} -gt 0 ] && [ "$INSTALL_DEPS" = 1 ] && [ "$CHECK_ONLY" = 0 ]; then
         local helper=""
         for h in paru yay; do command -v "$h" >/dev/null 2>&1 && { helper="$h"; break; }; done
         if [ -n "$helper" ]; then
             step "Installiere: ${missing[*]}"
-            run "$helper" -S --needed "${missing[@]}"
-            FAILED=0
+            # Nur bei Erfolg gilt das Fehlende als erledigt – ein abgebrochenes
+            # paru darf nicht zu "Alles eingerichtet" fuehren
+            if run "$helper" -S --needed "${missing[@]}"; then
+                FAILED=0
+            else
+                fail "Paketinstallation gescheitert oder abgebrochen"
+            fi
         else
-            warn "Kein paru/yay gefunden — bitte von Hand: sudo pacman -S ${missing[*]}"
+            warn "Kein paru/yay gefunden — bitte von Hand:"
+            manual_install_hint "${missing[@]}"
         fi
     elif [ ${#missing[@]} -gt 0 ]; then
-        warn "Nachinstallieren mit: ./install.sh --install-deps   (oder pacman -S ${missing[*]})"
+        warn "Nachinstallieren mit: ./install.sh --install-deps   (braucht paru/yay), oder:"
+        manual_install_hint "${missing[@]}"
     fi
+}
+
+# Was pacman selbst kennt, geht per pacman; der Rest (AUR) braucht paru/yay.
+# pacman -Si liest nur die lokale Paketdatenbank, das geht auch offline.
+manual_install_hint() {
+    local repo=() aur=() p
+    for p in "$@"; do
+        if pacman -Si "$p" >/dev/null 2>&1; then repo+=("$p"); else aur+=("$p"); fi
+    done
+    [ ${#repo[@]} -gt 0 ] && warn "   sudo pacman -S --needed ${repo[*]}"
+    [ ${#aur[@]} -gt 0 ] && warn "   aus dem AUR (paru/yay): ${aur[*]}"
+    return 0
 }
 
 # ---------------------------------------------------------- 1b. Dienste ---
@@ -357,17 +475,30 @@ check_deps() {
 check_services() {
     step "Systemdienste"
 
-    local unit state
+    # is-active allein reicht nicht: fuer eine Unit, die es gar nicht gibt,
+    # meldet es ebenfalls "inactive". Ob sie installiert ist, sagt LoadState.
+    local unit load state
     for unit in "${!SERVICES[@]}"; do
+        load="$(systemctl show -p LoadState --value "$unit" 2>/dev/null)"
         state="$(systemctl is-active "$unit" 2>/dev/null)"
+        case "$load" in
+            loaded) ;;
+            masked)
+                warn "$unit ist maskiert — ${SERVICES[$unit]} bleibt leer"
+                warn "   sudo systemctl unmask $unit && sudo systemctl enable --now $unit"
+                continue ;;
+            *)
+                warn "$unit nicht installiert (Paket: ${SERVICE_PKG[$unit]}) — ${SERVICES[$unit]} entfaellt"
+                continue ;;
+        esac
         case "$state" in
             active)
                 ok "$unit (${SERVICES[$unit]})" ;;
-            inactive|failed)
+            activating|reloading)
+                ok "$unit startet gerade (${SERVICES[$unit]})" ;;
+            *)
                 warn "$unit laeuft nicht — ${SERVICES[$unit]} bleibt leer"
                 warn "   sudo systemctl enable --now $unit" ;;
-            *)
-                warn "$unit nicht installiert (Paket: ${SERVICE_PKG[$unit]}) — ${SERVICES[$unit]} entfaellt" ;;
         esac
     done
 }
@@ -379,12 +510,25 @@ check_services() {
 check_notifications() {
     step "Benachrichtigungen"
 
-    local other=""
+    local other="" d owner=""
     for d in mako dunst swaync fnott; do
         pgrep -x "$d" >/dev/null 2>&1 && other="$d"
     done
 
-    if [ -n "$other" ]; then
+    # Entscheidend ist, wer den DBus-Namen haelt – ein nebenher laufender
+    # Daemon stoert nicht, solange die Shell den Namen schon hat.
+    if command -v busctl >/dev/null 2>&1; then
+        owner="$(busctl --user status org.freedesktop.Notifications 2>/dev/null \
+                 | sed -n 's/^Comm=//p')"
+    fi
+
+    if [ "$owner" = qs ] || [ "$owner" = quickshell ]; then
+        ok "die Shell haelt org.freedesktop.Notifications"
+        [ -n "$other" ] && skip "$other laeuft nebenher, wird aber nicht gebraucht"
+    elif [ -n "$owner" ]; then
+        warn "$owner belegt org.freedesktop.Notifications"
+        warn "   Die Shell bringt einen eigenen Daemon mit – $owner beenden oder abschalten."
+    elif [ -n "$other" ]; then
         warn "$other laeuft und belegt org.freedesktop.Notifications"
         warn "   Die Shell bringt einen eigenen Daemon mit – $other beenden oder abschalten."
     else
@@ -403,13 +547,144 @@ link_files() {
     fi
     link "$DI_DIR/scripts/hypr-profile" "$BIN_DIR/hypr-profile"
     link "$DI_DIR/scripts/theme-set" "$BIN_DIR/theme-set"
-    link "$DI_DIR/completions/dynamic-island.fish" "$CONFIG_DIR/fish/completions/dynamic-island.fish"
+    if command -v fish >/dev/null 2>&1; then
+        link "$DI_DIR/completions/dynamic-island.fish" "$CONFIG_DIR/fish/completions/dynamic-island.fish"
+    else
+        skip "kein fish installiert, keine Completions"
+    fi
+}
+
+# --------------------------------------------------------- 2b. PATH ---
+# Die Befehle liegen in ~/.local/bin. Arch und EndeavourOS nehmen den Ordner
+# nicht von selbst in den PATH (CachyOS' fish-Config schon) – ohne das gibt
+# es nach der Installation "dynamic-island: command not found". Darum einen
+# markierten Block in die rc-Datei jeder vorhandenen Shell; Hyprland selbst
+# ergaenzt den PATH in hyprland.lua.
+PATH_MARK="# >>> dynamic-island PATH >>>"
+
+path_block() {  # path_block <shell>
+    printf '\n%s\n' "$PATH_MARK"
+    if [ "$1" = fish ]; then
+        printf 'fish_add_path -g ~/.local/bin\n'
+    else
+        cat <<'EOF'
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+EOF
+    fi
+    printf '# <<< dynamic-island PATH <<<\n'
+}
+
+setup_path() {
+    step "PATH"
+
+    # Ziel-Dateien: bash/zsh-rc, wenn es sie gibt oder die Shell die
+    # Login-Shell ist (eine neue ~/.zshrc wuerde sonst zsh's Ersteinrichtung
+    # unterdruecken); fish ueber conf.d, damit config.fish unangetastet bleibt
+    local login="${SHELL##*/}" zshrc="${ZDOTDIR:-$HOME}/.zshrc"
+    local -a targets=()
+    { [ -f "$HOME/.bashrc" ] || [ "$login" = bash ]; } && targets+=("bash:$HOME/.bashrc")
+    { [ -f "$zshrc" ] || [ "$login" = zsh ]; } && targets+=("zsh:$zshrc")
+    command -v fish >/dev/null 2>&1 && targets+=("fish:$CONFIG_DIR/fish/conf.d/dynamic-island-path.fish")
+
+    local entry sh rc handled=0
+    for entry in "${targets[@]}"; do
+        sh="${entry%%:*}"; rc="${entry#*:}"
+        if [ -f "$rc" ] && grep -qF "$PATH_MARK" "$rc"; then
+            skip "$(short "$rc") setzt den PATH schon"
+            handled=1
+            continue
+        fi
+        # Steht ~/.local/bin schon in der rc (eigene Zeile), nichts doppeln
+        if [ -f "$rc" ] && grep -qE '(\$HOME|~|'"$HOME"')/\.local/bin' "$rc"; then
+            skip "$(short "$rc") nennt ~/.local/bin schon"
+            handled=1
+            continue
+        fi
+        if [ "$CHECK_ONLY" = 1 ]; then
+            case ":$PATH:" in
+                *":$BIN_DIR:"*) ;;
+                *) warn "$(short "$rc") nimmt ~/.local/bin nicht in den PATH" ;;
+            esac
+            continue
+        fi
+        if [ "$DRY_RUN" = 1 ]; then
+            printf '  %s[dry-run]%s ~/.local/bin in %s eintragen\n' "$c_dim" "$c_reset" "$(short "$rc")"
+            continue
+        fi
+        mkdir -p "$(dirname "$rc")"
+        path_block "$sh" >> "$rc"
+        ok "~/.local/bin in $(short "$rc") eingetragen ($sh)"
+        handled=1
+    done
 
     case ":$PATH:" in
         *":$BIN_DIR:"*) ok "~/.local/bin liegt im PATH" ;;
-        *) warn "~/.local/bin fehlt im PATH — fish: fish_add_path ~/.local/bin"
-           warn "                                bash/zsh: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+        *) if [ "$handled" = 1 ]; then
+               PATH_HINT=1
+           elif [ "$DRY_RUN" = 0 ]; then
+               warn "~/.local/bin fehlt im PATH, und keine Shell-Config gefunden:"
+               warn "   export PATH=\"\$HOME/.local/bin:\$PATH\"  in die rc deiner Shell"
+           fi ;;
     esac
+}
+
+# --------------------------------------------------------- 2c. kitty ---
+# Die Transparenz des Terminals steckt in kitty (background_opacity), nicht in
+# Hyprland. Ohne das ist kitty auf einem frischen Rechner voll deckend. Die
+# Einstellungen liegen in config/kitty/dynamic-island.conf; kitty.conf selbst
+# bleibt die des Rechners und bekommt nur einen markierten include-Block.
+KITTY_MARK="# >>> dynamic-island kitty >>>"
+
+kitty_setup() {
+    step "kitty (Transparenz)"
+    local src="$SRC_DIR/kitty/dynamic-island.conf"
+    local dst="$CONFIG_DIR/kitty/dynamic-island.conf"
+    local kc="$CONFIG_DIR/kitty/kitty.conf"
+
+    if ! command -v kitty >/dev/null 2>&1 && [ ! -d "$CONFIG_DIR/kitty" ]; then
+        skip "kitty nicht installiert"
+        return 0
+    fi
+
+    local included=0
+    [ -f "$kc" ] && grep -qE "^[[:space:]]*include[[:space:]]+(\\./)?dynamic-island\\.conf[[:space:]]*\$" "$kc" \
+        && included=1
+
+    if [ "$CHECK_ONLY" = 1 ]; then
+        if same_path "$dst" "$src"; then ok "$(short "$dst") zeigt auf das Repo"
+        elif [ -f "$dst" ]; then ok "$(short "$dst") (Kopie)"
+        else warn "$(short "$dst") fehlt (./install.sh legt sie an)"
+        fi
+        if [ "$included" = 1 ]; then ok "$(short "$kc") bindet dynamic-island.conf ein"
+        else warn "$(short "$kc") bindet dynamic-island.conf nicht ein"
+        fi
+        return 0
+    fi
+
+    if [ "$COPY" = 1 ]; then
+        # Ein frueherer Symlink zeigt auf die Quelle selbst – cp wuerde scheitern
+        [ -L "$dst" ] && run rm -f "$dst"
+        run mkdir -p "$(dirname "$dst")"
+        run cp "$src" "$dst"
+        ok "$(short "$dst") kopiert"
+    else
+        link "$src" "$dst"
+    fi
+
+    if [ "$included" = 1 ]; then
+        skip "$(short "$kc") bindet dynamic-island.conf schon ein"
+    elif [ "$DRY_RUN" = 1 ]; then
+        printf '  %s[dry-run]%s include dynamic-island.conf an %s anhaengen\n' "$c_dim" "$c_reset" "$(short "$kc")"
+    else
+        mkdir -p "$(dirname "$kc")"
+        printf '\n%s\n# Transparenz der Dynamic-Island-Rice; eigene Werte darunter gewinnen\ninclude dynamic-island.conf\n# <<< dynamic-island kitty <<<\n' \
+            "$KITTY_MARK" >> "$kc"
+        ok "include dynamic-island.conf in $(short "$kc") eingetragen"
+        warn "Offene kitty-Fenster laden das erst nach Strg+Shift+F5 (oder neu starten)"
+    fi
 }
 
 # ------------------------------------------------------- Rust-Helfer ---
@@ -545,9 +820,18 @@ seed_scheme() {
          \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
          2>/dev/null | sort | head -1)"
     if [ -n "$wp" ]; then
-        "$BIN_DIR/dynamic-island" wallpaper -f "$wp" && ok "Schema aus $(basename "$wp") erzeugt"
+        if "$BIN_DIR/dynamic-island" wallpaper -f "$wp"; then
+            ok "Schema aus $(basename "$wp") erzeugt"
+        else
+            warn "Schema aus $(basename "$wp") liess sich nicht erzeugen"
+            warn "  spaeter von Hand: dynamic-island wallpaper -f BILD"
+        fi
     else
-        "$BIN_DIR/dynamic-island" scheme set -n island -m dark && ok "Statisches Schema 'island' gesetzt"
+        if "$BIN_DIR/dynamic-island" scheme set -n island -m dark; then
+            ok "Statisches Schema 'island' gesetzt"
+        else
+            warn "Schema 'island' liess sich nicht setzen"
+        fi
         warn "Keine Wallpaper in ~/Pictures/Wallpapers — spaeter: dynamic-island wallpaper -f BILD"
     fi
 }
@@ -557,13 +841,20 @@ hypr_profile() {
     step "Hyprland-Profil"
     local pf="$CONFIG_DIR/hypr/profile"
     if [ ! -d "$CONFIG_DIR/hypr" ]; then
-        fail "~/.config/hypr fehlt — install.sh ohne --check laufen lassen"
+        # Bei --dry-run hat deploy() nur angekuendigt, nichts angelegt
+        if [ "$DRY_RUN" = 1 ] && [ "$CHECK_ONLY" = 0 ]; then
+            skip "wuerde nach dem Verteilen das Profil 'simple' setzen"
+        else
+            fail "~/.config/hypr fehlt — install.sh ohne --check laufen lassen"
+        fi
         return 0
     fi
     if [ -f "$pf" ]; then
         skip "aktives Profil: $(cat "$pf")"
+    elif [ "$DRY_RUN" = 1 ]; then
+        printf '  %s[dry-run]%s Profil simple nach %s\n' "$c_dim" "$c_reset" "$(short "$pf")"
     else
-        run sh -c "printf simple > '$pf'"
+        printf simple > "$pf"
         ok "Profil auf 'simple' gesetzt (= Dynamic Island)"
     fi
     [ -d "$CONFIG_DIR/quickshell/$SHELL_NAME" ] \
@@ -571,16 +862,94 @@ hypr_profile() {
         || fail "Shell-Config ~/.config/quickshell/$SHELL_NAME fehlt"
 }
 
+# ------------------------------------------------------- 6b. Monitore ---
+# Welche Bildschirme ein Rechner hat, steht in hypr/monitors.lua (git-ignoriert,
+# Vorlage monitors.example.lua). Laeuft Hyprland gerade, wird sie aus den
+# angeschlossenen Monitoren erzeugt: Aufloesung, Position und Skalierung wie
+# jetzt, Workspace-Gruppen (1-10, 11-20, ...) von links nach rechts. Ohne die
+# Datei laeuft Hyprland mit bevorzugter Aufloesung und Auto-Gruppen weiter.
+MONITORS_GEN='
+import json, sys
+mons = [m for m in json.load(sys.stdin) if m.get("mirrorOf", "none") == "none"]
+mons.sort(key=lambda m: (m["x"], m["y"]))
+def num(v):
+    return str(int(v)) if float(v).is_integer() else ("%.2f" % v).rstrip("0").rstrip(".")
+out = ["-- monitors.lua - Bildschirme dieses Rechners (git-ignoriert).",
+       "-- Erzeugt von install.sh aus hyprctl monitors; neu: ./install.sh --monitors",
+       "-- Felder und Erklaerung: monitors.example.lua", "", "return {"]
+for i, m in enumerate(mons):
+    r = m["refreshRate"]
+    rate = str(round(r)) if abs(r - round(r)) < 0.01 else "%.2f" % r
+    out += ["    {",
+            "        output     = %s," % json.dumps(m["name"]),
+            "        mode       = \"%dx%d@%s\"," % (m["width"], m["height"], rate),
+            "        position   = \"%dx%d\"," % (m["x"], m["y"]),
+            "        scale      = %s," % num(m["scale"])]
+    if m.get("transform"):
+        out.append("        transform  = %d," % m["transform"])
+    if m.get("vrr"):
+        out.append("        vrr        = true,")
+    out += ["        workspaces = %d,  -- %d-%d" % (i * 10, i * 10 + 1, i * 10 + 10), "    },"]
+out.append("}")
+print("\n".join(out))
+'
+
+setup_monitors() {  # setup_monitors [force]
+    step "Monitore"
+    local mf="$CONFIG_DIR/hypr/monitors.lua"
+
+    if [ -f "$mf" ] && [ "${1:-}" != force ]; then
+        skip "$(short "$mf") vorhanden (neu erzeugen: ./install.sh --monitors)"
+        return 0
+    fi
+    if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || ! command -v hyprctl >/dev/null 2>&1; then
+        skip "Hyprland laeuft nicht — bevorzugte Aufloesung, Workspaces je Monitor automatisch"
+        skip "   eigene Datei spaeter, in Hyprland: ./install.sh --monitors"
+        return 0
+    fi
+
+    local gen
+    if ! gen="$(hyprctl monitors -j 2>/dev/null | python -c "$MONITORS_GEN" 2>/dev/null)" \
+       || [ -z "$gen" ]; then
+        warn "Monitore liessen sich nicht auslesen — Vorlage: config/hypr/monitors.example.lua"
+        return 0
+    fi
+
+    # Kurzuebersicht: "HDMI-A-1 2560x1440@60 -> Workspaces 1-10"
+    local summary
+    summary="$(printf '%s\n' "$gen" | sed -nE \
+        -e 's/.*output += "([^"]+)".*/\1/p' \
+        -e 's/.*mode += "([^"]+)".*/\1/p' \
+        -e 's/.*-- ([0-9]+-[0-9]+)$/-> Workspaces \1/p' | paste -d' ' - - -)"
+
+    if [ "$DRY_RUN" = 1 ]; then
+        printf '  %s[dry-run]%s %s schreiben:\n' "$c_dim" "$c_reset" "$(short "$mf")"
+        printf '%s\n' "$summary" | sed 's/^/      /'
+        return 0
+    fi
+    [ -f "$mf" ] && backup_copy "$mf"
+    mkdir -p "$(dirname "$mf")"
+    printf '%s\n' "$gen" > "$mf.tmp" && mv "$mf.tmp" "$mf"
+    local line
+    while IFS= read -r line; do ok "$line"; done <<<"$summary"
+    ok "$(short "$mf") geschrieben — wirkt nach: hyprctl reload"
+}
+
 # --------------------------------------------------- 7. Fish-Sequenzen ---
 fish_hook() {
-    local cf="$CONFIG_DIR/fish/config.fish"
-    step "Terminalfarben (fish)"
-    [ -f "$cf" ] || { skip "keine fish-Config"; return 0; }
-    if grep -q "state/$SHELL_NAME/sequences.txt" "$cf"; then
-        skip "sequences.txt wird schon eingelesen"
-    else
-        warn "In $cf ergaenzen:  cat ~/.local/state/$SHELL_NAME/sequences.txt 2> /dev/null"
-    fi
+    step "Terminalfarben"
+    local cf found=0
+    for cf in "$CONFIG_DIR/fish/config.fish" "$HOME/.bashrc" "${ZDOTDIR:-$HOME}/.zshrc"; do
+        [ -f "$cf" ] || continue
+        found=1
+        if grep -q "state/$SHELL_NAME/sequences.txt" "$cf"; then
+            skip "$(short "$cf") liest sequences.txt schon ein"
+        else
+            warn "Fuer Schema-Farben im Terminal in $(short "$cf") ergaenzen:"
+            warn "   cat ~/.local/state/$SHELL_NAME/sequences.txt 2> /dev/null"
+        fi
+    done
+    [ "$found" = 1 ] || skip "keine Shell-Config gefunden"
 }
 
 # ------------------------------------------------------------- Abschluss ---
@@ -592,6 +961,10 @@ summary() {
         printf '  %sAlles eingerichtet.%s\n' "$c_green" "$c_reset"
     fi
     [ "$CHECK_ONLY" = 1 ] && return 0
+    if [ "$PATH_HINT" = 1 ]; then
+        printf '\n  %sDer Befehl dynamic-island geht erst in einem NEUEN Terminal%s\n' "$c_yellow" "$c_reset"
+        printf '  %s(oder in diesem nach: source ~/.bashrc  bzw.  exec $SHELL).%s\n' "$c_yellow" "$c_reset"
+    fi
     cat <<EOF
 
   Weiter geht es mit:
@@ -610,9 +983,10 @@ summary() {
 
   Profile wechseln:  CTRL + SUPER + SHIFT + P   (oder hypr-profile toggle)
 
-  Wenn die Helligkeit nicht reagiert: sie laeuft ueber DDC/CI, und die
-  Bus-Nummern stehen fest in modules/services/brightness/Brightness.qml.
-  Welche dieser Rechner hat, sagt "ddcutil detect".
+  Wenn die Helligkeit nicht reagiert: am Laptop laeuft sie ueber
+  brightnessctl, an externen Monitoren ueber DDC/CI (ddcutil). Ob deine
+  Monitore DDC/CI koennen, sagt "ddcutil detect" (ggf. im OSD einschalten
+  und das Modul i2c-dev laden).
 EOF
     if [ "$COPY" = 1 ]; then
         printf '\n  %sKopiert statt verlinkt: nach einem `git pull` dieses Skript erneut laufen lassen.%s\n' \
@@ -623,12 +997,18 @@ EOF
 check_links() {
     step "Befehle und Completions"
     local f short
-    for f in "$BIN_DIR/dynamic-island" "$BIN_DIR/hypr-profile" "$BIN_DIR/theme-set" \
-             "$CONFIG_DIR/fish/completions/dynamic-island.fish"; do
+    local -a files=("$BIN_DIR/dynamic-island" "$BIN_DIR/hypr-profile" "$BIN_DIR/theme-set")
+    command -v fish >/dev/null 2>&1 && files+=("$CONFIG_DIR/fish/completions/dynamic-island.fish")
+    for f in "${files[@]}"; do
         short="~${f#$HOME}"
         if [ -e "$f" ]; then ok "$short"; else fail "$short fehlt"; fi
     done
 }
+
+if [ "$MONITORS_ONLY" = 1 ]; then
+    setup_monitors force
+    exit $FAILED
+fi
 
 ki_warnung
 
@@ -637,11 +1017,14 @@ check_services
 check_notifications
 if [ "$CHECK_ONLY" = 1 ]; then check_deploy; else deploy; fi
 if [ "$CHECK_ONLY" = 1 ]; then check_links; else link_files; fi
+setup_path
+kitty_setup
 if [ "$CHECK_ONLY" = 1 ]; then check_helpers; else build_helpers; fi
 make_dirs
 seed_wallpapers
 seed_scheme
 hypr_profile
+setup_monitors
 fish_hook
 summary
 exit $FAILED

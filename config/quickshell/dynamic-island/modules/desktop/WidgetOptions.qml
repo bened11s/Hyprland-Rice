@@ -1,18 +1,20 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Layouts
 
 import qs
 import qs.modules.services.config
 import qs.modules.services.desktop
+import qs.modules.settings
 
 // Optionen eines Widgets, angedockt an seinen Auswahlrahmen (WidgetHost
 // setzt Lage und die Ecke, die am Rahmen anliegt). Gleicher Rand wie der
 // Rahmen, damit beides als eine Flaeche liest.
 //
-// Inhalt: Kopf (Typ, Duplizieren, Loeschen mit Rueckfrage), je Option eine
-// Chip-Reihe (Schalter als "an | aus"), Groesse, Farbe/Akzent (die gewaehlte
-// mit Namen), Monitor.
+// Aufbau wie eine Gruppe im Einstellungsfenster (docs/settings-style.md):
+// Kopf (Titel, Duplizieren, Loeschen – Loeschen fragt im Kopf nach),
+// darunter Zeilen mit je einem Bedienelement (EditRow): Sichtbar, die
+// Optionen des Typs (Schalter bzw. Auswahlknopf), Groesse, Farbe/Akzent als
+// Farbtupfer, Monitor als Zweier-Segment.
 Rectangle {
     id: pop
 
@@ -28,36 +30,34 @@ Rectangle {
 
     readonly property var info: pop.widget ? DesktopWidgets.info(pop.widget.type) : null
     readonly property real size: pop.widget?.size ?? 1
-    // Breite der Beschriftungsspalte ("Wachsen zeigen" passt gerade so)
-    readonly property real labelWidth: 100
 
-    // Loeschen ist zweistufig: erster Klick fragt, 3 s lang
-    property bool deleteArmed: false
-
-    readonly property var colorLabels: ({
-        "hell": "Hell", "primary": "Primär", "secondary": "Sekundär",
-        "tertiary": "Tertiär", "weiss": "Weiß", "dunkel": "Dunkel"
-    })
+    // Rueckfrage "Wirklich loeschen?" im Kopf
+    property bool confirmDelete: false
+    // Offene Listen der Auswahlknoepfe in den Zeilen
+    property int menusOpen: 0
 
     function setSize(value: real): void {
         pop.store.patch(pop.widget.id, { size: Number(Math.max(0.3, Math.min(8, value)).toFixed(3)) });
     }
 
-    Timer {
-        id: disarm
-
-        interval: 3000
-        onTriggered: pop.deleteArmed = false
+    // Anzeigename eines Auswahlwerts: uebersetzt und gross angefangen (wie
+    // SettingsRow.optionLabel) – Werte sind Config-Schluessel ("mitte")
+    function optionLabel(value: var): string {
+        const shown = typeof value === "string" ? I18n.tr(value) : String(value);
+        return shown.charAt(0).toUpperCase() + shown.slice(1);
     }
 
-    implicitWidth: Math.max(300, rows.implicitWidth + 28)
-    implicitHeight: rows.implicitHeight + 24
+    implicitWidth: 320
+    implicitHeight: body.implicitHeight + 10
     color: Colors.alpha(Colors.background, 0.96)
     border.width: 2
     border.color: Colors.primary
 
-    // Maus ueber dem Feld: Widgets darunter sperren (WidgetHost.blocked)
-    readonly property bool hovered: popHover.hovered
+    // Maus ueber dem Feld: Widgets darunter sperren (WidgetHost.blocked).
+    // Die Listen (⋮, Auswahlknoepfe) liegen als Popup ausserhalb des Felds –
+    // solange eine offen ist, gilt dasselbe, sonst traefe ein Klick in die
+    // Liste das Widget darunter (Qt 6 reicht den Druck an alle Handler weiter)
+    readonly property bool hovered: popHover.hovered || pop.menusOpen > 0
 
     HoverHandler {
         id: popHover
@@ -70,60 +70,82 @@ Rectangle {
         onWheel: wheel => wheel.accepted = true
     }
 
-    ColumnLayout {
-        id: rows
+    Column {
+        id: body
 
-        x: 14
-        y: 12
-        spacing: 8
+        x: 16
+        y: 4
+        width: pop.width - 32
 
         // ---- Kopf ----
-        RowLayout {
-            spacing: 8
-            Layout.fillWidth: true
+        Item {
+            width: parent.width
+            height: 46
 
             Text {
-                text: pop.info?.icon ?? "widgets"
-                color: Colors.primary
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 18
-            }
-
-            Text {
-                text: I18n.tr(pop.info?.title ?? pop.widget?.type ?? "")
+                anchors {
+                    left: parent.left
+                    right: headActions.left
+                    rightMargin: 8
+                    verticalCenter: parent.verticalCenter
+                }
+                text: pop.confirmDelete ? I18n.tr("Wirklich löschen?") : I18n.tr(pop.info?.title ?? pop.widget?.type ?? "")
                 color: Colors.fgBackground
                 font.family: Config.font
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.weight: Font.DemiBold
-                Layout.fillWidth: true
+                elide: Text.ElideRight
             }
 
-            // Anzeigen oder nur beim Anordnen sichtbar
-            EditChip {
-                icon: pop.widget?.hidden ? "visibility_off" : "visibility"
-                text: pop.widget?.hidden ? I18n.tr("Nur im Editor") : I18n.tr("Sichtbar")
-                on: !pop.widget?.hidden
-                onClicked: pop.store.patch(pop.widget.id, { hidden: !pop.widget?.hidden })
-            }
+            Row {
+                id: headActions
 
-            EditChip {
-                icon: "content_copy"
-                onClicked: pop.store.duplicate(pop.widget.id)
-            }
-
-            EditChip {
-                icon: pop.deleteArmed ? "check" : "delete"
-                text: pop.deleteArmed ? I18n.tr("Löschen?") : ""
-                danger: true
-                armed: pop.deleteArmed
-                onClicked: {
-                    if (pop.deleteArmed) {
-                        pop.store.remove(pop.widget.id);
-                    } else {
-                        pop.deleteArmed = true;
-                        disarm.restart();
-                    }
+                anchors {
+                    right: parent.right
+                    // Symbolknoepfe ragen in den Rand, ihr Symbol fluchtet mit den Bedienelementen
+                    rightMargin: pop.confirmDelete ? 0 : -6
+                    verticalCenter: parent.verticalCenter
                 }
+                spacing: 6
+
+                // Direkt als Knoepfe: Loeschen fragt ohnehin hier im Kopf nach,
+                // ein Umweg ueber ⋮ waere ein Schritt mehr
+                EditButton {
+                    visible: !pop.confirmDelete
+                    icon: "content_copy"
+                    onClicked: pop.store.duplicate(pop.widget.id)
+                }
+
+                EditButton {
+                    visible: !pop.confirmDelete
+                    icon: "delete"
+                    danger: true
+                    onClicked: pop.confirmDelete = true
+                }
+
+                EditButton {
+                    visible: pop.confirmDelete
+                    text: I18n.tr("Löschen")
+                    danger: true
+                    onClicked: pop.store.remove(pop.widget.id)
+                }
+
+                EditButton {
+                    visible: pop.confirmDelete
+                    text: I18n.tr("Abbrechen")
+                    onClicked: pop.confirmDelete = false
+                }
+            }
+        }
+
+        // Anzeigen oder nur beim Anordnen sichtbar
+        EditRow {
+            label: I18n.tr("Sichtbar")
+
+            SettingsSwitch {
+                anchors.verticalCenter: parent.verticalCenter
+                checked: !pop.widget?.hidden
+                onToggled: pop.store.patch(pop.widget.id, { hidden: !pop.widget?.hidden })
             }
         }
 
@@ -131,77 +153,68 @@ Rectangle {
         Repeater {
             model: pop.info ? Object.keys(pop.info.options ?? {}) : []
 
-            RowLayout {
+            EditRow {
                 id: optRow
 
                 required property string modelData
-                readonly property var option: pop.info.options[optRow.modelData]
+                readonly property var option: pop.info?.options?.[optRow.modelData] ?? ({})
                 readonly property var value: DesktopWidgets.opt(pop.widget, optRow.modelData)
 
-                spacing: 6
+                label: I18n.tr(optRow.option.title ?? optRow.modelData)
 
-                EditLabel {
-                    text: I18n.tr(optRow.option.title ?? optRow.modelData)
-                    Layout.preferredWidth: pop.labelWidth
+                SettingsSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: optRow.option.bool === true
+                    checked: !!optRow.value
+                    onToggled: pop.store.setOpt(pop.widget.id, optRow.modelData, !optRow.value)
                 }
 
-                // Schalter: beide Zustaende sichtbar, der aktive hervorgehoben
-                Repeater {
-                    model: optRow.option.bool === true ? [true, false] : []
-
-                    EditChip {
-                        required property bool modelData
-
-                        text: modelData ? I18n.tr("an") : I18n.tr("aus")
-                        on: !!optRow.value === modelData
-                        onClicked: pop.store.setOpt(pop.widget.id, optRow.modelData, modelData)
-                    }
-                }
-
-                Flow {
+                SettingsDropdown {
+                    anchors.verticalCenter: parent.verticalCenter
                     visible: (optRow.option.values ?? []).length > 0
-                    spacing: 6
-                    Layout.maximumWidth: 420
-                    Layout.preferredWidth: implicitWidth
-
-                    Repeater {
-                        model: optRow.option.values ?? []
-
-                        EditChip {
-                            required property var modelData
-
-                            // Werte sind Config-Schluessel; nur Woerter werden uebersetzt
-                            text: typeof modelData === "string" ? I18n.tr(modelData) : String(modelData)
-                            on: optRow.value === modelData
-                            onClicked: pop.store.setOpt(pop.widget.id, optRow.modelData, modelData)
-                        }
-                    }
+                    maxWidth: 180
+                    options: optRow.option.values ?? []
+                    current: optRow.value
+                    labelOf: pop.optionLabel
+                    onPicked: v => pop.store.setOpt(pop.widget.id, optRow.modelData, v)
+                    onMenuOpenChanged: pop.menusOpen += menuOpen ? 1 : -1
+                    // Zeile verschwindet mit offener Liste (anderer Typ)
+                    Component.onDestruction: if (menuOpen) pop.menusOpen--
                 }
             }
         }
 
         // ---- Groesse (auch: Griff an der Ecke, Tasten + / -) ----
-        RowLayout {
-            spacing: 6
-            visible: pop.widget !== null
+        EditRow {
+            label: I18n.tr("Größe")
 
-            EditLabel {
-                text: I18n.tr("Größe")
-                Layout.preferredWidth: pop.labelWidth
-            }
-
-            EditChip {
+            EditButton {
+                anchors.verticalCenter: parent.verticalCenter
                 icon: "remove"
                 onClicked: pop.setSize(pop.size / 1.1)
             }
 
-            EditChip {
+            // Klick auf den Wert: zurueck auf 100 %
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 50
+                horizontalAlignment: Text.AlignHCenter
                 text: Math.round(pop.size * 100) + " %"
-                Layout.preferredWidth: 64
-                onClicked: pop.setSize(1)
+                color: Colors.fgSurface
+                font.family: Config.font
+                font.pixelSize: 12
+
+                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: pop.setSize(1)
+                }
             }
 
-            EditChip {
+            EditButton {
+                anchors.verticalCenter: parent.verticalCenter
                 icon: "add"
                 onClicked: pop.setSize(pop.size * 1.1)
             }
@@ -211,65 +224,125 @@ Rectangle {
         Repeater {
             model: [["color", "Farbe", "hell"], ["accent", "Akzent", "primary"]]
 
-            RowLayout {
+            EditRow {
                 id: colorRow
 
                 required property var modelData
                 readonly property string current: pop.widget?.opts?.[colorRow.modelData[0]] ?? colorRow.modelData[2]
 
-                spacing: 6
-
-                EditLabel {
-                    text: I18n.tr(colorRow.modelData[1])
-                    Layout.preferredWidth: pop.labelWidth
-                }
+                label: I18n.tr(colorRow.modelData[1])
 
                 Repeater {
-                    model: DesktopWidgets.colorNames
+                    // Feste Farbe der Szene (z.B. Cyberpunk-Gelb "#fcee0a") als
+                    // weiterer Tupfer hinten
+                    model: DesktopWidgets.colorNames.concat(colorRow.current.startsWith("#") ? [colorRow.current] : [])
 
-                    EditChip {
+                    Item {
+                        id: dot
+
                         required property string modelData
+                        readonly property bool on: colorRow.current === dot.modelData
 
-                        swatch: DesktopWidgets.color(modelData, "transparent")
-                        on: colorRow.current === modelData
-                        // Name nur an der gewaehlten Farbe, sonst wird die Reihe zu breit
-                        text: on ? I18n.tr(pop.colorLabels[modelData] ?? modelData) : ""
-                        onClicked: pop.store.setOpt(pop.widget.id, colorRow.modelData[0], modelData)
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 24
+                        height: 24
+
+                        // Gewaehlt: Ring
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 12
+                            color: "transparent"
+                            border.width: 2
+                            border.color: dot.on ? Colors.primary
+                                        : dotHover.hovered ? Colors.alpha(Colors.fgSurface, 0.3) : "transparent"
+                        }
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 14
+                            height: 14
+                            radius: 7
+                            color: DesktopWidgets.color(dot.modelData, "transparent")
+                            border.width: 1
+                            border.color: Colors.alpha(Colors.fgSurface, 0.3)
+                        }
+
+                        HoverHandler {
+                            id: dotHover
+
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        TapHandler {
+                            onTapped: pop.store.setOpt(pop.widget.id, colorRow.modelData[0], dot.modelData)
+                        }
                     }
-                }
-
-                // Feste Farbe der Szene (z.B. Cyberpunk-Gelb)
-                EditChip {
-                    visible: colorRow.current.startsWith("#")
-                    swatch: colorRow.current.startsWith("#") ? colorRow.current : "transparent"
-                    text: I18n.tr("Eigene")
-                    on: true
                 }
             }
         }
 
         // ---- Monitor ----
-        RowLayout {
+        // Genau einer an. Festgelegt heisst der zweite wie der Monitor des
+        // Widgets – auch wenn es nur hierher ragt (halb links, halb rechts)
+        EditRow {
             visible: pop.monitors
-            spacing: 6
+            label: I18n.tr("Monitor")
 
-            EditLabel {
-                text: I18n.tr("Monitor")
-                Layout.preferredWidth: pop.labelWidth
-            }
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: segments.width + 4
+                height: 30
+                radius: 8
+                color: Colors.alpha(Colors.fgSurface, 0.06)
 
-            // Genau einer an. Festgelegt heisst der zweite wie der Monitor des
-            // Widgets – auch wenn es nur hierher ragt (halb links, halb rechts)
-            EditChip {
-                text: I18n.tr("Beide")
-                on: !pop.pinned
-                onClicked: pop.store.patch(pop.widget.id, { monitor: "*" })
-            }
+                Row {
+                    id: segments
 
-            EditChip {
-                text: I18n.tr("Nur %1").arg(pop.pinned ? pop.widget.monitor : pop.screenName)
-                on: pop.pinned
-                onClicked: if (!pop.pinned) pop.store.patch(pop.widget.id, { monitor: pop.screenName })
+                    x: 2
+                    y: 2
+
+                    Repeater {
+                        model: [false, true]
+
+                        Rectangle {
+                            id: segment
+
+                            required property bool modelData
+                            readonly property bool on: pop.pinned === segment.modelData
+
+                            width: segmentText.implicitWidth + 24
+                            height: 26
+                            radius: 6
+                            color: segment.on ? Colors.alpha(Colors.primary, 0.2)
+                                 : segmentHover.hovered ? Colors.alpha(Colors.fgSurface, 0.07) : "transparent"
+
+                            Text {
+                                id: segmentText
+
+                                anchors.centerIn: parent
+                                text: !segment.modelData ? I18n.tr("Beide")
+                                    : I18n.tr("Nur %1").arg(pop.pinned ? pop.widget.monitor : pop.screenName)
+                                color: segment.on ? Colors.primary : Colors.fgSurfaceVariant
+                                font.family: Config.font
+                                font.pixelSize: 12
+                                font.weight: segment.on ? Font.DemiBold : Font.Normal
+                            }
+
+                            HoverHandler {
+                                id: segmentHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                onTapped: {
+                                    if (!segment.on)
+                                        pop.store.patch(pop.widget.id, { monitor: segment.modelData ? pop.screenName : "*" });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

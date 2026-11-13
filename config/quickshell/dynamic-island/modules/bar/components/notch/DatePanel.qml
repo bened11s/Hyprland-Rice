@@ -159,8 +159,6 @@ Item {
         color: Colors.fgSurfaceVariant
         font.pixelSize: 10
         font.weight: Font.Medium
-        font.capitalization: Font.AllUppercase
-        font.letterSpacing: 0.8
     }
 
     Row {

@@ -73,15 +73,15 @@ def op_freeze(args):
     with ThreadPoolExecutor(max_workers=max(1, len(monitors))) as pool:
         shots = dict(pool.map(grab, monitors))
 
-    # Hyprland 0.57 gibt Spezial-Workspaces keine IDs mehr (id = null), deshalb
-    # wird ueber den Namen verglichen – der ist immer gesetzt (z. B. "3" oder
-    # "special:communication").
+    # Workspaces ueber den Namen vergleichen: seit Hyprland 0.57 fehlt "id"
+    # bei Spezial-Workspaces im JSON (KeyError, sobald z. B. Discord im
+    # Scratchpad lag)
     visible = {}
     for m in monitors:
-        ws = {m["activeWorkspace"].get("name")}
-        special = (m.get("specialWorkspace") or {}).get("name") or ""
+        ws = (m.get("activeWorkspace") or {}).get("name", "")
+        special = (m.get("specialWorkspace") or {}).get("name", "")
         if special:
-            ws = {special}      # Spezial-Workspace liegt ueber allem
+            ws = special        # Spezial-Workspace liegt ueber allem
         visible[m["id"]] = (m["name"], ws)
 
     windows = []
@@ -89,7 +89,7 @@ def op_freeze(args):
         mon = visible.get(c.get("monitor"))
         if not mon or not c.get("mapped") or c.get("hidden"):
             continue
-        if (c.get("workspace") or {}).get("name") not in mon[1]:
+        if (c.get("workspace") or {}).get("name", "") != mon[1]:
             continue
         windows.append({
             "x": c["at"][0], "y": c["at"][1], "w": c["size"][0], "h": c["size"][1],
@@ -173,6 +173,7 @@ def tr(de: str, en: str) -> str:
 
 def act_copy(img):
     path = save_png(img, CACHE / f"{stamp()}.png")
+    img.close()   # der wartende Enkel (notify_detached) hielte das Bild sonst bis zum Wegklicken
     wl_copy_file(path)
 
     def keep():
@@ -193,6 +194,7 @@ def act_copy(img):
 
 def act_save(img):
     path = save_png(img, pictures_dir() / f"Screenshot_{stamp()}.png")
+    img.close()
     wl_copy_file(path)
     folder = str(path.parent)
     notify_detached(["-i", str(path), "-h", f"string:image-path:{path}",
@@ -258,6 +260,7 @@ def act_ocr(img):
 
 def act_qr(img):
     path = save_png(img, CACHE / "qr.png")
+    img.close()
     res = subprocess.run(["zbarimg", "-q", "--raw", str(path)], capture_output=True, text=True)
     path.unlink(missing_ok=True)
     codes = [c for c in res.stdout.splitlines() if c.strip()]

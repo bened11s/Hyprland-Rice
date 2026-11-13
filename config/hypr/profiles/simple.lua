@@ -17,6 +17,8 @@
 -- Umschalten: hypr-profile <name>   (oder CTRL + SUPER + SHIFT + P)
 
 local home = os.getenv("HOME")
+local monitors = require("monitor-setup")
+local pick = require("apps")
 local hyprProfile = home .. "/.local/bin/hypr-profile"
 
 --------------------------------------------------------------------------------
@@ -46,12 +48,12 @@ end
 -- Die wichtigsten Einstellungen
 --------------------------------------------------------------------------------
 local cfg = {
-	-- Apps
-	terminal = "kitty",
-	browser = "zen-browser",
-	editor = "kate",
-	fileExplorer = "dolphin",
-	audioSettings = "pavucontrol",
+	-- Apps: die erste installierte gewinnt (apps.lua), vorne steht meine Wahl
+	terminal = pick({ "kitty", "alacritty", "foot", "wezterm", "ghostty", "konsole", "gnome-terminal", "xfce4-terminal", "xterm" }),
+	browser = pick({ "zen-browser", "firefox", "librewolf", "brave", "chromium", "google-chrome-stable", "vivaldi-stable" }),
+	editor = pick({ "codium", "code", "zed", "kate", "gnome-text-editor", "mousepad" }),
+	fileExplorer = pick({ "dolphin", "nautilus", "thunar", "nemo", "pcmanfm-qt", "pcmanfm" }),
+	audioSettings = pick({ "pavucontrol", "pwvucontrol", "pavucontrol-qt" }),
 	launcher = "fuzzel",
 	-- Sperrbildschirm (SUPER + L): scripts/lock.sh liest die Shell-Einstellung
 	-- "Sperrbildschirm" (shell.json, lockscreen.style):
@@ -100,15 +102,9 @@ local cfg = {
 	brightnessStep = 5,
 
 	-- Energie
-	sleepCmd = "systemctl suspend",
+	-- ohne eingerichtete Hibernation scheitert suspend-then-hibernate -> nur Standby
+	sleepCmd = "systemctl suspend-then-hibernate || systemctl suspend",
 
-	-- Fuenf Workspaces je Monitor; stabile IDs in 10er-Bloecken.
-	wsMonitorOffset = {
-		["eDP-1"] = 0,
-		["HDMI-A-1"] = 10,
-		["DVI-I-1"] = 20,
-		["DVI-I-2"] = 30,
-	},
 }
 
 --------------------------------------------------------------------------------
@@ -181,6 +177,13 @@ hl.config({
 
 	animations = {
 		enabled = true,
+	},
+
+	-- Kein automatisches HDR im Vollbild: Hyprland 0.57 schaltete DP-2 bei
+	-- jedem Vollbild (auch kitty/Obsidian, kein HDR-Inhalt) auf BT2020+PQ,
+	-- das Modeset machte den Monitor kurz schwarz (2026-11-09)
+	render = {
+		cm_auto_hdr = 0,
 	},
 
 	input = {
@@ -299,16 +302,8 @@ hl.workspace_rule({
 	},
 })
 
--- Je Monitor nur die ersten fuenf IDs des Blocks verwenden
-for monitor, offset in pairs(cfg.wsMonitorOffset) do
-	for i = 1, 5 do
-		hl.workspace_rule({
-			workspace = tostring(offset + i),
-			monitor = monitor,
-			default = (i == 1),
-		})
-	end
-end
+-- Jede 10er-Gruppe fest an ihren Monitor binden (Gruppen: monitors.lua)
+monitors.bind_workspaces()
 
 -- Launcher-Overlay huebsch einblenden
 hl.layer_rule({ match = { namespace = "launcher" }, animation = "popin 80%", blur = true })
@@ -342,13 +337,8 @@ end)
 --------------------------------------------------------------------------------
 -- Workspace-Helfer: SUPER+N = Workspace N des fokussierten Monitors
 --------------------------------------------------------------------------------
-local function monitor_offset()
-	local mon = hl.get_active_monitor()
-	if mon and cfg.wsMonitorOffset[mon.name] then
-		return cfg.wsMonitorOffset[mon.name]
-	end
-	return 0
-end
+-- Jeder Monitor hat seine eigene 10er-Gruppe (Anzeige jeweils 1-10), siehe monitors.lua
+local monitor_offset = monitors.offset
 
 local function wsaction(action, i)
 	return function()
@@ -402,7 +392,7 @@ bind(
 	hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher toggle || " .. cfg.launcher),
 	desc("App-Menü", { release = true })
 )
-bind("SUPER + Space", hl.dsp.exec_cmd(cfg.launcher), desc("App-Starter (fuzzel)"))
+bind("SUPER + Space", hl.dsp.exec_cmd(cfg.launcher), desc("App-Starter ohne Shell"))
 -- Untermenues der Notch (Quickshell-IPC), nochmal druecken = zu.
 -- Dieselben Ansichten erreicht man im Launcher mit >medien, >steuerung,
 -- >benachrichtigungen, >system, >power oder durch Blaettern in der Notch.
@@ -413,6 +403,9 @@ bind("SUPER + I", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher system
 bind("SUPER + X", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher power"), desc("Power-Menü"))
 bind("SUPER + K", hl.dsp.exec_cmd("qs -c dynamic-island ipc call launcher keys"), desc("Tastenkürzel"))
 bind("SUPER + L", hl.dsp.exec_cmd(cfg.lockCmd), desc("Sperren"))
+-- Stuerzt die Shell bei gesperrter Sitzung ab, bleibt Hyprland gesperrt ohne
+-- Oberflaeche zurueck – hyprlock uebernimmt dann (allow_session_lock_restore)
+bind("SUPER + ALT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), desc("Sperre retten", { locked = true }))
 bind("SUPER + SHIFT + L", hl.dsp.exec_cmd(cfg.sleepCmd), desc("Standby", { locked = true }))
 
 -- Fenster

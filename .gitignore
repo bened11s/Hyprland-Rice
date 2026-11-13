@@ -41,6 +41,11 @@ __pycache__/
 # faellt auf "simple" zurueck (install.sh -> hypr_profile legt es auch an),
 # Colors.qml auf das Theme "ink".
 /config/hypr/profile
+
+# Monitore dieses Rechners (Ausgaenge, Aufloesung, Workspace-Gruppen). Vorlage:
+# config/hypr/monitors.example.lua; install.sh erzeugt sie aus `hyprctl monitors`,
+# ohne sie nimmt monitor-setup.lua bevorzugte Aufloesung + Auto-Gruppen.
+/config/hypr/monitors.lua
 /config/quickshell/dynamic-island/themes/current
 
 # Spicetify: nur das eigene Theme "Island" + die Queue-Extension. color.ini ist
@@ -65,3 +70,6 @@ __pycache__/
 # Rust-Build der Helfer
 /config/dynamic-island/rust/target/
 /config/dynamic-island/bin/dynamic-island-rs
+
+# Offscreen-Screenshots
+docs/*/shots/

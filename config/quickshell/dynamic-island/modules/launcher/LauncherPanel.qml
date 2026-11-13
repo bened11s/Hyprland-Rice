@@ -257,7 +257,7 @@ Item {
             Text {
                 anchors.fill: parent
                 visible: search.text === ""
-                text: panel.favoritesOnly ? I18n.tr("Favoriten durchsuchen…") : I18n.tr("Suchen…   >  für Aktionen")
+                text: panel.favoritesOnly ? I18n.tr("Favoriten durchsuchen…") : I18n.tr("Suchen…")
                 color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
                 font: search.font
                 verticalAlignment: Text.AlignVCenter

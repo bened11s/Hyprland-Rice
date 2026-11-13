@@ -38,6 +38,7 @@
                     "title": { "type": "string" },
                     "desc": { "type": "string" },
                     "options": { "type": "array", "items": { "type": "string" } },
+                    "labels": { "type": "object", "description": "Anzeigenamen der Optionen (Wert -> Text)", "additionalProperties": { "type": "string" } },
                     "min": { "type": "number" },
                     "max": { "type": "number" },
                     "step": { "type": "number" },
@@ -90,7 +91,7 @@
         },
         "panels": {
             "type": "object",
-            "description": "Sektionen in Ansichten der Shell, je Ansicht eine (bisher nur \"wallpaper\")",
+            "description": "Sektionen in Ansichten der Shell, je Ansicht eine (\"wallpaper\": Sektion der Wallpaper-Auswahl, \"notch\": eigene Ansicht in der Notch)",
             "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
             "additionalProperties": {
                 "type": "object",

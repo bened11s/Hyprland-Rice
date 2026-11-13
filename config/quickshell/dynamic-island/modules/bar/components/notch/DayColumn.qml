@@ -42,7 +42,7 @@ Item {
             topMargin: 1
         }
         text: {
-            const name = column.day.toLocaleDateString(I18n.locale, "ddd").replace(".", "").toUpperCase();
+            const name = column.day.toLocaleDateString(I18n.locale, "ddd").replace(".", "");
             return column.isFocus ? name : name.charAt(0);
         }
         color: column.isToday ? Colors.error
@@ -50,7 +50,6 @@ Item {
              : Colors.fgSurfaceVariant
         font.pixelSize: [9.5, 8.5, 8, 7.5, 7][column.distance]
         font.weight: column.isFocus || column.isToday ? Font.Bold : Font.Normal
-        font.letterSpacing: 0.5
     }
 
     Rectangle {

@@ -1,13 +1,9 @@
 local vars = require("variables")
+local monitors = require("monitor-setup")
 
 -- Workspace-Gruppe hängt am fokussierten Monitor, nicht am aktiven Workspace
-local function monitor_ws_offset()
-    local mon = hl.get_active_monitor()
-    if mon and vars.wsMonitorOffset[mon.name] then
-        return vars.wsMonitorOffset[mon.name]
-    end
-    return 0
-end
+-- (Gruppen je Monitor: monitors.lua)
+local monitor_ws_offset = monitors.offset
 
 local function wsaction(action, range, i)
     return function()

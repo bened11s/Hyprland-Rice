@@ -10,7 +10,7 @@ import qs.modules.services.media
 
 // "Jetzt laeuft" auf dem Desktop: Cover, Titel, Interpret und (optional) eine
 // duenne Fortschrittslinie mit Zeit – frei auf dem Wallpaper, ohne Karte,
-// in der Sprache der Notch (Inter Display fuer den Titel, Interpret als kleine
+// in der Sprache der Notch (Config.displayFont fuer den Titel, Interpret als kleine
 // Versalien-Kopfzeile mit Akzentpunkt). Stile:
 //
 //   zeile   kleines, abgerundetes Cover links, rechts Kopfzeile/Titel/Linie
@@ -49,7 +49,7 @@ Item {
     readonly property bool useTint: root.opts.tint ?? true
     readonly property bool idleShown: root.opts.idle === "ruhig"
 
-    readonly property string display: Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : Config.font
+    readonly property string display: Config.displayFont
 
     // Gibt es einen Titel? (pausiert zaehlt – nur "nichts da" ist leer)
     readonly property bool hasMusic: Media.available && Media.title !== ""

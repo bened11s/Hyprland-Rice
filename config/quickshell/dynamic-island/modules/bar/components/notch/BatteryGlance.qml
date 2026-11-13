@@ -10,16 +10,16 @@ import qs.modules.widgets
 // Akkus aller Geraete fuer die aufgeklappte Notch (Uebersicht), unter den
 // Systemwerten: je Geraet ein Chip mit Symbol, Batterie und Prozent. Klick
 // oeffnet die Seite "Akku" im Einstellungs-Fenster (Verlauf, Kennzahlen).
-// Ohne Akku – oder mit ausgeschalteter Akkuanzeige – ist die Reihe 0 hoch.
+// Ohne Akku ist die Reihe 0 hoch.
 Row {
     id: root
 
     // Systemakku zuerst, dann die Geraete (schwaechster zuerst), hoechstens
     // fuenf – mehr passen nicht nebeneinander
+    // Systemakku nur mit Akkuanzeige (bar.battery); die Geraete schaltet
+    // die Uebersicht selbst (notch.batteries, Notch.qml)
     readonly property var batteries: {
-        if (!Config.bar.battery)
-            return [];
-        const list = root.systemDevice ? [root.systemDevice] : [];
+        const list = root.systemDevice && Config.bar.battery ? [root.systemDevice] : [];
         return list.concat(Power.deviceBatteries).slice(0, 5);
     }
     readonly property var systemDevice: Power.hasSystemBattery ? Power.systemDevice : null

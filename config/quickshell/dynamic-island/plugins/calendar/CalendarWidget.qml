@@ -44,7 +44,7 @@ Item {
     readonly property bool showUpcoming: root.opts.upcoming ?? true
 
     readonly property var locale: I18n.locale
-    readonly property string display: Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : Config.font
+    readonly property string display: Config.displayFont
     // Ziffer im Akzentkreis: dunkel auf hellem, hell auf dunklem Akzent
     readonly property color onAccent: root.accent.hslLightness > 0.6 ? "#161616" : "#fafafa"
 

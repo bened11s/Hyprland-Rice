@@ -9,21 +9,84 @@ import qs.modules.services.core
 
 import qs
 
+// VPN-Dienst mit Anbieter-Register: die eingebauten (NordVPN, Cloudflare
+// WARP) plus eigene aus Config.vpn.custom. Jeder Eintrag in `providers`:
+//
+//     { id, name, icon, builtin, available }
+//
+// Eingebaute rufen ihre CLI direkt (`nordvpn connect`), eigene laufen als
+// Shell-Befehl (`sh -c …`). Verbunden ist ein eigener Anbieter, wenn die
+// Ausgabe (stdout + stderr) seines Status-Befehls auf `connectedRegex`
+// passt (Gross/Klein egal) – ohne Regex zaehlt Exit-Code 0 als verbunden.
+// Installiert ist er, wenn das erste Wort seines Verbinden-Befehls per
+// `command -v` zu finden ist (sudo/pkexec/doas davor werden uebersprungen).
 Singleton {
     id: root
 
-    readonly property string provider: Config.vpn.provider === "cloudflare" ? "cloudflare" : "nordvpn"
-    readonly property string providerName: provider === "cloudflare" ? "Cloudflare WARP" : "NordVPN"
+    // ---- Register ----
+
+    readonly property var builtins: [
+        { id: "nordvpn", name: "NordVPN", icon: "vpn_key", builtin: true, bin: "nordvpn" },
+        { id: "cloudflare", name: "Cloudflare WARP", icon: "cloud", builtin: true, bin: "warp-cli" }
+    ]
+
+    // Eigene Anbieter aus der Datei, als reine JS-Objekte (der Adapter
+    // liefert QVariant-Listen)
+    readonly property var customList: {
+        const raw = Config.vpn.custom;
+        if (!raw || raw.length === undefined)
+            return [];
+        let list;
+        try {
+            list = JSON.parse(JSON.stringify(raw));
+        } catch (e) {
+            return [];
+        }
+        return list.filter(c => c && typeof c === "object" && String(c.id ?? "") !== "");
+    }
+
+    readonly property var definitions: root.builtins.concat(root.customList.map(c => ({
+        id: String(c.id),
+        name: String(c.name ?? "") || String(c.id),
+        icon: String(c.icon ?? "") || "vpn_key",
+        builtin: false,
+        connect: String(c.connect ?? ""),
+        disconnect: String(c.disconnect ?? ""),
+        status: String(c.status ?? ""),
+        connectedRegex: String(c.connectedRegex ?? ""),
+        bin: root.binOf(String(c.connect ?? ""))
+    })))
+
+    // Welche CLIs installiert sind ({ nordvpn: true, "wg-quick": false }) –
+    // fehlende werden gar nicht erst aufgerufen
+    property var tools: ({})
+    property bool toolsChecked: false
+
+    readonly property var providers: root.definitions.map(d => ({
+        id: d.id, name: d.name, icon: d.icon, builtin: d.builtin,
+        available: root.tools[d.bin] === true
+    }))
+
+    function definition(id: string): var {
+        return root.definitions.find(d => d.id === id) ?? null;
+    }
+
+    // Unbekannte id (geloeschter Anbieter, Tippfehler in der Datei): NordVPN
+    readonly property string provider: root.definition(Config.vpn.provider) ? Config.vpn.provider : "nordvpn"
+    readonly property var current: root.definition(root.provider) ?? root.builtins[0]
+    readonly property string providerName: root.current.name
+    readonly property string providerIcon: root.current.icon
+    readonly property bool builtin: root.current.builtin
+    readonly property bool available: root.tools[root.current.bin] === true
+    readonly property bool nordAvailable: root.tools["nordvpn"] === true
+    readonly property bool warpAvailable: root.tools["warp-cli"] === true
+
     readonly property bool connected: statusProc.status === "Connected"
     readonly property string statusText: !root.available ? (root.toolsChecked ? I18n.tr("Nicht installiert") : I18n.tr("Nicht bereit"))
                                                 : connected ? I18n.tr("Verbunden")
                                                 : statusProc.status === "Disconnected" ? I18n.tr("Getrennt")
                                                 : I18n.tr("Nicht bereit")
-    // Welche CLIs installiert sind – fehlende werden gar nicht erst aufgerufen
-    property bool nordAvailable: false
-    property bool warpAvailable: false
-    property bool toolsChecked: false
-    readonly property bool available: provider === "cloudflare" ? warpAvailable : nordAvailable
+
     property bool nordConnected: false
     property bool warpConnected: false
     property bool nordStatusReady: false
@@ -34,12 +97,55 @@ Singleton {
     readonly property Demand demand: Demand {}
     readonly property bool watching: root.demand.active
 
+    // Programm hinter einem Shell-Befehl: erstes Wort, das kein Rechte-
+    // Wrapper und keine VAR=wert-Zuweisung ist
+    function binOf(cmd: string): string {
+        const skip = ["sudo", "doas", "pkexec", "env", "nohup", "run0"];
+        for (const word of cmd.trim().split(/\s+/)) {
+            if (word === "" || skip.includes(word) || word.includes("=") || word.startsWith("-"))
+                continue;
+            // ~/bin/x: ~ selbst aufloesen, sonst bliebe "/bin/x" uebrig
+            const w = word.startsWith("~/") ? Quickshell.env("HOME") + word.slice(1) : word;
+            return w.replace(/[^A-Za-z0-9._+\/-]/g, "");
+        }
+        return "";
+    }
+
     function commandFor(vpnProvider: string, action: string): list<string> {
-        return vpnProvider === "cloudflare" ? ["warp-cli", action] : ["nordvpn", action];
+        const def = root.definition(vpnProvider) ?? root.builtins[0];
+        if (def.builtin)
+            return [def.bin, action];
+        // Status mit Zeitlimit: ein haengender Befehl blockierte sonst
+        // statusProc fuer immer (running = true bewirkt dann nichts mehr)
+        if (action === "status")
+            return ["timeout", "15", "sh", "-c", String(def[action] ?? "")];
+        return ["sh", "-c", String(def[action] ?? "")];
+    }
+
+    // Ausgabe des Status-Befehls -> "Connected" | "Disconnected" | "Unknown"
+    function parseStatus(def: var, text: string, code: int): string {
+        if (def.builtin) {
+            const match = text.match(/Status(?: update)?:\s*(Connected|Disconnected)/i);
+            if (!match)
+                return "Unknown";
+            return match[1].toLowerCase() === "connected" ? "Connected" : "Disconnected";
+        }
+        return root.matches(text, code, def.connectedRegex) ? "Connected" : "Disconnected";
+    }
+
+    function matches(text: string, code: int, pattern: string): bool {
+        if (pattern.trim() === "")
+            return code === 0;
+        try {
+            return new RegExp(pattern, "i").test(text);
+        } catch (e) {
+            console.warn("VPN: ungueltiger Regex", JSON.stringify(pattern), e);
+            return false;
+        }
     }
 
     function selectProvider(vpnProvider: string): void {
-        if (vpnProvider === root.provider)
+        if (vpnProvider === root.provider || !root.definition(vpnProvider))
             return;
 
         // Den alten Tunnel nicht unbemerkt weiterlaufen lassen.
@@ -49,8 +155,10 @@ Singleton {
         Config.set("vpn", "provider", vpnProvider);
     }
 
+    // Nur zwischen den eingebauten: meldet genau eine CLI "verbunden",
+    // wechselt die Anzeige dorthin. Ein eigener Anbieter bleibt gewaehlt.
     function applyDetectedProvider(): void {
-        if (!root.nordStatusReady || !root.warpStatusReady)
+        if (!root.nordStatusReady || !root.warpStatusReady || !root.builtin)
             return;
 
         if (warpConnected && !nordConnected && root.provider !== "cloudflare")
@@ -75,8 +183,13 @@ Singleton {
     }
 
     function refreshStatus(): void {
-        if (root.available)
+        if (root.available && (root.builtin || root.current.status.trim() !== ""))
             statusProc.running = true;
+        else if (root.available && !root.builtin)
+            // Eigener Anbieter ohne Status-Befehl: der zuletzt geschaltete
+            // Zustand gilt (sonst fiele er nach 5 s auf "unbekannt" und
+            // toggle() koennte nie trennen), anfangs "getrennt"
+            statusProc.status = statusProc.status === "Connected" ? "Connected" : "Disconnected";
         else
             statusProc.status = "Unknown";
     }
@@ -100,6 +213,88 @@ Singleton {
 
         refreshTimer.restart();
     }
+
+    // ---- Eigene Anbieter (Config.vpn.custom) ----
+
+    function normaliseCustom(id: string, obj: var): var {
+        return {
+            id,
+            name: String(obj.name ?? "").trim(),
+            icon: String(obj.icon ?? "").trim() || "vpn_key",
+            connect: String(obj.connect ?? "").trim(),
+            disconnect: String(obj.disconnect ?? "").trim(),
+            status: String(obj.status ?? "").trim(),
+            connectedRegex: String(obj.connectedRegex ?? "").trim()
+        };
+    }
+
+    function addCustom(obj: var): string {
+        const id = "custom-" + Date.now().toString(36);
+        const list = root.customList.map(c => Object.assign({}, c));
+        list.push(root.normaliseCustom(id, obj));
+        Config.set("vpn", "custom", list);
+        return id;
+    }
+
+    function updateCustom(id: string, obj: var): void {
+        const list = root.customList.map(c => c.id === id ? root.normaliseCustom(id, obj) : Object.assign({}, c));
+        Config.set("vpn", "custom", list);
+    }
+
+    // Den gewaehlten entfernen: vorher trennen, dann zurueck zu einem
+    // eingebauten (dem installierten, sonst NordVPN)
+    function removeCustom(id: string): void {
+        if (root.provider === id) {
+            if (root.connected)
+                Quickshell.execDetached(root.commandFor(id, "disconnect"));
+            Config.set("vpn", "provider", root.warpAvailable && !root.nordAvailable ? "cloudflare" : "nordvpn");
+        }
+        Config.set("vpn", "custom", root.customList.filter(c => c.id !== id).map(c => Object.assign({}, c)));
+    }
+
+    // Probelauf fuer den Editor: Status-Befehl ausfuehren und melden, ob die
+    // Ausgabe als "verbunden" gelten wuerde.
+    //   { running, output, code, connected }  (null = noch nie getestet)
+    property var testResult: null
+
+    function testStatus(cmd: string, pattern: string): void {
+        if (testProc.running)
+            return;
+        testProc.pattern = pattern;
+        // Mit Zeitlimit: ein haengender Befehl liesse "Testen" sonst fuer
+        // immer gesperrt (Exit-Code 124 = abgebrochen)
+        testProc.command = ["timeout", "10", "sh", "-c", cmd];
+        root.testResult = { running: true, output: "", code: -1, connected: false };
+        testProc.running = true;
+    }
+
+    function clearTest(): void {
+        root.testResult = null;
+    }
+
+    Process {
+        id: testProc
+
+        property string pattern: ""
+
+        stdout: StdioCollector {
+            id: testOut
+        }
+        stderr: StdioCollector {
+            id: testErr
+        }
+        onExited: (code, exitStatus) => {
+            const text = testOut.text + testErr.text;
+            root.testResult = {
+                running: false,
+                output: text.trim(),
+                code,
+                connected: root.matches(text, code, testProc.pattern)
+            };
+        }
+    }
+
+    // ---- Prozesse ----
 
     Process {
         id: connectProc
@@ -132,42 +327,77 @@ Singleton {
 
         stdout: StdioCollector {
             id: collector
-            onStreamFinished: {
-                const match = collector.text.match(/Status(?: update)?:\s*(Connected|Disconnected)/i);
-                if (!match)
-                    statusProc.status = "Unknown";
-                else
-                    statusProc.status = match[1].toLowerCase() === "connected" ? "Connected" : "Disconnected";
-
-                // Zaehlt zugleich als Ergebnis der Anbieter-Erkennung
-                if (root.provider === "cloudflare") {
-                    root.warpConnected = root.connected;
-                    root.warpStatusReady = true;
-                } else {
-                    root.nordConnected = root.connected;
-                    root.nordStatusReady = true;
-                }
-                root.applyDetectedProvider();
-            }
         }
+        stderr: StdioCollector {
+            id: errCollector
+        }
+
+        // Die Sammler sind beim Exit komplett (so auch Clipboard/Idle)
+        onExited: (code, exitStatus) => {
+            const def = root.current;
+            statusProc.status = root.parseStatus(def, def.builtin ? collector.text : collector.text + "\n" + errCollector.text, code);
+
+            // Zaehlt zugleich als Ergebnis der Anbieter-Erkennung
+            if (!def.builtin)
+                return;
+            if (def.id === "cloudflare") {
+                root.warpConnected = root.connected;
+                root.warpStatusReady = true;
+            } else {
+                root.nordConnected = root.connected;
+                root.nordStatusReady = true;
+            }
+            root.applyDetectedProvider();
+        }
+    }
+
+    // Alle Programme der Anbieter auf einmal nachsehen
+    readonly property string binList: {
+        const bins = [];
+        for (const d of root.definitions) {
+            if (d.bin !== "" && !bins.includes(d.bin))
+                bins.push(d.bin);
+        }
+        return bins.map(b => "'" + b.replace(/'/g, "") + "'").join(" ");
     }
 
     Process {
         id: toolCheck
-        command: ["sh", "-c", "for t in nordvpn warp-cli; do command -v \"$t\" >/dev/null && echo \"$t\"; done"]
+        command: ["sh", "-c", "for t in " + root.binList + "; do command -v \"$t\" >/dev/null && echo \"$t\"; done"]
         running: true
+
+        property bool again: false
 
         stdout: StdioCollector {
             onStreamFinished: {
                 const found = this.text.split("\n");
-                root.nordAvailable = found.includes("nordvpn");
-                root.warpAvailable = found.includes("warp-cli");
+                const next = {};
+                for (const d of root.definitions)
+                    next[d.bin] = found.includes(d.bin);
+                root.tools = next;
                 root.toolsChecked = true;
                 root.refreshStatus();
                 root.detectProviders();
             }
         }
+        onExited: {
+            if (toolCheck.again) {
+                toolCheck.again = false;
+                toolCheck.running = true;
+            }
+        }
     }
+
+    function recheckTools(): void {
+        if (toolCheck.running)
+            toolCheck.again = true;
+        else
+            toolCheck.running = true;
+    }
+
+    // Neuer oder geaenderter Anbieter: Programm pruefen, Status neu lesen
+    onBinListChanged: if (root.toolsChecked) root.recheckTools()
+    onCurrentChanged: if (root.toolsChecked) providerRefresh.restart()
 
     Process {
         id: nordStatusProc
@@ -175,7 +405,7 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                root.nordConnected = /Status:\s*Connected/i.test(this.text);
+                root.nordConnected = root.parseStatus(root.builtins[0], this.text, 0) === "Connected";
                 root.nordStatusReady = true;
                 root.applyDetectedProvider();
             }
@@ -188,7 +418,7 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                root.warpConnected = /Status update:\s*Connected/i.test(this.text);
+                root.warpConnected = root.parseStatus(root.builtins[1], this.text, 0) === "Connected";
                 root.warpStatusReady = true;
                 root.applyDetectedProvider();
             }
@@ -222,7 +452,7 @@ Singleton {
     // Symbol der Insel-Pille.
     Timer {
         interval: root.watching ? 15000 : 300000
-        running: root.toolsChecked && (root.nordAvailable || root.warpAvailable)
+        running: root.toolsChecked && (root.available || root.nordAvailable || root.warpAvailable)
         repeat: true
         onTriggered: {
             root.refreshStatus();
@@ -235,6 +465,6 @@ Singleton {
         interval: 600000
         running: true
         repeat: true
-        onTriggered: toolCheck.running = true
+        onTriggered: root.recheckTools()
     }
 }

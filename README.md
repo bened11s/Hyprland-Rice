@@ -17,12 +17,11 @@ The colors follow the wallpaper (Material You), and every wallpaper can have
 its own desktop widgets. On top of that, the `dynamic-island` CLI handles
 color schemes, wallpapers, screenshots and screen recording.
 
-This is the config exactly as it runs on my machines — including my monitor
-names and two profiles that need shells not included here (see
+This is the config exactly as it runs on my machines — including two profiles that need shells not included here (see
 [Profiles](#profiles)).
 
 The interface speaks **English** (default) and **German** — switch it under
-Settings > Appearance > Language.
+Settings > Language & region.
 
 ![Desktop with the notch, clock and visualizer widgets](docs/screenshots/desktop.jpg)
 
@@ -42,7 +41,7 @@ Settings > Appearance > Language.
 </table>
 
 ![Keybind overview](docs/screenshots/tastenkuerzel.jpg)
-<sub><b>Keybind overview</b> (<code>SUPER + K</code>) — live from Hyprland, click to run, keybinds can be rebound right there</sub>
+<sub><b>Keybind overview</b> (<code>SUPER + K</code>) — live from Hyprland, click to run, <code>Ctrl + E</code> opens the editor in the settings</sub>
 
 <sub>The screenshots show the German interface.</sub>
 
@@ -60,7 +59,10 @@ as symlinks by default, so a `git pull` in the clone
 applies right away. Whatever is already there is moved to `~/backups/` first;
 nothing is deleted. It also copies the bundled wallpapers to
 `~/Pictures/Wallpapers` (existing files are left alone) and generates the
-first color scheme from them.
+first color scheme from them. For the see-through terminal it places
+`config/kitty/dynamic-island.conf` in `~/.config/kitty/` and appends a marked
+`include` block to your `kitty.conf` (nothing else in that file is touched;
+your own values below the block win).
 
 Then:
 
@@ -79,6 +81,7 @@ It doesn't matter where the clone lives.
 | `--copy` | copy instead of symlink (run again after `git pull`) |
 | `--extras` | also link my hyprlock layouts, nvim, spicetify and spotify-launcher configs (replaces yours, backed up to `~/backups/`) |
 | `--check` | only check, change nothing |
+| `--monitors` | only (re)write `~/.config/hypr/monitors.lua` from the connected monitors |
 | `--dry-run` | show what would happen |
 | `-y` | run without asking |
 
@@ -89,36 +92,48 @@ a few things. Thanks to the symlinks, `~/.config/hypr` is the same folder as
 `config/hypr/` in the clone — wherever you edit, it's the same file. After every
 change: `hyprctl reload`. Hyprland reports typos as a red bar at the top.
 
-### 1. Monitors (most important)
+### 1. Monitors
 
-First check what your screens are called:
+Monitors live in `~/.config/hypr/monitors.lua` — a file per machine that is
+not part of the repo (it's in `.gitignore`, so `git pull` never touches it).
+`install.sh` writes it from the monitors that are connected right now, if
+Hyprland is running. Installed from a TTY? Then run this once inside Hyprland:
 
 ```sh
-hyprctl monitors    # names like HDMI-A-1, DP-1, eDP-1 + available resolutions
+./install.sh --monitors   # writes monitors.lua from `hyprctl monitors`
+hyprctl reload
 ```
 
-The top of `config/hypr/hyprland.lua` has my three (`HDMI-A-1` left, `DP-2` right,
-`eDP-1` = laptop). Enter your names, resolution, refresh rate and position
-there and delete the extra blocks. Example for one monitor:
+Settings > Monitors writes the same file: arrangement, resolution,
+refresh rate and scale, with a timer that reverts a setting that leaves you
+with a black screen.
+
+Without the file everything still works: every monitor gets its preferred
+resolution, and the workspace groups are handed out left to right.
+
+The file looks like this (template with all options:
+`config/hypr/monitors.example.lua`):
 
 ```lua
-hl.monitor({
-    output   = "DP-1",            -- name from `hyprctl monitors`
-    mode     = "1920x1080@144",   -- or "preferred"
-    position = "0x0",
-    scale    = 1,
-})
+return {
+    {
+        output     = "DP-1",            -- name from `hyprctl monitors`
+        mode       = "1920x1080@144",   -- or "preferred"
+        position   = "0x0",
+        scale      = 1,
+        workspaces = 0,                 -- this monitor has workspaces 1-10
+    },
+    {
+        output     = "HDMI-A-1",
+        mode       = "preferred",
+        position   = "1920x0",
+        scale      = 1,
+        workspaces = 10,                -- 11-20 (SUPER+1 here jumps to 11)
+    },
+}
 ```
 
-Then enter the same names under `wsMonitorOffset` in
-`config/hypr/profiles/simple.lua`. Every monitor gets its own workspaces 1–10; the
-first has offset `0`, a second one `10`. With a single monitor:
-
-```lua
-wsMonitorOffset = {
-    ["DP-1"] = 0,
-},
-```
+Every monitor gets its own workspaces 1–10 (shown as 1–10 in the bar).
 
 ### 2. Keyboard
 
@@ -144,7 +159,8 @@ Edgerunners, Miku, Lord of the Mysteries, …) and is copied to
 ## Keybinds
 
 `SUPER` is the Windows key. Applies to the `simple` profile. `SUPER + K`
-shows all keybinds — you can also rebind or disable them there.
+shows all keybinds; rebind or disable them under Settings > Keyboard shortcuts
+(`Ctrl + E` in the overview).
 
 | Keybind | What happens |
 | --- | --- |
@@ -161,6 +177,7 @@ shows all keybinds — you can also rebind or disable them there.
 | `SUPER + 1…0` | workspace 1–10 (of the focused monitor) |
 | `SUPER + ALT + 1…0` | move window to workspace 1–10 |
 | `CTRL + SUPER + ←/→` | previous / next workspace |
+| `SUPER + Tab` | workspace overview |
 | `SUPER + S` | toggle scratchpad workspace |
 | `SUPER + M` | Spotify workspace (starts Spotify if needed) |
 | `SUPER + D` | Discord workspace |
@@ -180,7 +197,7 @@ shows all keybinds — you can also rebind or disable them there.
 | `CTRL + SUPER + ALT + R` | restart the shell |
 
 The defaults are at the bottom of `config/hypr/profiles/simple.lua` under
-`Keybinds`; changes made in the overview are stored in
+`Keybinds`; changes made in the settings are stored in
 `~/.config/dynamic-island/keybinds.json`.
 
 ## Desktop widgets and plugins
@@ -199,6 +216,7 @@ turned on and off under Settings > Plugins:
 | Desktop widgets | the widget layer itself, plus clock, visualizer and lyrics |
 | Calendar, Weather, System monitor, Now playing | more desktop widgets (weather from open-meteo, no API key) |
 | Matrix rain, Bonsai, Terminal widget | eye candy: GPU-shader matrix, ASCII bonsai, any terminal program (cmatrix, cava, btop …) in a transparent kitty panel |
+| Workspace overview | all workspaces as tiles, one tab per monitor — fullscreen or inside the notch (`SUPER + Tab`) |
 | Wallhaven | search wallhaven.cc right in the wallpaper picker, with live preview |
 | Terminal looks | starship prompt and fastfetch follow the color scheme or the wallpaper folder's look (off by default) |
 
@@ -208,7 +226,10 @@ with `dynamic-island plugin export|import`. To write your own: start with
 [`config/quickshell/dynamic-island/plugins/README.md`](config/quickshell/dynamic-island/plugins/README.md).
 
 The shell itself is configured in the settings window (`>settings` in the
-app menu) — it writes `~/.config/dynamic-island/shell.json`.
+app menu): appearance and wallpaper library, the notch (every part of it can
+be switched off), bar, quick-settings tiles, notifications, Bluetooth & VPN,
+battery, lock screen & standby, monitors, keyboard shortcuts, language. It
+writes `~/.config/dynamic-island/shell.json`.
 
 ## Updating
 
@@ -218,12 +239,15 @@ git pull
 hyprctl reload
 ```
 
-If you changed files yourself (e.g. the monitors), `git pull` may complain.
+If you changed files yourself (e.g. the keyboard layout), `git pull` may complain.
 Then:
 
 ```sh
 git stash && git pull && git stash pop
 ```
+
+Or under Settings > About > Updates: it pulls, keeps your own commits on top
+and restarts the shell.
 
 You can't push — the repo is read-only for others. If you want to keep your
 own changes on GitHub: click **Fork** at the top right, then clone your fork.
@@ -297,6 +321,8 @@ Switch: `hypr-profile toggle` or `CTRL + SUPER + SHIFT + P`.
 * The CLI in `config/dynamic-island/` is derived from
   [caelestia-cli](https://github.com/caelestia-dots/cli) and, like it, is
   licensed under the **GPL-3.0** ([`config/dynamic-island/LICENSE`](config/dynamic-island/LICENSE)).
+* Everything else in this repository is also licensed under the **GPL-3.0** ([`LICENSE`](LICENSE)),
+  except the wallpapers (see below) and `config/nvim/` (Apache-2.0, from the LazyVim starter).
 * The look of the notch is inspired by saneAspect's "Dynamite".
 * The wallpapers belong to their respective artists (collected among others
   from [wallhaven.cc](https://wallhaven.cc)), see

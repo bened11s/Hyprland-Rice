@@ -12,11 +12,13 @@ import qs
 // Plugin-Verwaltung – die Seite hinter "Plugins verwalten" im Einstellungs-
 // Fenster (SettingsCard.qml zeigt sie statt der Zeilenliste).
 //
-// Oben Importieren und Ordner oeffnen, darunter je Plugin eine Karte:
-// Symbol, Name, Version, Autor, Beschreibung, was es mitbringt (Einstellungen,
-// Kacheln, Launcher-Aktionen, Kuerzel – eine Textzeile), ein An/Aus-
-// Schalter und die Knoepfe Einstellungen / Exportieren / Zuruecksetzen /
-// Entfernen (zweistufig, wie "Alles zuruecksetzen" in der Leiste).
+// Eine einspaltige Liste (hoechstens 820 px breit) in einem gerundeten
+// Behaelter: je Plugin eine Zeile aus Symbol, Name, einer Unterzeile
+// (Beschreibung bzw. Zwischenzustand/Fehler) und rechts Einstellungen-Knopf,
+// An/Aus-Schalter und ⋮-Menue (Komponenten, Exportieren, Zuruecksetzen,
+// Entfernen – zweistufig, die Rueckfrage steht in der Zeile).
+// Kopfzeile: Importieren, rechts ⋮ mit "Ordner oeffnen" und dem Schalter fuer
+// Einstellungswerte im Export.
 //
 // Import und Export laufen ueber die CLI (Plugins.importPlugin/exportPlugin/
 // removePlugin); das Ergebnis steht in Plugins.lastResult und erscheint hier
@@ -29,10 +31,10 @@ import qs
 // Exporte landen in ~/Downloads/<id>-<version>.dip (page.exportDir).
 //
 // Komponenten (Manifest `parent`, z.B. Bonsai unter Desktop-Widgets) stehen
-// nicht oben, sondern im Untermenue ihres Plugins: der Knopf auf dessen
-// Karte (Titel aus Manifest `components`) oeffnet es. Dort gibt es die
-// Grundausstattung des Plugins (seine eigenen `widgets`), die Karten der
-// Komponenten und einen Import, der nur Komponenten dieses Plugins annimmt.
+// nicht oben, sondern im Untermenue ihres Plugins: der Eintrag im ⋮-Menue
+// (Titel aus Manifest `components`) oeffnet es. Dort stehen die
+// Grundausstattung des Plugins (seine eigenen `widgets`), die Zeilen der
+// Komponenten und ein Import, der nur Komponenten dieses Plugins annimmt.
 Item {
     id: page
 
@@ -70,7 +72,6 @@ Item {
 
     // Was gerade in der Liste steht: oben die Plugins, im Untermenue die Komponenten
     readonly property var listed: page.subPage !== "" ? page.subChildren : Plugins.topLevel
-    readonly property int activeCount: page.listed.filter(p => p.enabled).length
 
     function openFolder(path: string): void {
         Quickshell.execDetached(["xdg-open", path]);
@@ -184,59 +185,47 @@ Item {
 
     // ---- Bausteine ----
 
-    // Knopf im Chip-Stil (wie "Standard" im Kachel-Editor)
+    // Knopf: nur Text (flache Pille) oder nur Symbol (rund, ohne Flaeche)
     component ActionButton: Rectangle {
         id: button
 
-        required property string icon
-        required property string label
+        property string icon: ""
+        property string label: ""
         property color tint: Colors.fgSurface
         property bool filled: false
         signal clicked()
 
-        implicitWidth: buttonRow.implicitWidth + 22
-        implicitHeight: 28
+        implicitWidth: button.label !== "" ? buttonLabel.implicitWidth + 28 : 30
+        implicitHeight: 30
         radius: height / 2
         opacity: enabled ? 1 : 0.4
-        color: button.filled ? (buttonHover.hovered ? Colors.alpha(Colors.primary, 0.85) : Colors.primary)
-             : buttonHover.hovered ? Colors.alpha(Colors.fgSurface, 0.12)
-             : Colors.alpha(Colors.fgSurface, 0.06)
+        color: button.filled ? Colors.alpha(Colors.primary, buttonHover.hovered ? 0.85 : 1)
+             : Colors.alpha(Colors.fgSurface, (button.label !== "" ? 0.07 : 0) + (buttonHover.hovered && button.enabled ? 0.07 : 0))
 
         Behavior on color {
             ColorAnimation { duration: Appearance.fadeDuration }
         }
         Fade on opacity {}
 
-        Row {
-            id: buttonRow
+        Text {
+            anchors.centerIn: parent
+            visible: button.label === ""
+            text: button.icon
+            color: button.tint === Colors.fgSurface ? Colors.fgSurfaceVariant : button.tint
+            font.family: "Material Symbols Outlined"
+            font.pixelSize: 18
+        }
+
+        Text {
+            id: buttonLabel
 
             anchors.centerIn: parent
-            spacing: 5
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: button.icon
-                color: button.filled ? Colors.fgPrimary : button.tint
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 15
-
-                Behavior on color {
-                    ColorAnimation { duration: Appearance.fadeDuration }
-                }
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                font.family: Config.font
-                text: button.label
-                color: button.filled ? Colors.fgPrimary : button.tint
-                font.pixelSize: 11
-                font.weight: button.filled ? Font.DemiBold : Font.Normal
-
-                Behavior on color {
-                    ColorAnimation { duration: Appearance.fadeDuration }
-                }
-            }
+            visible: button.label !== ""
+            font.family: Config.font
+            text: button.label
+            color: button.filled ? Colors.fgPrimary : button.tint
+            font.pixelSize: 12
+            font.weight: Font.Medium
         }
 
         HoverHandler {
@@ -289,11 +278,13 @@ Item {
         }
     }
 
-    // ---- Die Karte eines Plugins ----
-    component PluginCard: Rectangle {
+    // ---- Die Zeile eines Plugins ----
+    component PluginCard: Item {
         id: pcard
 
         required property var info
+        // Trennlinie zur Zeile darueber
+        property bool divider: true
         readonly property string section: Plugins.sectionPrefix + pcard.info.id
         // Eigener Schalter – eine Komponente kann an sein, waehrend ihr
         // Eltern-Plugin aus ist (Status "Wartet")
@@ -304,268 +295,170 @@ Item {
         // Irgendein Wert weicht von der Vorgabe ab?
         readonly property bool changed: pcard.hasSettings
             && Object.keys(Plugins.raw[pcard.section] ?? {}).some(k => !Plugins.isDefault(pcard.section, k))
-        readonly property color statusTint: page.statusColor(pcard.info.status)
-        // Was das Plugin mitbringt, als eine Zeile: "4 Einstellungen, 1 Kachel, SUPER+ALT+D"
-        readonly property string features: {
+        // Rueckfrage, Fehler oder Zwischenzustand ersetzen die Beschreibung
+        readonly property bool alert: pcard.removeArmed || pcard.info.error !== ""
+                                      || ["error", "invalid"].includes(pcard.info.status)
+        readonly property string subline: {
             const info = pcard.info;
-            const parts = [];
-            if (info.settingsCount > 0)
-                parts.push(info.settingsCount === 1 ? I18n.tr("1 Einstellung") : I18n.tr("%1 Einstellungen").arg(info.settingsCount));
-            if (info.tiles.length > 0)
-                parts.push(info.tiles.length === 1 ? I18n.tr("1 Kachel") : I18n.tr("%1 Kacheln").arg(info.tiles.length));
-            if (info.widgets.length > 0)
-                parts.push(info.widgets.length === 1 ? I18n.tr("1 Desktop-Widget") : I18n.tr("%1 Desktop-Widgets").arg(info.widgets.length));
-            if (info.actions > 0)
-                parts.push(info.actions === 1 ? I18n.tr("1 Launcher-Aktion") : I18n.tr("%1 Launcher-Aktionen").arg(info.actions));
-            for (const k of info.keybinds)
-                parts.push(k.keys);
+            if (pcard.removeArmed)
+                return I18n.tr("Wirklich entfernen?");
+            // Pfade auf den Dateinamen kuerzen, sonst fuellt der Pfad die Zeile
+            if (info.error !== "")
+                return info.error.trim().replace(/\S*\/([^\/\s]+)/g, "$1").replace(/\?v=\d+/g, "");
+            if (info.status === "blocked")
+                return I18n.tr("%1 aus").arg(page.pluginName(info.parent));
             // Komponente, deren Plugin fehlt – steht deshalb oben
             if (info.parentMissing)
-                parts.push(I18n.tr("gehört zu „%1“ (nicht installiert)").arg(info.parent));
-            return parts.join(", ");
+                return I18n.tr("gehört zu „%1“ (nicht installiert)").arg(info.parent);
+            return page.statusLabel(info.status) || I18n.tr(info.description);
+        }
+        readonly property var menu: {
+            const info = pcard.info;
+            const e = [];
+            if (info.status !== "invalid")
+                e.push({ text: "v" + info.version + (info.author !== "" ? " · " + info.author : ""), icon: "info", enabled: false });
+            if (pcard.hasSub)
+                e.push({
+                    text: `${I18n.tr(info.components?.title ?? "Komponenten")} · ${pcard.components.length}`,
+                    icon: info.components?.icon ?? "extension",
+                    action: () => page.openSub(info.id)
+                });
+            // Eingebaute Plugins gehoeren zur Shell: weder Export noch Entfernen
+            if (!info.builtin)
+                e.push({ text: I18n.tr("Exportieren"), icon: "upload", enabled: !page.busy && info.status !== "invalid",
+                         action: () => page.exportPlugin(info) });
+            if (pcard.hasSettings)
+                e.push({ text: I18n.tr("Zurücksetzen"), icon: "restart_alt", enabled: pcard.changed,
+                         action: () => Plugins.resetPlugin(info.id) });
+            if (!info.builtin) {
+                if (e.length > 0)
+                    e.push({ separator: true });
+                e.push({ text: I18n.tr("Entfernen"), icon: "delete", danger: true, enabled: !page.busy,
+                         action: () => { pcard.removeArmed = true; disarmRemove.restart(); } });
+            }
+            return e;
         }
 
+        // Zweistufig: der Menue-Eintrag stellt nur die Rueckfrage in die Zeile
         property bool removeArmed: false
 
         width: parent.width
-        implicitHeight: body.implicitHeight + 28
-        radius: 14
-        color: Colors.alpha(Colors.fgSurface, cardHover.hovered ? 0.07 : 0.045)
-        border.width: 1
-        border.color: Colors.alpha(Colors.outline, 0.18)
-
-        Behavior on color {
-            ColorAnimation { duration: Appearance.fadeDuration }
-        }
-
-        HoverHandler {
-            id: cardHover
-        }
+        implicitHeight: Math.max(56, texts.implicitHeight + 20)
 
         Timer {
             id: disarmRemove
 
-            interval: 3000
+            interval: 6000
             onTriggered: pcard.removeArmed = false
         }
 
-        ColumnLayout {
-            id: body
-
+        Rectangle {
             anchors {
                 left: parent.left
                 right: parent.right
-                top: parent.top
-                margins: 14
+                leftMargin: 52
             }
-            spacing: 10
+            height: 1
+            visible: pcard.divider
+            color: Colors.alpha(Colors.outline, 0.16)
+        }
 
-            // Kopf: Symbol, Name, Status, Schalter
-            RowLayout {
+        RowLayout {
+            anchors {
+                fill: parent
+                leftMargin: 16
+                rightMargin: 10
+            }
+            spacing: 6
+
+            Text {
+                Layout.preferredWidth: 24
+                Layout.rightMargin: 6
+                horizontalAlignment: Text.AlignHCenter
+                text: pcard.info.icon
+                color: pcard.on ? Colors.primary : Colors.fgSurfaceVariant
+                font.family: "Material Symbols Outlined"
+                font.pixelSize: 20
+
+                Behavior on color {
+                    ColorAnimation { duration: Appearance.fadeDuration }
+                }
+            }
+
+            Column {
+                id: texts
+
                 Layout.fillWidth: true
-                spacing: 12
+                Layout.rightMargin: 6
+                spacing: 2
 
-                Rectangle {
-                    Layout.preferredWidth: 40
-                    Layout.preferredHeight: 40
-                    Layout.alignment: Qt.AlignTop
-                    radius: 13
-                    color: pcard.on ? Colors.alpha(Colors.primary, 0.16) : Colors.alpha(Colors.fgSurface, 0.08)
-
-                    Behavior on color {
-                        ColorAnimation { duration: Appearance.fadeDuration }
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: pcard.info.icon
-                        color: pcard.on ? Colors.primary : Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 22
-                        font.variableAxes: ({ FILL: pcard.on ? 1 : 0 })
-
-                        Behavior on color {
-                            ColorAnimation { duration: Appearance.fadeDuration }
-                        }
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 3
-
-                    Row {
-                        spacing: 8
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            font.family: Config.font
-                            text: I18n.tr(pcard.info.name)
-                            color: Colors.fgBackground
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                        }
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: pcard.info.status !== "invalid"
-                            width: versionLabel.implicitWidth + 12
-                            height: 18
-                            radius: 9
-                            color: Colors.alpha(Colors.fgSurface, 0.08)
-
-                            Text {
-                                id: versionLabel
-
-                                anchors.centerIn: parent
-                                font.family: Config.font
-                                text: "v" + pcard.info.version
-                                color: Colors.fgSurfaceVariant
-                                font.pixelSize: 10
-                            }
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            font.family: Config.font
-                            visible: pcard.info.author !== ""
-                            text: I18n.tr("von %1").arg(pcard.info.author)
-                            color: Colors.fgSurfaceVariant
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        font.family: Config.font
-                        visible: text !== ""
-                        text: I18n.tr(pcard.info.description)
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 10
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: 3
-                        elide: Text.ElideRight
-                    }
-
-                    // Fehlermeldung (Manifest kaputt, Main.qml laedt nicht)
-                    RowLayout {
-                        Layout.fillWidth: true
-                        visible: pcard.info.error !== ""
-                        spacing: 5
-
-                        Text {
-                            Layout.alignment: Qt.AlignTop
-                            text: "error"
-                            color: Colors.error
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 13
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            font.family: Config.font
-                            text: pcard.info.error
-                            color: Colors.error
-                            font.pixelSize: 10
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
-                        }
-                    }
-                }
-
-                // Zwischenzustand (Wartet, Laedt, Fehler, Ungueltig) – An/Aus
-                // sagt der Schalter
                 Text {
-                    Layout.alignment: Qt.AlignTop
-                    Layout.topMargin: 6
+                    width: parent.width
+                    font.family: Config.font
+                    text: I18n.tr(pcard.info.name)
+                    color: Colors.fgSurface
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+
+                // Fehlermeldungen (Manifest kaputt, Main.qml laedt nicht)
+                // duerfen zwei Zeilen haben, alles andere eine
+                Text {
+                    width: parent.width
                     font.family: Config.font
                     visible: text !== ""
-                    text: pcard.info.status === "blocked" ? I18n.tr("%1 aus").arg(page.pluginName(pcard.info.parent))
-                        : page.statusLabel(pcard.info.status)
-                    color: pcard.statusTint
-                    font.pixelSize: 10
-                }
-
-                Toggle {
-                    Layout.alignment: Qt.AlignTop
-                    Layout.topMargin: 2
-                    checked: pcard.on
-                    enabled: pcard.info.status !== "invalid" && !page.busy
-                    onToggled: Plugins.toggle(pcard.info.id)
+                    text: pcard.subline
+                    color: pcard.alert ? Colors.error
+                         : pcard.info.status === "loading" ? Colors.secondary
+                         : Colors.fgSurfaceVariant
+                    font.pixelSize: 11
+                    wrapMode: pcard.info.error !== "" && !pcard.removeArmed ? Text.Wrap : Text.NoWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
                 }
             }
 
-            // Was das Plugin mitbringt – buendig mit der Beschreibung
-            Text {
-                Layout.fillWidth: true
-                Layout.leftMargin: 52
-                font.family: Config.font
-                visible: pcard.info.status !== "invalid" && text !== ""
-                text: pcard.features
-                color: Colors.alpha(Colors.fgSurfaceVariant, 0.8)
-                font.pixelSize: 10
-                elide: Text.ElideRight
+            ActionButton {
+                visible: pcard.removeArmed
+                label: I18n.tr("Abbrechen")
+                onClicked: pcard.removeArmed = false
             }
 
-            // Knoepfe
-            Flow {
-                Layout.fillWidth: true
-                Layout.leftMargin: 52
-                spacing: 6
-
-                // Untermenue mit den Komponenten
-                ActionButton {
-                    visible: pcard.hasSub
-                    filled: true
-                    icon: pcard.info.components?.icon ?? "extension"
-                    label: `${I18n.tr(pcard.info.components?.title ?? "Komponenten")} · ${pcard.components.length}`
-                    onClicked: page.openSub(pcard.info.id)
+            ActionButton {
+                visible: pcard.removeArmed
+                enabled: !page.busy
+                label: I18n.tr("Entfernen")
+                tint: Colors.error
+                onClicked: {
+                    pcard.removeArmed = false;
+                    Plugins.removePlugin(pcard.info.id);
                 }
+            }
 
-                ActionButton {
-                    visible: pcard.hasSettings
-                    enabled: pcard.info.enabled
-                    icon: "tune"
-                    label: I18n.tr("Einstellungen")
-                    onClicked: page.openSection(pcard.section)
-                }
+            Toggle {
+                Layout.leftMargin: 4
+                Layout.rightMargin: 2
+                visible: !pcard.removeArmed
+                checked: pcard.on
+                enabled: pcard.info.status !== "invalid" && !page.busy
+                onToggled: Plugins.toggle(pcard.info.id)
+            }
 
-                // Eingebaute Plugins gehoeren zur Shell: nur an/aus
-                ActionButton {
-                    visible: !pcard.info.builtin
-                    enabled: !page.busy && pcard.info.status !== "invalid"
-                    icon: "upload"
-                    label: I18n.tr("Exportieren")
-                    onClicked: page.exportPlugin(pcard.info)
-                }
+            SettingsMenuButton {
+                visible: !pcard.removeArmed
+                enabled: pcard.menu.length > 0
+                entries: pcard.menu
+            }
 
-                ActionButton {
-                    visible: pcard.hasSettings
-                    enabled: pcard.changed
-                    icon: "restart_alt"
-                    label: I18n.tr("Zurücksetzen")
-                    onClicked: Plugins.resetPlugin(pcard.info.id)
-                }
-
-                // Zweistufig, wie "Alles zuruecksetzen": erst "Entfernen",
-                // dann 3 s lang "Wirklich?"
-                ActionButton {
-                    visible: !pcard.info.builtin
-                    enabled: !page.busy
-                    icon: pcard.removeArmed ? "check" : "delete"
-                    label: pcard.removeArmed ? I18n.tr("Wirklich entfernen?") : I18n.tr("Entfernen")
-                    tint: pcard.removeArmed ? Colors.error : Colors.fgSurface
-                    onClicked: {
-                        if (pcard.removeArmed) {
-                            pcard.removeArmed = false;
-                            Plugins.removePlugin(pcard.info.id);
-                        } else {
-                            pcard.removeArmed = true;
-                            disarmRemove.restart();
-                        }
-                    }
-                }
+            // Zu den Einstellungen des Plugins; ohne Einstellungen bleibt der
+            // Platz frei, damit die Schalter untereinander stehen
+            ActionButton {
+                visible: !pcard.removeArmed
+                enabled: pcard.hasSettings && pcard.info.enabled
+                opacity: pcard.hasSettings ? (enabled ? 1 : 0.4) : 0
+                icon: "chevron_right"
+                onClicked: page.openSection(pcard.section)
             }
         }
     }
@@ -596,18 +489,14 @@ Item {
         Column {
             id: column
 
-            anchors {
-                left: parent.left
-                right: parent.right
-                leftMargin: 2
-                rightMargin: 2
-            }
-            spacing: 8
+            x: 2
+            width: Math.min(flick.width - 4, 820)
+            spacing: 10
 
             // ---- Kopfzeile ----
             Item {
                 width: parent.width
-                height: 36
+                height: 34
 
                 Row {
                     anchors {
@@ -619,58 +508,22 @@ Item {
                     ActionButton {
                         visible: page.subPage !== ""
                         icon: "arrow_back"
-                        label: I18n.tr("Alle Plugins")
                         onClicked: page.openSub("")
                     }
 
                     ActionButton {
-                        icon: page.importOpen ? "expand_less" : "download"
-                        label: I18n.tr("Importieren")
-                        filled: page.importOpen
+                        label: page.importOpen ? I18n.tr("Abbrechen") : I18n.tr("Importieren")
                         onClicked: page.importOpen = !page.importOpen
-                    }
-
-                    ActionButton {
-                        visible: page.subPage === ""
-                        icon: "folder_open"
-                        label: I18n.tr("Ordner öffnen")
-                        onClicked: page.openFolder(Plugins.dir)
                     }
                 }
 
-                // Rechts: Einstellungswerte in den Export mitnehmen, Zaehler
-                // oder "laeuft"
                 Row {
                     anchors {
                         right: parent.right
-                        rightMargin: 4
+                        rightMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
                     spacing: 6
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: Plugins.plugins.length > 0 && page.subPage === "" && !page.busy
-                        font.family: Config.font
-                        text: I18n.tr("Einstellungswerte mitnehmen")
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 10
-                    }
-
-                    Toggle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: Plugins.plugins.length > 0 && page.subPage === "" && !page.busy
-                        checked: page.exportWithSettings
-                        onToggled: page.exportWithSettings = !page.exportWithSettings
-                    }
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: Plugins.plugins.length > 0 && page.subPage === "" && !page.busy
-                        width: 1
-                        height: 14
-                        color: Colors.alpha(Colors.outline, 0.3)
-                    }
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
@@ -678,7 +531,7 @@ Item {
                         text: "progress_activity"
                         color: Colors.primary
                         font.family: "Material Symbols Outlined"
-                        font.pixelSize: 15
+                        font.pixelSize: 16
 
                         RotationAnimation on rotation {
                             running: page.busy
@@ -689,17 +542,12 @@ Item {
                         }
                     }
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.family: Config.font
-                        text: page.busy ? I18n.tr("Bitte warten…")
-                            : page.listed.length === 0 ? ""
-                            : page.subPage !== "" ? (page.listed.length === 1 ? I18n.tr("1 Komponente · %1 aktiv").arg(page.activeCount)
-                                                     : I18n.tr("%1 Komponenten · %2 aktiv").arg(page.listed.length).arg(page.activeCount))
-                            : (page.listed.length === 1 ? I18n.tr("1 Plugin · %1 aktiv").arg(page.activeCount)
-                               : I18n.tr("%1 Plugins · %2 aktiv").arg(page.listed.length).arg(page.activeCount))
-                        color: page.busy ? Colors.primary : Colors.alpha(Colors.fgSurfaceVariant, 0.8)
-                        font.pixelSize: 10
+                    SettingsMenuButton {
+                        entries: [
+                            { text: I18n.tr("Ordner öffnen"), icon: "folder_open", action: () => page.openFolder(Plugins.dir) },
+                            { text: I18n.tr("Einstellungswerte beim Export mitnehmen"), current: page.exportWithSettings,
+                              action: () => page.exportWithSettings = !page.exportWithSettings }
+                        ]
                     }
                 }
             }
@@ -713,13 +561,11 @@ Item {
                 readonly property color tint: banner.ok ? Colors.primary : Colors.error
 
                 width: parent.width
-                height: page.result ? bannerBody.implicitHeight + 20 : 0
+                height: page.result ? Math.max(56, bannerBody.implicitHeight + 20) : 0
                 visible: height > 0
                 clip: true
-                radius: 12
+                radius: 14
                 color: Colors.alpha(banner.tint, 0.1)
-                border.width: 1
-                border.color: Colors.alpha(banner.tint, 0.35)
 
                 Behavior on height {
                     NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
@@ -731,32 +577,34 @@ Item {
                     anchors {
                         left: parent.left
                         right: parent.right
-                        top: parent.top
-                        leftMargin: 14
-                        rightMargin: 8
-                        topMargin: 10
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 16
+                        rightMargin: 10
                     }
-                    spacing: 10
+                    spacing: 6
 
                     Text {
-                        Layout.alignment: Qt.AlignTop
+                        Layout.preferredWidth: 24
+                        Layout.rightMargin: 6
+                        horizontalAlignment: Text.AlignHCenter
                         text: banner.ok ? "check_circle" : "error"
                         color: banner.tint
                         font.family: "Material Symbols Outlined"
-                        font.pixelSize: 18
+                        font.pixelSize: 20
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
+                        Layout.rightMargin: 6
                         spacing: 2
 
                         Text {
                             Layout.fillWidth: true
                             font.family: Config.font
                             text: I18n.tr(banner.ok ? "%1 erledigt" : "%1 fehlgeschlagen").arg(page.opLabel(page.result?.op ?? ""))
-                            color: Colors.fgBackground
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
+                            color: Colors.fgSurface
+                            font.pixelSize: 13
+                            font.weight: Font.Medium
                         }
 
                         Text {
@@ -765,8 +613,8 @@ Item {
                             visible: text !== ""
                             text: page.result?.message ?? ""
                             color: Colors.fgSurfaceVariant
-                            font.pixelSize: 10
-                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
                             maximumLineCount: 4
                             elide: Text.ElideRight
                         }
@@ -776,53 +624,28 @@ Item {
                             font.family: Config.font
                             visible: banner.path !== ""
                             text: page.shortPath(banner.path)
-                            color: Colors.fgSurface
-                            font.pixelSize: 10
+                            color: Colors.fgSurfaceVariant
+                            font.pixelSize: 11
                             elide: Text.ElideMiddle
                         }
                     }
 
                     ActionButton {
-                        Layout.alignment: Qt.AlignTop
                         visible: banner.ok && banner.path !== ""
                         icon: "folder_open"
-                        label: I18n.tr("Im Ordner zeigen")
                         onClicked: page.openFolder(banner.path.slice(0, banner.path.lastIndexOf("/")))
                     }
 
                     ActionButton {
-                        Layout.alignment: Qt.AlignTop
                         visible: banner.ok && page.result?.op === "import" && (page.result?.data?.id ?? "") !== ""
                                  && Plugins.sections.includes(Plugins.sectionPrefix + page.result.data.id)
                         icon: "tune"
-                        label: I18n.tr("Einstellungen")
                         onClicked: page.openSection(Plugins.sectionPrefix + page.result.data.id)
                     }
 
-                    Rectangle {
-                        Layout.alignment: Qt.AlignTop
-                        width: 26
-                        height: 26
-                        radius: 13
-                        color: dismissHover.hovered ? Colors.alpha(Colors.fgSurface, 0.12) : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "close"
-                            color: Colors.fgSurfaceVariant
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 15
-                        }
-
-                        HoverHandler {
-                            id: dismissHover
-
-                            cursorShape: Qt.PointingHandCursor
-                        }
-
-                        TapHandler {
-                            onTapped: page.dismissed = Plugins.lastResult
-                        }
+                    ActionButton {
+                        icon: "close"
+                        onClicked: page.dismissed = Plugins.lastResult
                     }
                 }
             }
@@ -832,13 +655,11 @@ Item {
                 id: importPanel
 
                 width: parent.width
-                height: page.importOpen ? importBody.implicitHeight + 28 : 0
+                height: page.importOpen ? importBody.implicitHeight + 12 : 0
                 visible: height > 0
                 clip: true
                 radius: 14
                 color: Colors.alpha(Colors.fgSurface, 0.045)
-                border.width: 1
-                border.color: Colors.alpha(Colors.primary, 0.35)
 
                 Behavior on height {
                     NumberAnimation { duration: Appearance.fadeDuration; easing.type: Easing.OutCubic }
@@ -851,151 +672,101 @@ Item {
                         left: parent.left
                         right: parent.right
                         top: parent.top
-                        margins: 14
+                        margins: 6
                     }
-                    spacing: 8
-
-                    Text {
-                        font.family: Config.font
-                        text: page.subPage !== "" ? I18n.tr("%1 für %2 importieren").arg(page.subTitle).arg(I18n.tr(page.subInfo?.name ?? "")) : I18n.tr("Paket importieren")
-                        color: Colors.fgBackground
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                    }
-
-                    Text {
-                        width: parent.width
-                        font.family: Config.font
-                        text: I18n.tr("Ein .dip-Paket aus Downloads, Home oder Dokumenten wählen – oder unten den Pfad eintragen.")
-                              + (page.subPage !== "" ? " " + I18n.tr("Angenommen werden nur Komponenten (Manifest \"parent\": \"%1\").").arg(page.subPage) : "")
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 10
-                        wrapMode: Text.WordWrap
-                    }
+                    spacing: 2
 
                     // Gefundene Pakete
-                    Column {
-                        width: parent.width
-                        spacing: 2
+                    Repeater {
+                        model: page.files
 
-                        Repeater {
-                            model: page.files
+                        Rectangle {
+                            id: fileRow
 
-                            Rectangle {
-                                id: fileRow
+                            required property var modelData
+                            readonly property bool selected: page.expand(page.importPath) === fileRow.modelData.path
 
-                                required property var modelData
-                                readonly property bool selected: page.expand(page.importPath) === fileRow.modelData.path
+                            width: parent.width
+                            height: 40
+                            radius: 10
+                            color: fileRow.selected ? Colors.alpha(Colors.primary, 0.16)
+                                 : fileHover.hovered ? Colors.alpha(Colors.fgSurface, 0.07)
+                                 : "transparent"
 
-                                width: parent.width
-                                height: 34
-                                radius: 10
-                                color: fileRow.selected ? Colors.alpha(Colors.primary, 0.16)
-                                     : fileHover.hovered ? Colors.alpha(Colors.fgSurface, 0.07)
-                                     : "transparent"
+                            Behavior on color {
+                                ColorAnimation { duration: Appearance.fadeDuration }
+                            }
 
-                                Behavior on color {
-                                    ColorAnimation { duration: Appearance.fadeDuration }
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: 10
+                                    rightMargin: 12
                                 }
+                                spacing: 12
 
                                 Text {
-                                    id: fileIcon
-
-                                    anchors {
-                                        left: parent.left
-                                        leftMargin: 10
-                                        verticalCenter: parent.verticalCenter
-                                    }
+                                    Layout.preferredWidth: 24
+                                    horizontalAlignment: Text.AlignHCenter
                                     text: "package_2"
                                     color: fileRow.selected ? Colors.primary : Colors.fgSurfaceVariant
                                     font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 17
+                                    font.pixelSize: 18
                                 }
 
                                 Text {
-                                    id: fileName
-
+                                    Layout.maximumWidth: fileRow.width * 0.5
                                     font.family: Config.font
-                                    anchors {
-                                        left: fileIcon.right
-                                        leftMargin: 10
-                                        verticalCenter: parent.verticalCenter
-                                    }
                                     text: fileRow.modelData.name
-                                    color: Colors.fgBackground
-                                    font.pixelSize: 11
-                                    font.weight: fileRow.selected ? Font.DemiBold : Font.Normal
-                                }
-
-                                Text {
-                                    font.family: Config.font
-                                    anchors {
-                                        left: fileName.right
-                                        leftMargin: 8
-                                        right: fileSize.left
-                                        rightMargin: 8
-                                        verticalCenter: parent.verticalCenter
-                                    }
-                                    text: fileRow.modelData.dir
-                                    color: Colors.fgSurfaceVariant
-                                    font.pixelSize: 10
+                                    color: Colors.fgSurface
+                                    font.pixelSize: 12
                                     elide: Text.ElideMiddle
                                 }
 
                                 Text {
-                                    id: fileSize
-
+                                    Layout.fillWidth: true
                                     font.family: Config.font
-                                    anchors {
-                                        right: parent.right
-                                        rightMargin: 12
-                                        verticalCenter: parent.verticalCenter
-                                    }
+                                    text: fileRow.modelData.dir
+                                    color: Colors.fgSurfaceVariant
+                                    font.pixelSize: 11
+                                    elide: Text.ElideMiddle
+                                }
+
+                                Text {
+                                    font.family: Config.font
                                     text: page.formatSize(fileRow.modelData.size)
                                     color: Colors.fgSurfaceVariant
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                 }
+                            }
 
-                                HoverHandler {
-                                    id: fileHover
+                            HoverHandler {
+                                id: fileHover
 
-                                    cursorShape: Qt.PointingHandCursor
-                                }
+                                cursorShape: Qt.PointingHandCursor
+                            }
 
-                                TapHandler {
-                                    onTapped: page.importPath = page.shortPath(fileRow.modelData.path)
-                                }
+                            TapHandler {
+                                onTapped: page.importPath = page.shortPath(fileRow.modelData.path)
                             }
                         }
+                    }
 
-                        Row {
-                            visible: page.files.length === 0
-                            height: 30
-                            spacing: 6
-                            leftPadding: 10
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "search_off"
-                                color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
-                                font.family: "Material Symbols Outlined"
-                                font.pixelSize: 15
-                            }
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                font.family: Config.font
-                                text: I18n.tr("Keine .dip-Pakete in ~/Downloads, ~ oder ~/Documents")
-                                color: Colors.alpha(Colors.fgSurfaceVariant, 0.8)
-                                font.pixelSize: 10
-                            }
-                        }
+                    Text {
+                        visible: page.files.length === 0
+                        height: 40
+                        leftPadding: 10
+                        verticalAlignment: Text.AlignVCenter
+                        font.family: Config.font
+                        text: I18n.tr("Keine .dip-Pakete in ~/Downloads, ~ oder ~/Documents")
+                        color: Colors.fgSurfaceVariant
+                        font.pixelSize: 11
                     }
 
                     // Pfadfeld
                     Rectangle {
                         width: parent.width
-                        height: 32
+                        height: 36
                         radius: 10
                         color: Colors.alpha(Colors.fgSurface, pathInput.activeFocus ? 0.09 : 0.06)
                         border.width: 1
@@ -1008,32 +779,18 @@ Item {
                             ColorAnimation { duration: Appearance.fadeDuration }
                         }
 
-                        Text {
-                            id: pathIcon
-
-                            anchors {
-                                left: parent.left
-                                leftMargin: 10
-                                verticalCenter: parent.verticalCenter
-                            }
-                            text: "draft"
-                            color: Colors.fgSurfaceVariant
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 15
-                        }
-
                         TextInput {
                             id: pathInput
 
                             anchors {
-                                left: pathIcon.right
-                                leftMargin: 8
+                                left: parent.left
+                                leftMargin: 12
                                 right: parent.right
-                                rightMargin: 10
+                                rightMargin: 12
                                 verticalCenter: parent.verticalCenter
                             }
                             font.family: Config.font
-                            font.pixelSize: 11
+                            font.pixelSize: 12
                             color: Colors.fgSurface
                             selectionColor: Colors.alpha(Colors.primary, 0.35)
                             clip: true
@@ -1052,41 +809,44 @@ Item {
                         }
                     }
 
-                    Item {
+                    // Im Untermenue: was der Import annimmt
+                    Text {
                         width: parent.width
-                        height: 30
+                        visible: page.subPage !== ""
+                        topPadding: 6
+                        leftPadding: 10
+                        rightPadding: 10
+                        font.family: Config.font
+                        text: I18n.tr("Angenommen werden nur Komponenten (Manifest \"parent\": \"%1\").").arg(page.subPage)
+                        color: Colors.fgSurfaceVariant
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
+                    }
 
-                        Row {
-                            anchors {
-                                left: parent.left
-                                leftMargin: 4
-                                verticalCenter: parent.verticalCenter
-                            }
-                            spacing: 8
+                    RowLayout {
+                        width: parent.width
+                        height: 46
+                        spacing: 10
 
-                            Toggle {
-                                anchors.verticalCenter: parent.verticalCenter
-                                checked: page.importEnable
-                                onToggled: page.importEnable = !page.importEnable
-                            }
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 10
+                            font.family: Config.font
+                            text: I18n.tr("Nach dem Import einschalten")
+                            color: Colors.fgSurface
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
 
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                font.family: Config.font
-                                text: I18n.tr("Nach dem Import einschalten")
-                                color: Colors.fgSurface
-                                font.pixelSize: 11
-                            }
+                        Toggle {
+                            checked: page.importEnable
+                            onToggled: page.importEnable = !page.importEnable
                         }
 
                         ActionButton {
-                            anchors {
-                                right: parent.right
-                                verticalCenter: parent.verticalCenter
-                            }
+                            Layout.rightMargin: 4
                             filled: true
                             enabled: page.importPath.trim() !== "" && !page.busy
-                            icon: "download"
                             label: I18n.tr("Importieren")
                             onClicked: page.runImport()
                         }
@@ -1095,238 +855,133 @@ Item {
             }
 
             // ---- Untermenue: Kopf ----
-            Rectangle {
+            Column {
                 id: subHead
 
                 readonly property bool parentOn: page.subInfo?.enabled ?? false
 
-                width: parent.width
+                x: 16
+                width: parent.width - 32
                 visible: page.subPage !== ""
-                implicitHeight: subBody.implicitHeight + 28
-                radius: 14
-                color: Colors.alpha(Colors.primary, 0.06)
-                border.width: 1
-                border.color: Colors.alpha(Colors.primary, 0.22)
+                topPadding: 4
+                spacing: 3
 
-                ColumnLayout {
-                    id: subBody
+                Text {
+                    width: parent.width
+                    font.family: Config.font
+                    text: I18n.tr(page.subInfo?.name ?? "") + " › " + page.subTitle
+                    color: Colors.fgSurface
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                }
 
-                    anchors {
-                        left: parent.left
-                        right: parent.right
-                        top: parent.top
-                        margins: 14
-                    }
-                    spacing: 10
+                Text {
+                    width: parent.width
+                    font.family: Config.font
+                    visible: text !== ""
+                    text: I18n.tr(page.subInfo?.components?.desc ?? "")
+                    color: Colors.fgSurfaceVariant
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 12
-
-                        Rectangle {
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-                            Layout.alignment: Qt.AlignTop
-                            radius: 13
-                            color: Colors.alpha(Colors.primary, subHead.parentOn ? 0.16 : 0.08)
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: page.subInfo?.components?.icon ?? page.subInfo?.icon ?? "extension"
-                                color: subHead.parentOn ? Colors.primary : Colors.fgSurfaceVariant
-                                font.family: "Material Symbols Outlined"
-                                font.pixelSize: 22
-                                font.variableAxes: ({ FILL: subHead.parentOn ? 1 : 0 })
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 3
-
-                            Row {
-                                spacing: 6
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    font.family: Config.font
-                                    text: I18n.tr(page.subInfo?.name ?? "")
-                                    color: Colors.fgSurfaceVariant
-                                    font.pixelSize: 13
-                                }
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "chevron_right"
-                                    color: Colors.fgSurfaceVariant
-                                    font.family: "Material Symbols Outlined"
-                                    font.pixelSize: 15
-                                }
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    font.family: Config.font
-                                    text: page.subTitle
-                                    color: Colors.fgBackground
-                                    font.pixelSize: 13
-                                    font.weight: Font.DemiBold
-                                }
-                            }
-
-                            Text {
-                                Layout.fillWidth: true
-                                font.family: Config.font
-                                visible: text !== ""
-                                text: I18n.tr(page.subInfo?.components?.desc ?? "")
-                                color: Colors.fgSurfaceVariant
-                                font.pixelSize: 10
-                                wrapMode: Text.WordWrap
-                            }
-                        }
-                    }
-
-                    // Eltern-Plugin aus: Komponenten warten
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 52
-                        visible: !subHead.parentOn
-                        spacing: 8
-
-                        Text {
-                            Layout.fillWidth: true
-                            font.family: Config.font
-                            text: I18n.tr("%1 ist aus – eingeschaltete Komponenten laufen erst, wenn es an ist.").arg(I18n.tr(page.subInfo?.name ?? ""))
-                            color: Colors.secondary
-                            font.pixelSize: 10
-                            wrapMode: Text.WordWrap
-                        }
-
-                        ActionButton {
-                            enabled: !page.busy && page.subInfo?.status !== "invalid"
-                            icon: "power_settings_new"
-                            label: I18n.tr("Einschalten")
-                            onClicked: Plugins.setEnabled(page.subPage, true)
-                        }
-                    }
-
-                    // Was das Plugin selbst schon mitbringt
-                    Text {
-                        Layout.fillWidth: true
-                        font.family: Config.font
-                        visible: (page.subInfo?.widgets ?? []).length > 0
-                        text: I18n.tr("Eingebaut") + ": " + (page.subInfo?.widgets ?? []).map(w => I18n.tr(w.title)).join(", ")
-                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.8)
-                        font.pixelSize: 10
-                        wrapMode: Text.WordWrap
-                    }
+                // Was das Plugin selbst schon mitbringt
+                Text {
+                    width: parent.width
+                    font.family: Config.font
+                    visible: (page.subInfo?.widgets ?? []).length > 0
+                    text: I18n.tr("Eingebaut") + ": " + (page.subInfo?.widgets ?? []).map(w => I18n.tr(w.title)).join(", ")
+                    color: Colors.fgSurfaceVariant
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
                 }
             }
 
             // ---- Die Plugins (bzw. im Untermenue die Komponenten) ----
-            // Ab ~850 px zwei Spalten (Karten mindestens 420 px), abwechselnd
-            // verteilt; jede Spalte waechst fuer sich
-            Row {
-                id: cards
-
-                readonly property int columns: cards.width >= 2 * 420 + cards.spacing ? 2 : 1
-
+            Rectangle {
                 width: parent.width
-                spacing: 10
+                height: rows.implicitHeight
+                visible: height > 0
+                radius: 14
+                color: Colors.alpha(Colors.fgSurface, 0.045)
 
-                Repeater {
-                    model: cards.columns
+                Column {
+                    id: rows
 
-                    Column {
-                        id: cardColumn
+                    width: parent.width
 
-                        required property int index
+                    // Eltern-Plugin aus: Komponenten warten
+                    Item {
+                        width: parent.width
+                        height: 56
+                        visible: page.subPage !== "" && !subHead.parentOn
 
-                        width: (cards.width - cards.spacing * (cards.columns - 1)) / cards.columns
-                        spacing: 8
-
-                        Repeater {
-                            model: page.listed.filter((p, i) => i % cards.columns === cardColumn.index)
-
-                            PluginCard {
-                                required property var modelData
-
-                                info: modelData
+                        RowLayout {
+                            anchors {
+                                fill: parent
+                                leftMargin: 16
+                                rightMargin: 10
                             }
+                            spacing: 6
+
+                            Text {
+                                Layout.preferredWidth: 24
+                                Layout.rightMargin: 6
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "pause_circle"
+                                color: Colors.fgSurfaceVariant
+                                font.family: "Material Symbols Outlined"
+                                font.pixelSize: 20
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.rightMargin: 6
+                                font.family: Config.font
+                                text: I18n.tr("%1 ist aus – eingeschaltete Komponenten laufen erst, wenn es an ist.").arg(I18n.tr(page.subInfo?.name ?? ""))
+                                color: Colors.fgSurfaceVariant
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            ActionButton {
+                                enabled: !page.busy && page.subInfo?.status !== "invalid"
+                                label: I18n.tr("Einschalten")
+                                onClicked: Plugins.setEnabled(page.subPage, true)
+                            }
+                        }
+                    }
+
+                    Repeater {
+                        model: page.listed
+
+                        PluginCard {
+                            required property var modelData
+                            required property int index
+
+                            info: modelData
+                            divider: index > 0 || (page.subPage !== "" && !subHead.parentOn)
                         }
                     }
                 }
             }
 
-            // Untermenue ohne Komponenten
-            Item {
-                width: parent.width
-                height: 120
-                visible: page.subPage !== "" && page.listed.length === 0
-
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "add_circle"
-                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.6)
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 28
-                    }
-
-                    Text {
-                        font.family: Config.font
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: I18n.tr("Noch keine %1 installiert").arg(page.subTitle)
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 12
-                    }
-
-                    Text {
-                        font.family: Config.font
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: I18n.tr("Oben über „Importieren“ ein .dip-Paket hinzufügen")
-                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
-                        font.pixelSize: 10
-                    }
-                }
-            }
-
-            // Kein Plugin da
-            Item {
-                width: parent.width
-                height: 160
-                visible: page.subPage === "" && Plugins.plugins.length === 0
-
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "extension_off"
-                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.6)
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 28
-                    }
-
-                    Text {
-                        font.family: Config.font
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: I18n.tr("Keine Plugins gefunden")
-                        color: Colors.fgSurfaceVariant
-                        font.pixelSize: 12
-                    }
-
-                    Text {
-                        font.family: Config.font
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: I18n.tr("Ein Paket importieren oder einen Ordner nach %1 legen").arg(page.shortPath(Plugins.dir))
-                        color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
-                        font.pixelSize: 10
-                    }
-                }
+            // Untermenue ohne Komponenten / kein Plugin da
+            Text {
+                x: 16
+                width: parent.width - 32
+                topPadding: 8
+                visible: page.subPage !== "" ? page.listed.length === 0 : Plugins.plugins.length === 0
+                font.family: Config.font
+                text: page.subPage !== "" ? I18n.tr("Noch keine %1 installiert").arg(page.subTitle)
+                    : I18n.tr("Keine Plugins gefunden") + " – "
+                      + I18n.tr("Ein Paket importieren oder einen Ordner nach %1 legen").arg(page.shortPath(Plugins.dir))
+                color: Colors.fgSurfaceVariant
+                font.pixelSize: 12
+                wrapMode: Text.Wrap
             }
         }
     }

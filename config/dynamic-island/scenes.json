@@ -2731,6 +2731,550 @@
           "date": true,
           "color": "hell"
         }
+      },
+      {
+        "id": "wmw17luc7px",
+        "type": "progress",
+        "x": 0.9375,
+        "y": 0.0502,
+        "size": 1,
+        "monitor": "DVI-I-1",
+        "opts": {
+          "stil": "balken",
+          "tag": false,
+          "woche": true,
+          "monat": true,
+          "jahr": true,
+          "color": "secondary",
+          "accent": "secondary"
+        },
+        "hidden": false
+      },
+      {
+        "id": "wmw17n0ommb",
+        "type": "matrix",
+        "x": 0.5001,
+        "y": 0.7208,
+        "size": 1,
+        "monitor": "*",
+        "opts": {
+          "form": "hoch",
+          "speed": "mittel",
+          "density": "dicht",
+          "glyphs": "katakana",
+          "color": "hell"
+        }
+      },
+      {
+        "id": "wmw17o4j78h",
+        "type": "astro",
+        "x": 0.5,
+        "y": 0.4145,
+        "size": 1,
+        "monitor": "*",
+        "opts": {
+          "ort": "Köln",
+          "verlauf": true,
+          "mond": true,
+          "color": "hell"
+        }
+      }
+    ],
+    "Konosuba/konosuba-megumin-1320252.jpg": [
+      {
+        "id": "wclo200k",
+        "type": "clock",
+        "x": 0.075,
+        "y": 0.2,
+        "size": 1.15,
+        "monitor": "*",
+        "opts": {
+          "style": "gestapelt",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ff5a2e"
+        }
+      },
+      {
+        "id": "wwea201k",
+        "type": "weather",
+        "x": 0.075,
+        "y": 0.335,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#ffffff",
+          "accent": "#ff5a2e"
+        }
+      },
+      {
+        "id": "wvis202k",
+        "type": "visualizer",
+        "x": 0.1,
+        "y": 0.78,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "style": "kapseln",
+          "bars": 24,
+          "idle": "ausblenden",
+          "color": "#ffffff",
+          "accent": "#ff5a2e"
+        }
+      },
+      {
+        "id": "wlyr203k",
+        "type": "lyrics",
+        "x": 0.1,
+        "y": 0.855,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#ffffff",
+          "accent": "#ff5a2e"
+        }
+      }
+    ],
+    "Konosuba/konosuba-j3qd2m.jpg": [
+      {
+        "id": "wclo300k",
+        "type": "clock",
+        "x": 0.075,
+        "y": 0.45,
+        "size": 1.0,
+        "monitor": "*",
+        "opts": {
+          "style": "gestapelt",
+          "date": true,
+          "color": "#2b1a22",
+          "accent": "#b8372a"
+        }
+      },
+      {
+        "id": "wlyr301k",
+        "type": "lyrics",
+        "x": 0.12,
+        "y": 0.88,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#2b1a22",
+          "accent": "#b8372a"
+        }
+      }
+    ],
+    "Konosuba/konosuba-jx1gz5.jpg": [
+      {
+        "id": "wclo302k",
+        "type": "clock",
+        "x": 0.85,
+        "y": 0.17,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#7fd8ff"
+        }
+      },
+      {
+        "id": "wwea303k",
+        "type": "weather",
+        "x": 0.85,
+        "y": 0.29,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#ffffff",
+          "accent": "#7fd8ff"
+        }
+      },
+      {
+        "id": "wvis304k",
+        "type": "visualizer",
+        "x": 0.85,
+        "y": 0.79,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "style": "kapseln",
+          "bars": 24,
+          "idle": "ausblenden",
+          "color": "#ffffff",
+          "accent": "#7fd8ff"
+        }
+      },
+      {
+        "id": "wlyr305k",
+        "type": "lyrics",
+        "x": 0.85,
+        "y": 0.87,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "rechts",
+          "color": "#ffffff",
+          "accent": "#7fd8ff"
+        }
+      }
+    ],
+    "Konosuba/konosuba-kw1l6m.jpg": [
+      {
+        "id": "wclo306k",
+        "type": "clock",
+        "x": 0.15,
+        "y": 0.2,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#3a1608",
+          "accent": "#a0281a"
+        }
+      },
+      {
+        "id": "wwea307k",
+        "type": "weather",
+        "x": 0.15,
+        "y": 0.32,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#3a1608",
+          "accent": "#a0281a"
+        }
+      },
+      {
+        "id": "wlyr308k",
+        "type": "lyrics",
+        "x": 0.15,
+        "y": 0.41,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#3a1608",
+          "accent": "#a0281a"
+        }
+      }
+    ],
+    "Konosuba/konosuba-pkjx6p.jpg": [
+      {
+        "id": "wclo309k",
+        "type": "clock",
+        "x": 0.85,
+        "y": 0.82,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ff4fa0"
+        }
+      },
+      {
+        "id": "wvis310k",
+        "type": "visualizer",
+        "x": 0.15,
+        "y": 0.8,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "style": "kapseln",
+          "bars": 24,
+          "idle": "ausblenden",
+          "color": "#ffffff",
+          "accent": "#ff4fa0"
+        }
+      },
+      {
+        "id": "wlyr311k",
+        "type": "lyrics",
+        "x": 0.15,
+        "y": 0.88,
+        "size": 0.75,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#ffffff",
+          "accent": "#ff4fa0"
+        }
+      }
+    ],
+    "Konosuba/konosuba-wqlk86.jpg": [
+      {
+        "id": "wclo312k",
+        "type": "clock",
+        "x": 0.82,
+        "y": 0.15,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ff7a3c"
+        }
+      },
+      {
+        "id": "wlyr313k",
+        "type": "lyrics",
+        "x": 0.82,
+        "y": 0.26,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "rechts",
+          "color": "#ffffff",
+          "accent": "#ff7a3c"
+        }
+      },
+      {
+        "id": "wwea314k",
+        "type": "weather",
+        "x": 0.1,
+        "y": 0.1,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#ffffff",
+          "accent": "#ff7a3c"
+        }
+      }
+    ],
+    "Konosuba/konosuba-x1we1o.jpg": [
+      {
+        "id": "wclo315k",
+        "type": "clock",
+        "x": 0.15,
+        "y": 0.76,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ffb347"
+        }
+      },
+      {
+        "id": "wlyr316k",
+        "type": "lyrics",
+        "x": 0.15,
+        "y": 0.88,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#ffffff",
+          "accent": "#ffb347"
+        }
+      }
+    ],
+    "Konosuba/konosuba-xlmljz.jpg": [
+      {
+        "id": "wclo317k",
+        "type": "clock",
+        "x": 0.875,
+        "y": 0.3,
+        "size": 1.0,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ff3b5c"
+        }
+      },
+      {
+        "id": "wwea318k",
+        "type": "weather",
+        "x": 0.875,
+        "y": 0.41,
+        "size": 0.8,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#ffffff",
+          "accent": "#ff3b5c"
+        }
+      },
+      {
+        "id": "wvis319k",
+        "type": "visualizer",
+        "x": 0.875,
+        "y": 0.78,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "style": "kapseln",
+          "bars": 24,
+          "idle": "ausblenden",
+          "color": "#ffffff",
+          "accent": "#ff3b5c"
+        }
+      },
+      {
+        "id": "wlyr320k",
+        "type": "lyrics",
+        "x": 0.875,
+        "y": 0.86,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "rechts",
+          "color": "#ffffff",
+          "accent": "#ff3b5c"
+        }
+      }
+    ],
+    "Konosuba/konosuba-yjw7jk.jpg": [
+      {
+        "id": "wclo321k",
+        "type": "clock",
+        "x": 0.1,
+        "y": 0.22,
+        "size": 1.15,
+        "monitor": "*",
+        "opts": {
+          "style": "gestapelt",
+          "date": true,
+          "color": "#ffffff",
+          "accent": "#ff6a3d"
+        }
+      },
+      {
+        "id": "wwea322k",
+        "type": "weather",
+        "x": 0.1,
+        "y": 0.37,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "kompakt",
+          "details": true,
+          "place": true,
+          "color": "#ffffff",
+          "accent": "#ff6a3d"
+        }
+      }
+    ],
+    "Konosuba/konosuba-zx5w9o.jpg": [
+      {
+        "id": "wclo323k",
+        "type": "clock",
+        "x": 0.85,
+        "y": 0.2,
+        "size": 1.2,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#f3e6d0",
+          "accent": "#f2c14e"
+        }
+      },
+      {
+        "id": "wcal324k",
+        "type": "calendar",
+        "x": 0.85,
+        "y": 0.53,
+        "size": 0.9,
+        "monitor": "*",
+        "opts": {
+          "style": "monat",
+          "weeks": true,
+          "holidays": "NW",
+          "upcoming": true,
+          "color": "#f3e6d0",
+          "accent": "#f2c14e"
+        }
+      },
+      {
+        "id": "wlyr325k",
+        "type": "lyrics",
+        "x": 0.85,
+        "y": 0.85,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "rechts",
+          "color": "#f3e6d0",
+          "accent": "#f2c14e"
+        }
+      }
+    ],
+    "Konosuba/konosuba-zxwelo.jpg": [
+      {
+        "id": "wclo326k",
+        "type": "clock",
+        "x": 0.15,
+        "y": 0.18,
+        "size": 1.1,
+        "monitor": "*",
+        "opts": {
+          "style": "sperrbildschirm",
+          "date": true,
+          "color": "#1e2a38",
+          "accent": "#c0392b"
+        }
+      },
+      {
+        "id": "wlyr327k",
+        "type": "lyrics",
+        "x": 0.15,
+        "y": 0.3,
+        "size": 0.7,
+        "monitor": "*",
+        "opts": {
+          "lines": 3,
+          "align": "links",
+          "color": "#1e2a38",
+          "accent": "#c0392b"
+        }
+      },
+      {
+        "id": "wwea328k",
+        "type": "weather",
+        "x": 0.86,
+        "y": 0.17,
+        "size": 0.85,
+        "monitor": "*",
+        "opts": {
+          "style": "aktuell",
+          "details": true,
+          "place": true,
+          "color": "#1e2a38",
+          "accent": "#c0392b"
+        }
       }
     ]
   }

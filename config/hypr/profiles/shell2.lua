@@ -22,6 +22,8 @@
 -- Umschalten: hypr-profile shell2   (oder CTRL + SUPER + SHIFT + P durchschalten)
 
 local home = os.getenv("HOME")
+local monitors = require("monitor-setup")
+local pick = require("apps")
 local hyprProfile = home .. "/.local/bin/hypr-profile"
 
 --------------------------------------------------------------------------------
@@ -51,12 +53,12 @@ end
 -- Die wichtigsten Einstellungen
 --------------------------------------------------------------------------------
 local cfg = {
-	-- Apps
-	terminal = "kitty",
-	browser = "zen-browser",
-	editor = "codium",
-	fileExplorer = "dolphin",
-	audioSettings = "pavucontrol",
+	-- Apps: die erste installierte gewinnt (apps.lua), vorne steht meine Wahl
+	terminal = pick({ "kitty", "alacritty", "foot", "wezterm", "ghostty", "konsole", "gnome-terminal", "xfce4-terminal", "xterm" }),
+	browser = pick({ "zen-browser", "firefox", "librewolf", "brave", "chromium", "google-chrome-stable", "vivaldi-stable" }),
+	editor = pick({ "codium", "code", "zed", "kate", "gnome-text-editor", "mousepad" }),
+	fileExplorer = pick({ "dolphin", "nautilus", "thunar", "nemo", "pcmanfm-qt", "pcmanfm" }),
+	audioSettings = pick({ "pavucontrol", "pwvucontrol", "pavucontrol-qt" }),
 	launcher = "fuzzel",
 	-- Sperrbildschirm (SUPER + L): scripts/lock.sh liest die Shell-Einstellung
 	-- "Sperrbildschirm" (shell.json, lockscreen.style): karte = Lockscreen der
@@ -104,13 +106,9 @@ local cfg = {
 	brightnessStep = 5,
 
 	-- Energie
-	sleepCmd = "systemctl suspend-then-hibernate",
+	-- ohne eingerichtete Hibernation scheitert suspend-then-hibernate -> nur Standby
+	sleepCmd = "systemctl suspend-then-hibernate || systemctl suspend",
 
-	-- Workspaces: jeder Monitor hat seine eigene 10er-Gruppe (Anzeige jeweils 1-10)
-	wsMonitorOffset = {
-		["HDMI-A-1"] = 0, -- links:  Workspaces 1-10
-		["DP-2"] = 10, -- rechts: Workspaces 11-20
-	},
 }
 
 --------------------------------------------------------------------------------
@@ -296,16 +294,8 @@ hl.workspace_rule({
 	},
 })
 
--- Jede 10er-Gruppe fest an ihren Monitor binden
-for monitor, offset in pairs(cfg.wsMonitorOffset) do
-	for i = 1, 10 do
-		hl.workspace_rule({
-			workspace = tostring(offset + i),
-			monitor = monitor,
-			default = (i == 1),
-		})
-	end
-end
+-- Jede 10er-Gruppe fest an ihren Monitor binden (Gruppen: monitors.lua)
+monitors.bind_workspaces()
 
 -- Launcher-Overlay huebsch einblenden
 hl.layer_rule({ match = { namespace = "launcher" }, animation = "popin 80%", blur = true })
@@ -342,13 +332,8 @@ end)
 --------------------------------------------------------------------------------
 -- Workspace-Helfer: SUPER+N = Workspace N des fokussierten Monitors
 --------------------------------------------------------------------------------
-local function monitor_offset()
-	local mon = hl.get_active_monitor()
-	if mon and cfg.wsMonitorOffset[mon.name] then
-		return cfg.wsMonitorOffset[mon.name]
-	end
-	return 0
-end
+-- Jeder Monitor hat seine eigene 10er-Gruppe (Anzeige jeweils 1-10), siehe monitors.lua
+local monitor_offset = monitors.offset
 
 local function wsaction(action, i)
 	return function()

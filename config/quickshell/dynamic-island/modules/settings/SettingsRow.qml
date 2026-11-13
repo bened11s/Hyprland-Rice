@@ -3,6 +3,7 @@ import QtQuick
 import qs.modules.services.config
 import qs.modules.services.plugins
 import qs.modules.widgets
+import qs.modules.settings.wallpaper
 
 import qs
 
@@ -11,7 +12,7 @@ import qs
 // der Typ des Werts in der Datei plus die Angaben in Config.meta:
 //
 //   Wahrheitswert                 Schalter
-//   String mit `options`          aufklappbare Auswahl (Chips)
+//   String mit `options`          Auswahlknopf (SettingsDropdown)
 //   Zahl mit `min`/`max`          Schieberegler (Mausrad geht auch)
 //   alles andere                  steht nur da
 //
@@ -27,6 +28,8 @@ Item {
 
     // { id, section, key, value, title, desc, options, min, max, step, unit, requires }
     required property var entry
+    // Editor, der sich selbst zeichnet (GroupCard.bare): ohne Titelzeile und Rand
+    property bool bare: false
 
     readonly property bool isBool: typeof row.entry?.value === "boolean"
     readonly property bool isNumber: typeof row.entry?.value === "number"
@@ -37,10 +40,13 @@ Item {
     // Verweis auf eine Plugin-Seite (SettingsCard haengt sie als Zeile an):
     // die ganze Zeile oeffnet die Seite
     readonly property bool isLink: (row.entry?.link ?? "") !== ""
+    // Schalter mit Unterseite (meta.sub): der Schalter schaltet, der Rest
+    // der Zeile oeffnet die Unterseite (Reihenfolge wie bei Plugins: Schalter → ›)
+    readonly property bool hasSub: row.isBool && (row.entry?.sub ?? "") !== ""
     // Schrift-Auswahl: jede Option in ihrer eigenen Schrift zeigen und nur
     // anbieten, was auch installiert ist
     readonly property bool isFont: row.isChoice && String(row.entry?.key ?? "").toLowerCase().includes("font")
-    readonly property bool interactive: row.isBool || row.isChoice || row.isNumber || row.isLink
+    readonly property bool interactive: row.isBool || row.isNumber || row.isLink
 
     // Voraussetzung erfuellt? Sonst ist die Zeile gedimmt und gesperrt.
     readonly property bool available: Plugins.satisfied(row.entry?.requires)
@@ -48,7 +54,9 @@ Item {
         const req = row.entry?.requires;
         if (!req)
             return "";
-        const id = typeof req === "string" ? req : Object.keys(req)[0];
+        // Bei mehreren Voraussetzungen die erste, die fehlt
+        const id = typeof req === "string" ? req
+                 : Object.keys(req).find(k => !Plugins.satisfied({ [k]: req[k] })) ?? Object.keys(req)[0];
         const title = Plugins.metaFor(id)?.title ?? id;
         return typeof req === "string" ? I18n.tr("Braucht „%1“").arg(I18n.tr(title))
                                        : I18n.tr("Braucht „%1“ = %2").arg(I18n.tr(title)).arg(row.optionLabel(req[id]));
@@ -60,8 +68,12 @@ Item {
         const v = String(value ?? "");
         const label = row.entry?.labels?.[v];
         if (label !== undefined)
-            return label;
-        return row.isChoice && !row.isFont ? I18n.tr(v) : v;
+            return I18n.tr(label);
+        if (!row.isChoice || row.isFont)
+            return v;
+        // Rohwerte wie "leicht" oder "notch" gross anfangen lassen
+        const shown = I18n.tr(v);
+        return shown.charAt(0).toUpperCase() + shown.slice(1);
     }
     readonly property bool changed: !row.isLink && !Plugins.isDefault(row.entry?.section ?? "", row.entry?.key ?? "")
 
@@ -76,7 +88,6 @@ Item {
             list.unshift(current);
         return list;
     }
-    property bool expanded: false
 
     // ---- Zahlen ----
     readonly property real min: Number(row.entry?.min ?? 0)
@@ -110,7 +121,7 @@ Item {
     readonly property string subtitle: !row.available && row.requirementLabel !== ""
                                        ? row.requirementLabel
                                        : (row.entry?.desc ?? "")
-    readonly property real lineHeight: row.subtitle !== "" ? 52 : 44
+    readonly property real lineHeight: row.bare ? 0 : row.subtitle !== "" ? 60 : 50
 
     // Breite des Bedienelements je nach Zeilenbreite: der Schieberegler
     // waechst von 110 auf 220 px mit, ein Auswahlwert wird abgeschnitten,
@@ -119,8 +130,7 @@ Item {
     readonly property real valueCap: Math.max(72, row.width - 28 - 160 - 10 - 26 - 24)
 
     implicitHeight: row.lineHeight
-                    + (row.expanded ? choiceFlow.implicitHeight + 12 : 0)
-                    + (row.isEditor ? editorLoader.implicitHeight + 14 : 0)
+                    + (row.isEditor ? editorLoader.implicitHeight + (row.bare ? 0 : 14) : 0)
 
     Behavior on implicitHeight {
         NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
@@ -133,8 +143,8 @@ Item {
             top: parent.top
             bottom: parent.bottom
         }
-        radius: 12
-        color: hover.hovered && row.available ? Colors.alpha(Colors.fgSurface, 0.05) : "transparent"
+        radius: 16
+        color: hover.hovered && row.available && !row.isEditor ? Colors.alpha(Colors.fgSurface, 0.04) : "transparent"
         opacity: row.available ? 1 : 0.45
         clip: true
 
@@ -151,7 +161,7 @@ Item {
             cursorShape: row.interactive && row.available ? Qt.PointingHandCursor : Qt.ArrowCursor
         }
 
-        // Die eigentliche Zeile; bei einer Auswahl haengt die Liste darunter
+        // Die eigentliche Zeile; ein Editor haengt darunter
         Item {
             id: line
 
@@ -161,40 +171,27 @@ Item {
                 top: parent.top
             }
             height: row.lineHeight
+            visible: !row.bare
 
             TapHandler {
-                enabled: (row.isBool || row.isChoice || row.isLink) && row.available
-                onTapped: {
+                // Die Unterseite geht auch ohne erfuellte Voraussetzung auf
+                enabled: ((row.isBool || row.isLink) && row.available) || row.hasSub
+                onTapped: point => {
+                    // Bei hasSub schaltet nur der Schalter selbst (links vom ›)
+                    const onSwitch = point.position.x >= control.x && point.position.x < control.x + 40 + 4;
                     if (row.isLink)
                         SettingsState.openPage(row.entry.link, {});
-                    else if (row.isBool)
+                    else if (row.hasSub && !onSwitch)
+                        SettingsState.openPage(row.entry.sub, {});
+                    else if (row.available)
                         Plugins.set(row.entry.section, row.entry.key, !row.entry.value);
-                    else
-                        row.expanded = !row.expanded;
-                }
-            }
-
-            // Mausrad auf einer Zahl: einen Schritt rauf oder runter
-            WheelHandler {
-                enabled: row.isNumber && row.available
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-
-                property real acc: 0
-
-                onWheel: event => {
-                    acc += event.angleDelta.y;
-                    if (Math.abs(acc) >= 120) {
-                        row.setNumber(Number(row.entry.value) + (acc > 0 ? row.step : -row.step));
-                        acc = 0;
-                    }
-                    event.accepted = true;
                 }
             }
 
             Column {
                 anchors {
                     left: parent.left
-                    leftMargin: 14
+                    leftMargin: 16
                     right: resetButton.left
                     rightMargin: 10
                     verticalCenter: parent.verticalCenter
@@ -210,7 +207,7 @@ Item {
                         width: Math.min(implicitWidth, parent.width - (row.changed ? 11 : 0))
                         text: row.entry?.title ?? ""
                         color: Colors.fgBackground
-                        font.pixelSize: 12
+                        font.pixelSize: 13
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
@@ -232,7 +229,7 @@ Item {
                     visible: text !== ""
                     text: row.subtitle
                     color: !row.available ? Colors.secondary : Colors.fgSurfaceVariant
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                     elide: Text.ElideRight
                 }
             }
@@ -295,12 +292,15 @@ Item {
                     rightMargin: 14
                     verticalCenter: parent.verticalCenter
                 }
-                width: row.isBool ? 40 : row.isNumber ? numberControl.width : row.isEditor ? 0 : row.isLink ? 20 : valueRow.width
+                width: row.hasSub ? 40 + 6 + 20 : row.isBool ? 40 : row.isNumber ? numberControl.width : row.isEditor ? 0 : row.isLink ? 20 : row.isChoice ? choiceDrop.width : valueRow.width
                 height: 28
 
                 Text {
-                    anchors.centerIn: parent
-                    visible: row.isLink
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    width: 20
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: row.isLink || row.hasSub
                     text: "chevron_right"
                     color: Colors.fgSurfaceVariant
                     font.family: "Material Symbols Outlined"
@@ -309,7 +309,8 @@ Item {
 
                 // Schalter fuer Wahrheitswerte
                 Rectangle {
-                    anchors.centerIn: parent
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 0
                     width: 40
                     height: 22
                     radius: height / 2
@@ -357,6 +358,24 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: row.sliderWidth
                         height: 28
+
+                        // Mausrad nur direkt auf dem Regler (sonst verstellt
+                        // das Scrollen der Liste die Werte): ein Schritt je Raste
+                        WheelHandler {
+                            enabled: row.isNumber && row.available
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+
+                            property real acc: 0
+
+                            onWheel: event => {
+                                acc += event.angleDelta.y;
+                                if (Math.abs(acc) >= 120) {
+                                    row.setNumber(Number(row.entry.value) + (acc > 0 ? row.step : -row.step));
+                                    acc = 0;
+                                }
+                                event.accepted = true;
+                            }
+                        }
 
                         readonly property real handleSize: 14
                         readonly property real trackInset: handleSize / 2
@@ -432,38 +451,36 @@ Item {
                     }
                 }
 
-                // Aktueller Wert (bei einer Auswahl mit Pfeil zum Aufklappen)
-                Row {
+                // Auswahl: Knopf mit dem aktuellen Wert, klappt die Liste auf
+                SettingsDropdown {
+                    id: choiceDrop
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: row.isChoice
+                    enabled: row.available
+                    width: implicitWidth
+                    // +20: der Knopf hat mehr Rand als der blosse Wert
+                    maxWidth: Math.min(240, row.valueCap + 20)
+                    options: row.choices
+                    current: row.entry?.value
+                    labelOf: row.optionLabel
+                    fontOf: row.isFont ? (v => String(v)) : null
+                    onPicked: v => Plugins.set(row.entry.section, row.entry.key, v)
+                }
+
+                // Sonstiger Wert: steht nur da
+                Text {
                     id: valueRow
 
                     anchors.verticalCenter: parent.verticalCenter
                     // Ein Editor zeigt den Rohwert nicht – der steht in ihm selbst
-                    visible: !row.isBool && !row.isNumber && !row.isEditor && !row.isLink
-                    spacing: 4
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.min(implicitWidth, row.valueCap)
-                        text: row.optionLabel(row.entry?.value)
-                        color: Colors.fgSurfaceVariant
-                        font.family: row.isFont ? String(row.entry?.value ?? "") : Config.font
-                        font.pixelSize: 11
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: row.isChoice
-                        text: "expand_more"
-                        rotation: row.expanded ? 180 : 0
-                        color: Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 16
-
-                        Behavior on rotation {
-                            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-                        }
-                    }
+                    visible: !row.isBool && !row.isNumber && !row.isEditor && !row.isLink && !row.isChoice
+                    width: Math.min(implicitWidth, row.valueCap)
+                    text: row.optionLabel(row.entry?.value)
+                    color: Colors.fgSurfaceVariant
+                    font.family: Config.font
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
                 }
             }
         }
@@ -476,8 +493,8 @@ Item {
                 left: parent.left
                 right: parent.right
                 top: line.bottom
-                leftMargin: 14
-                rightMargin: 14
+                leftMargin: row.bare ? 0 : 16
+                rightMargin: row.bare ? 0 : 16
             }
             active: row.isEditor
             sourceComponent: row.entry?.editor === "quick" ? quickEditor
@@ -486,6 +503,11 @@ Item {
                            : row.entry?.editor === "sounds" ? soundsEditor
                            : row.entry?.editor === "battery" ? batteryEditor
                            : row.entry?.editor === "keybinds" ? keybindsEditor
+                           : row.entry?.editor === "monitors" ? monitorsEditor
+                           : row.entry?.editor === "vpn" ? vpnEditor
+                           : row.entry?.editor === "system" ? systemEditor
+                           : row.entry?.editor === "account" ? accountEditor
+                           : row.entry?.editor === "wallpaperhero" ? heroEditor
                            : null
         }
 
@@ -520,91 +542,40 @@ Item {
         }
 
         Component {
+            id: monitorsEditor
+
+            MonitorsEditor {}
+        }
+
+        Component {
             id: desktopEditor
 
             DesktopSceneEditor {}
         }
 
-        // Die Optionen einer Auswahl als Chips
-        Flow {
-            id: choiceFlow
+        Component {
+            id: vpnEditor
 
-            anchors {
-                left: parent.left
-                right: parent.right
-                top: line.bottom
-                leftMargin: 14
-                rightMargin: 14
-            }
-            visible: row.isChoice
-            opacity: row.expanded ? 1 : 0
-            spacing: 6
+            VpnEditor {}
+        }
 
-            Behavior on opacity {
-                NumberAnimation { duration: 120 }
-            }
+        Component {
+            id: systemEditor
 
-            Repeater {
-                model: row.choices
+            SystemEditor {}
+        }
 
-                Rectangle {
-                    id: chip
+        Component {
+            id: accountEditor
 
-                    required property string modelData
-                    readonly property bool selected: chip.modelData === String(row.entry?.value ?? "")
+            AccountEditor {}
+        }
 
-                    readonly property bool previewed: (row.entry?.preview ?? "") !== ""
+        Component {
+            id: heroEditor
 
-                    width: chip.previewed ? Math.max(76, chipLabel.implicitWidth + 16) : chipLabel.implicitWidth + 24
-                    height: chip.previewed ? 58 : 28
-                    radius: chip.previewed ? 12 : height / 2
-                    color: chip.selected ? Colors.primary
-                         : chipHover.hovered ? Colors.alpha(Colors.fgSurface, 0.12)
-                         : Colors.alpha(Colors.fgSurface, 0.06)
-
-                    Behavior on color {
-                        ColorAnimation { duration: 120 }
-                    }
-
-                    // Vorschau der Variante (Uhr, Visualiser, Workspaces)
-                    Loader {
-                        active: chip.previewed
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.top: parent.top
-                        anchors.topMargin: 6
-
-                        sourceComponent: StylePreview {
-                            kind: row.entry.preview
-                            style: chip.modelData
-                            color: chip.selected ? Colors.fgPrimary : Colors.fgSurface
-                            accent: chip.selected ? Colors.fgPrimary : Colors.primary
-                        }
-                    }
-
-                    Text {
-                        id: chipLabel
-
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: chip.previewed ? undefined : parent.verticalCenter
-                        anchors.bottom: chip.previewed ? parent.bottom : undefined
-                        anchors.bottomMargin: 5
-                        font.pixelSize: chip.previewed ? 9 : 11
-                        text: row.optionLabel(chip.modelData)
-                        color: chip.selected ? Colors.fgPrimary : Colors.fgSurface
-                        font.family: row.isFont ? chip.modelData : Config.font
-                    }
-
-                    HoverHandler {
-                        id: chipHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        enabled: row.available
-                        onTapped: Plugins.set(row.entry.section, row.entry.key, chip.modelData)
-                    }
-                }
+            WallpaperHero {
+                inLibrary: false
             }
         }
     }

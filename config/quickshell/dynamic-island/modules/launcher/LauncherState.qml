@@ -5,6 +5,8 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
+import qs.modules.services.config
+
 // Gemeinsamer Zustand des Launchers. Die Notch (im Bar-Fenster) schaltet ihn
 // an, das Launcher-Fenster hängt seine Sichtbarkeit daran – die beiden leben
 // in verschiedenen Fenstern und können sich sonst nicht sehen.
@@ -26,7 +28,10 @@ Singleton {
     //   "control"    Steuerung: Kacheln, WLAN/BT/Audio, Tray
     //   "notifications"  Benachrichtigungsliste
     //   "system"     Auslastung und Temperaturen
+    //   "plugin"     Notch-Ansicht eines Plugins (Manifest `panels.notch`),
+    //                welches sagt `pluginView` (Plugin-id)
     property string mode: "apps"
+    property string pluginView: ""
 
     // App-Liste fuer den Launcher als gesammelter Schnappschuss. DesktopEntries
     // scannt erst beim ersten Zugriff und meldet dann Eintrag fuer Eintrag;
@@ -68,7 +73,17 @@ Singleton {
     // Die Ansichten, durch die man in der Notch blaettert (Mausrad kippen,
     // Touchpad wischen). "overview" ist keine Launcher-Ansicht, sondern die
     // Hover-Karte der Notch selbst – Blaettern dorthin schliesst den Launcher.
-    readonly property var views: ["overview", "media", "control", "notifications", "system"]
+    // Abgeschaltete Seiten (Config.notch.page*) fallen aus dem Blaettern,
+    // ihre Kuerzel oeffnen sie weiter. Ebenso Seiten, deren Karten alle
+    // aus sind (Steuerung behaelt immer die Kacheln, Benachrichtigungen die Liste).
+    readonly property bool mediaHasCards: ["mediaSources", "mediaCover", "mediaTitle", "mediaProgress",
+        "mediaControls", "mediaQueue"].some(k => Config.notch[k]) || Config.media.lyrics
+    readonly property bool systemHasCards: ["sysCpu", "sysGpu", "sysVram", "sysRam", "sysDisk",
+        "sysTemps", "sysThrottle"].some(k => Config.notch[k])
+    readonly property var views: ["overview"].concat(
+        [["media", Config.notch.pageMedia && root.mediaHasCards], ["control", Config.notch.pageControl],
+         ["notifications", Config.notch.pageNotifications], ["system", Config.notch.pageSystem && root.systemHasCards]]
+        .filter(v => v[1]).map(v => v[0]))
     readonly property int viewIndex: root.open ? root.views.indexOf(root.mode) : 0
 
     // Blaettern um `dir` (+1/-1). Liefert die neue Ansicht zurueck, damit die
@@ -160,6 +175,23 @@ Singleton {
             root.showWallpaperSection(target, section);
     }
 
+    // ---- Notch-Ansichten von Plugins ----
+    // Ein Plugin kann eine eigene Ansicht in die Notch bringen (Manifest
+    // `panels.notch`, Vertrag in plugins/README.md). Die Notch laedt sie wie
+    // ihre eigenen Ansichten erst beim Oeffnen.
+    function showPluginView(target: ShellScreen, id: string): void {
+        root.pluginView = id;
+        root.showMode(target, "plugin");
+    }
+
+    // Genau diese schon offen -> zu
+    function togglePluginView(target: ShellScreen, id: string): void {
+        if (root.open && root.mode === "plugin" && root.pluginView === id)
+            root.close();
+        else
+            root.showPluginView(target, id);
+    }
+
     // Farbschema-Auswahl. Anders als die Wallpaper hat sie keinen Knopf in der
     // Leiste – nur den Launcher-Befehl und diesen Weg hier.
     function showThemes(target: ShellScreen): void {
@@ -188,7 +220,7 @@ Singleton {
 
         function onFocusedMonitorChanged(): void {
             const name = Hyprland.focusedMonitor?.name ?? "";
-            if (root.open && (root.mode === "power" || root.mode === "keys" || root.mode === "clipboard") && name && name !== root.screen?.name)
+            if (root.open && (root.mode === "power" || root.mode === "keys" || root.mode === "clipboard" || root.mode === "plugin") && name && name !== root.screen?.name)
                 root.close();
         }
     }
@@ -263,9 +295,10 @@ Singleton {
     function blockedFrom(monitors: var, clients: var): var {
         const out = [];
         for (const m of monitors) {
-            const special = m.specialWorkspace?.id ?? 0;
-            const ws = special !== 0 ? special : (m.activeWorkspace?.id ?? 0);
-            const hit = clients.some(c => c.workspace?.id === ws && c.mapped !== false && !c.hidden
+            // Über den Namen: seit Hyprland 0.57 fehlt "id" bei Spezial-Workspaces
+            const special = m.specialWorkspace?.name ?? "";
+            const ws = special !== "" ? special : (m.activeWorkspace?.name ?? "");
+            const hit = clients.some(c => (c.workspace?.name ?? "") === ws && c.mapped !== false && !c.hidden
                 && Math.max(c.fullscreen ?? 0, c.fullscreenClient ?? 0) >= 2);
             if (hit)
                 out.push(m.name);

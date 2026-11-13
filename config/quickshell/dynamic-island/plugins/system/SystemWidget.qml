@@ -14,7 +14,7 @@ import qs.modules.services.system
 //   ringe    Kreis-Anzeigen (CPU, GPU, RAM, Platte), Prozent in der Mitte,
 //            Versalien-Label darunter, Temperatur bzw. Belegung klein dazu
 //   balken   schmale Balken, Label links, Wert und Detail rechts
-//   zeilen   rein typografisch: grosse Zahlen (Inter Display), kleine Label
+//   zeilen   rein typografisch: grosse Zahlen (Config.displayFont), kleine Label
 //
 // Daten aus SystemStats (dieselben Werte wie die Statuskarte der Leiste).
 // Der Dienst pollt nur, solange ihn jemand anfordert – hier nur bei
@@ -42,7 +42,7 @@ Item {
     readonly property bool showTemps: root.opts.temps ?? true
     readonly property bool showDisk: root.opts.disk ?? false
 
-    readonly property string display: Qt.fontFamilies().includes("Inter Display") ? "Inter Display" : Config.font
+    readonly property string display: Config.displayFont
     readonly property color dim: Colors.alpha(root.color, 0.6)
     readonly property color track: Colors.alpha(root.color, 0.16)
 

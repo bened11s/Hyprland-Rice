@@ -111,10 +111,10 @@ Item {
 
                 Text {
                     font.family: Config.font
-                    text: "AUSGABE"
-                    color: Colors.primary
+                    text: I18n.tr("Ausgabe")
+                    color: Colors.fgSurfaceVariant
                     font.pixelSize: 10
-                    font.weight: Font.Bold
+                    font.weight: Font.DemiBold
                     leftPadding: 10
                     height: 22
                     verticalAlignment: Text.AlignVCenter
@@ -155,10 +155,10 @@ Item {
 
                 Text {
                     font.family: Config.font
-                    text: "EINGABE"
-                    color: Colors.secondary
+                    text: I18n.tr("Eingabe")
+                    color: Colors.fgSurfaceVariant
                     font.pixelSize: 10
-                    font.weight: Font.Bold
+                    font.weight: Font.DemiBold
                     leftPadding: 10
                     height: 26
                     verticalAlignment: Text.AlignBottom
@@ -201,10 +201,10 @@ Item {
                 Text {
                     font.family: Config.font
                     visible: Audio.streams.length > 0
-                    text: "APPS"
-                    color: Colors.tertiary
+                    text: I18n.tr("Apps")
+                    color: Colors.fgSurfaceVariant
                     font.pixelSize: 10
-                    font.weight: Font.Bold
+                    font.weight: Font.DemiBold
                     leftPadding: 10
                     height: 26
                     verticalAlignment: Text.AlignBottom

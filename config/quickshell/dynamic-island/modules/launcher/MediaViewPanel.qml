@@ -26,6 +26,13 @@ ViewPanel {
         topOffset: 0
         padding: 0
         maxCoverSize: 190
+        showSources: Config.notch.mediaSources
+        showCover: Config.notch.mediaCover
+        showRing: Config.notch.mediaRing
+        showTitle: Config.notch.mediaTitle
+        showProgress: Config.notch.mediaProgress
+        showControls: Config.notch.mediaControls
+        showQueue: Config.notch.mediaQueue
         tint: Appearance.notchLayout ? Appearance.notchColor : Colors.background
         visible: Media.available
     }

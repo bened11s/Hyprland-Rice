@@ -1,20 +1,21 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Layouts
 
 import qs
 import qs.modules.desktop
 import qs.modules.lock
 import qs.modules.services.config
+import qs.modules.settings
 
 // Optionen von Uhr und Medien-Karte im Anordnungs-Editor, angedockt an den
-// Auswahlrahmen wie WidgetOptions bei den Widgets: Ein-/Ausblenden und Groesse.
+// Auswahlrahmen und gebaut wie WidgetOptions bei den Widgets
+// (docs/settings-style.md): Kopf mit dem Namen, darunter Zeilen mit je einem
+// Bedienelement (EditRow) – Sichtbar als Schalter, Groesse.
 Rectangle {
     id: pop
 
     required property string name
     property string title: ""
-    property string icon: "widgets"
 
     readonly property bool hiddenHere: LockLayout.hidden(pop.name)
     readonly property real size: LockLayout.scale(pop.name)
@@ -29,8 +30,8 @@ Rectangle {
         });
     }
 
-    implicitWidth: Math.max(260, rows.implicitWidth + 28)
-    implicitHeight: rows.implicitHeight + 24
+    implicitWidth: 320
+    implicitHeight: body.implicitHeight + 10
     width: implicitWidth
     height: implicitHeight
     radius: 14
@@ -48,62 +49,70 @@ Rectangle {
         onWheel: wheel => wheel.accepted = true
     }
 
-    ColumnLayout {
-        id: rows
+    Column {
+        id: body
 
-        x: 14
-        y: 12
-        spacing: 8
+        x: 16
+        y: 4
+        width: pop.width - 32
 
-        RowLayout {
-            spacing: 8
-            Layout.fillWidth: true
-
-            Text {
-                text: pop.icon
-                color: Colors.primary
-                font.family: "Material Symbols Outlined"
-                font.pixelSize: 18
-            }
+        Item {
+            width: parent.width
+            height: 46
 
             Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
                 text: pop.title
                 color: Colors.fgBackground
                 font.family: Config.font
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.weight: Font.DemiBold
-                Layout.fillWidth: true
-            }
-
-            EditChip {
-                icon: pop.hiddenHere ? "visibility_off" : "visibility"
-                text: pop.hiddenHere ? I18n.tr("Ausgeblendet") : I18n.tr("Sichtbar")
-                on: !pop.hiddenHere
-                onClicked: LockLayout.setHidden(pop.name, !pop.hiddenHere)
+                elide: Text.ElideRight
             }
         }
 
-        RowLayout {
-            spacing: 6
-            opacity: pop.hiddenHere ? 0.4 : 1
+        EditRow {
+            label: I18n.tr("Sichtbar")
 
-            EditLabel {
-                text: I18n.tr("Größe")
-                Layout.preferredWidth: 60
+            SettingsSwitch {
+                anchors.verticalCenter: parent.verticalCenter
+                checked: !pop.hiddenHere
+                onToggled: LockLayout.setHidden(pop.name, !pop.hiddenHere)
             }
+        }
 
-            EditChip {
+        // auch: Griff an der Ecke, Tasten + / -
+        EditRow {
+            label: I18n.tr("Größe")
+
+            EditButton {
+                anchors.verticalCenter: parent.verticalCenter
                 icon: "remove"
                 onClicked: pop.setSize(pop.size / 1.1)
             }
 
-            EditChip {
+            // Klick auf den Wert: zurueck auf 100 %
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 50
+                horizontalAlignment: Text.AlignHCenter
                 text: Math.round(pop.size * 100) + " %"
-                on: Math.abs(pop.size - 1) < 0.005
-                onClicked: pop.setSize(1)
+                color: Colors.fgSurface
+                font.family: Config.font
+                font.pixelSize: 12
+
+                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: pop.setSize(1)
+                }
             }
 
-            EditChip {
+            EditButton {
+                anchors.verticalCenter: parent.verticalCenter
                 icon: "add"
                 onClicked: pop.setSize(pop.size * 1.1)
             }
