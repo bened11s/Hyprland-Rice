@@ -122,6 +122,13 @@ Spalten fluchten.
   und Login wie die Info-Seite; darunter Profil (Bild, Anzeigename) und
   Sicherheit (Passwort klappt auf). Was der Kopf zeigt, steht nicht noch
   einmal als Zeile (kein „Benutzername“).
+- Seit 2026-11-14: Chips unter dem Login (Kontotyp, Shell, „seit …“ – vom
+  User ausdrücklich gewollt, Ausnahme von der Pillen-Regel), Karte „Sitzung“
+  (logind: seit, Desktop/TTY, Abmelden mit Rückfrage). Profilbild in
+  `account/AvatarShape` (Canvas statt MultiEffect, zeichnet auch im
+  Software-Renderer der Harnesse), Form fest sunny (circle, cookie, squircle,
+  clover gibt es in der Komponente, keine Einstellung); Ring in primary folgt
+  der Form.
 - Notch-Seiten: Zeilen unter „Seiten“ schalten die ganze Karte, › öffnet die
   Teile (`notch-media|control|notifications|system`).
 

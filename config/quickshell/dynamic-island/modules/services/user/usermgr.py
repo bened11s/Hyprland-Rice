@@ -3,7 +3,9 @@
 
 Eine JSON-Zeile je Aufruf ({"ok": ...}).
 
-  info            {"user", "name", "face"} – Login, Anzeigename (GECOS), ~/.face
+  info            {"user", "name", "face", "admin", "shell", "session"} – Login,
+                  Anzeigename (GECOS), ~/.face, Gruppe wheel/sudo/admin,
+                  Login-Shell, grafische Sitzung (logind, {} ohne systemd)
   pick            Bildauswahl (kdialog, sonst zenity) -> {"path": ""|pfad}
   face <pfad>     quadratisch auf 512 px zuschneiden -> ~/.face, dazu
                   AccountsService SetIconFile (Login-Bildschirm)
@@ -16,6 +18,7 @@ AccountsService: Bild und Name gehen ohne Passwort (change-own-user-data),
 das Passwort nur ueber den polkit-Dialog. Das Passwort steht nie in argv.
 """
 
+import grp
 import json
 import os
 import pwd
@@ -50,10 +53,32 @@ def accounts(method: str, sig: str, *args: str) -> str:
     return err or f"{method} fehlgeschlagen"
 
 
+def session() -> dict:
+    """Grafische Sitzung ueber logind: Start (Unix-Sekunden), Desktop, Art, TTY."""
+    def run(*cmd):
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        return res.stdout.strip() if res.returncode == 0 else ""
+    sid = os.environ.get("XDG_SESSION_ID") or run("loginctl", "show-user", str(os.getuid()), "-p", "Display", "--value")
+    if not sid:
+        return {}
+    props = dict(line.split("=", 1) for line in run(
+        "loginctl", "show-session", sid, "-p", "Desktop", "-p", "Type", "-p", "TTY").splitlines() if "=" in line)
+    # Timestamp gibt loginctl nur lokalisiert aus, D-Bus liefert Mikrosekunden
+    path = run("busctl", "--system", "call", "org.freedesktop.login1", "/org/freedesktop/login1",
+               "org.freedesktop.login1.Manager", "GetSession", "s", sid).split(" ", 1)[-1].strip('"')
+    stamp = run("busctl", "--system", "get-property", "org.freedesktop.login1", path,
+                "org.freedesktop.login1.Session", "Timestamp").split(" ")[-1] if path else ""
+    return {"since": int(stamp) // 1_000_000 if stamp.isdigit() else 0,
+            "desktop": props.get("Desktop", ""), "type": props.get("Type", ""), "tty": props.get("TTY", "")}
+
+
 def op_info(_args):
     entry = pwd.getpwuid(os.getuid())
     name = entry.pw_gecos.split(",")[0].strip()
-    out(user=entry.pw_name, name=name or entry.pw_name, face=str(FACE) if FACE.is_file() else "")
+    groups = {grp.getgrgid(g).gr_name for g in os.getgrouplist(entry.pw_name, entry.pw_gid)}
+    out(user=entry.pw_name, name=name or entry.pw_name, face=str(FACE) if FACE.is_file() else "",
+        admin=bool(groups & {"wheel", "sudo", "admin"}), shell=Path(entry.pw_shell).name,
+        session=session())
 
 
 def op_pick(_args):

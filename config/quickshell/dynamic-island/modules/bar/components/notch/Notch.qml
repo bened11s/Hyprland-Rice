@@ -283,7 +283,9 @@ Item {
     readonly property real clocklessWidth: sideLeft + sideRight + (sideLeft > 0 && sideRight > 0 ? 2 * compactGap : 0) + 2 * compactEdge
     readonly property real collapsedWidth: docked
         ? (clockHidden ? Math.max(2 * compactEdge + 24, clocklessWidth)
-                       : Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))) + ringGrowX
+                       // Nur Uhr: keine Mindestbreite und kein Abstand zu leeren Seiten
+                       : compactSide > 0 ? Math.max(compactMinWidth, clock.implicitWidth + 2 * (compactSide + compactGap + compactEdge))
+                                         : clock.implicitWidth + 2 * compactEdge) + ringGrowX
         : clock.implicitWidth + 50 + recordReserve
     readonly property real launcherWidth: wallpaperOpen ? wallpapers.outerWidth
                                         : themeOpen ? themes.outerWidth

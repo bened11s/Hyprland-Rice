@@ -20,6 +20,11 @@ Singleton {
     property string face: ""
     // Neu laden erzwingen, wenn ~/.face ersetzt wurde (gleicher Pfad)
     property int faceVersion: 0
+    // Kopf-Chips und Sitzung (Einstellungen > Konto)
+    property bool admin: false
+    property string shell: ""
+    // {since: Unix-Sekunden, desktop, type, tty}; leer ohne logind
+    property var session: ({})
     readonly property url faceUrl: root.face !== "" ? `file://${root.face}?v=${root.faceVersion}` : ""
 
     // Laufende Aktion ("face", "name", "password") und ihr Ergebnis
@@ -57,6 +62,11 @@ Singleton {
         pwProc.running = true;
     }
 
+    // Wie Abmelden im Power-Menue (Spotify-Prefs sichern, dann Hyprland beenden)
+    function logout(): void {
+        Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/session-exit.sh", "logout"]);
+    }
+
     function parse(text: string): var {
         try {
             return JSON.parse(text.trim().split("\n").pop());
@@ -78,6 +88,9 @@ Singleton {
             root.user = r.user ?? root.user;
             root.name = r.name ?? "";
             root.face = r.face ?? "";
+            root.admin = r.admin ?? false;
+            root.shell = r.shell ?? "";
+            root.session = r.session ?? {};
         } else if (op === "face") {
             root.face = r.face ?? root.face;
             root.faceVersion++;

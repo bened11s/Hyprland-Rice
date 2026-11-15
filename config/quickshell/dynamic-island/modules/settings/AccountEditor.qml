@@ -1,9 +1,9 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Effects
 
 import qs
 import qs.modules.services.config
+import qs.modules.services.system
 import qs.modules.services.user
 import qs.modules.widgets
 import qs.modules.settings.system
@@ -11,7 +11,8 @@ import qs.modules.settings.account
 
 // Einstellungsseite Konto (Config.meta editor "account"): Kopf mit
 // Profilbild, Anzeigename und Login wie der Kopf der Info-Seite, darunter
-// Profil (Bild, Name) und Sicherheit (Passwort).
+// Profil (Bild, Name), Sicherheit (Passwort) und Sitzung (seit wann,
+// welche, Abmelden mit Rueckfrage). Im Kopf Chips: Kontotyp, Shell, Dauer.
 // Geschrieben wird ueber User (usermgr.py -> AccountsService); das
 // Passwort bestaetigt der polkit-Dialog mit dem aktuellen Passwort.
 Item {
@@ -23,9 +24,46 @@ Item {
     property bool pwOpen: false
     readonly property bool pwValid: newPw.text !== "" && newPw.text === repeatPw.text
     readonly property bool pwMismatch: repeatPw.text !== "" && newPw.text !== repeatPw.text
+    // Abmelden-Rueckfrage offen
+    property bool logoutAsk: false
+
+    // Sekunden-Uhr fuer "seit …", tickt nur bei offener Seite
+    property real now: Date.now() / 1000
+    readonly property real since: User.session?.since ?? 0
+
+    function sinceText(): string {
+        const d = new Date(editor.since * 1000);
+        const time = Qt.formatTime(d, Config.appearance.clock === "12h" ? "h:mm AP" : "HH:mm");
+        const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+        if (days === 0)
+            return I18n.tr("Heute, %1").arg(time);
+        if (days === 1)
+            return I18n.tr("Gestern, %1").arg(time);
+        return `${Qt.formatDate(d, "dd.MM.")}, ${time}`;
+    }
+
+    function sessionText(): string {
+        const s = User.session ?? {};
+        const kind = s.type === "wayland" ? "Wayland" : s.type === "x11" ? "X11" : "";
+        const what = s.desktop && kind ? `${s.desktop} (${kind})` : s.desktop || kind;
+        return what && s.tty ? I18n.tr("%1 auf %2").arg(what).arg(s.tty) : what || s.tty || "";
+    }
+
+    Timer {
+        interval: 60000
+        repeat: true
+        running: editor.visible
+        triggeredOnStart: true
+        onTriggered: editor.now = Date.now() / 1000
+    }
 
     // Beim Oeffnen frisch lesen (Name koennte anderswo geaendert sein)
-    onVisibleChanged: if (visible) User.refresh()
+    onVisibleChanged: {
+        if (visible)
+            User.refresh();
+        else
+            editor.logoutAsk = false;
+    }
 
     Connections {
         target: User
@@ -49,7 +87,7 @@ Item {
         // ---- Kopf: Bild, Name, Login ----
         Rectangle {
             width: parent.width
-            height: 230
+            height: chips.visible ? 266 : 230
             radius: 16
             color: Colors.alpha(Colors.fgSurface, 0.04)
 
@@ -62,69 +100,29 @@ Item {
                     id: avatar
 
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 104
-                    height: 104
+                    width: 116
+                    height: 116
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: Colors.alpha(Colors.fgSurface, 0.08)
-                    }
-
-                    Image {
-                        id: face
-
+                    AvatarShape {
                         anchors.fill: parent
                         source: User.faceUrl
-                        sourceSize: Qt.size(208, 208)
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        cache: false
-                        visible: false
+                        dim: avatarHover.hovered || User.busy === "face" ? 1 : 0
+
+                        Behavior on dim {
+                            NumberAnimation { duration: Appearance.fadeDuration }
+                        }
                     }
 
-                    Rectangle {
-                        id: faceMask
-
-                        anchors.fill: parent
-                        radius: width / 2
-                        layer.enabled: true
-                        visible: false
-                    }
-
-                    MultiEffect {
-                        anchors.fill: parent
-                        source: face
-                        maskEnabled: true
-                        maskSource: faceMask
-                        visible: face.status === Image.Ready
-                    }
-
+                    // Beim Hovern: abgedunkelt (AvatarShape.dim) mit Stift, Klick waehlt ein Bild
                     Text {
                         anchors.centerIn: parent
-                        visible: face.status !== Image.Ready
-                        text: "person"
-                        color: Colors.fgSurfaceVariant
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 52
-                    }
-
-                    // Beim Hovern: abgedunkelt mit Stift, Klick waehlt ein Bild
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: Colors.alpha("#000000", 0.45)
                         opacity: avatarHover.hovered || User.busy === "face" ? 1 : 0
+                        text: User.busy === "face" ? "hourglass_empty" : "edit"
+                        color: "#ffffff"
+                        font.family: "Material Symbols Outlined"
+                        font.pixelSize: 26
 
                         Fade on opacity {}
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: User.busy === "face" ? "hourglass_empty" : "edit"
-                            color: "#ffffff"
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 26
-                        }
                     }
 
                     HoverHandler {
@@ -162,6 +160,63 @@ Item {
                     font.pixelSize: 13
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
+                }
+
+                Item {
+                    width: 1
+                    height: 10
+                    visible: chips.visible
+                }
+
+                // Chips: Kontotyp, Login-Shell, seit wann angemeldet
+                Row {
+                    id: chips
+
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 6
+                    visible: User.shell !== ""
+
+                    Repeater {
+                        model: [
+                            User.admin ? ["shield_person", I18n.tr("Administrator")] : ["person", I18n.tr("Standardkonto")],
+                            ["terminal", User.shell],
+                            ["schedule", editor.since > 0 ? I18n.tr("seit %1").arg(SystemInfo.formatUptime(Math.max(0, editor.now - editor.since))) : ""]
+                        ].filter(c => c[1] !== "")
+
+                        Rectangle {
+                            id: chip
+
+                            required property var modelData
+
+                            width: chipRow.implicitWidth + 20
+                            height: 26
+                            radius: 13
+                            color: Colors.alpha(Colors.fgSurface, 0.08)
+
+                            Row {
+                                id: chipRow
+
+                                anchors.centerIn: parent
+                                spacing: 5
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: chip.modelData[0]
+                                    color: Colors.fgSurfaceVariant
+                                    font.family: "Material Symbols Outlined"
+                                    font.pixelSize: 14
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: chip.modelData[1]
+                                    color: Colors.fgSurface
+                                    font.family: Config.font
+                                    font.pixelSize: 11
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -351,6 +406,66 @@ Item {
                             label: User.busy === "password" ? "…" : I18n.tr("Speichern")
                             enabled: editor.pwValid && User.busy === ""
                             onClicked: User.setPassword(newPw.text)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- Sitzung (nur mit logind) ----
+        SectionCard {
+            width: parent.width
+            visible: editor.since > 0
+            title: I18n.tr("Sitzung")
+
+            InfoLine {
+                label: I18n.tr("Angemeldet seit")
+                value: editor.since > 0 ? editor.sinceText() : ""
+            }
+
+            InfoLine {
+                label: I18n.tr("Sitzung")
+                value: editor.sessionText()
+            }
+
+            // Abmelden schliesst alle Fenster: erst nachfragen
+            Item {
+                width: parent.width
+                height: 50
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 16
+                        verticalCenter: parent.verticalCenter
+                    }
+                    text: editor.logoutAsk ? I18n.tr("Wirklich abmelden?") : I18n.tr("Abmelden")
+                    color: Colors.fgSurface
+                    font.family: Config.font
+                    font.pixelSize: 13
+                }
+
+                Row {
+                    anchors {
+                        right: parent.right
+                        rightMargin: 14
+                        verticalCenter: parent.verticalCenter
+                    }
+                    spacing: 8
+
+                    TextButton {
+                        visible: editor.logoutAsk
+                        label: I18n.tr("Abbrechen")
+                        onClicked: editor.logoutAsk = false
+                    }
+
+                    TextButton {
+                        filled: editor.logoutAsk
+                        label: I18n.tr("Abmelden")
+                        onClicked: {
+                            if (editor.logoutAsk)
+                                User.logout();
+                            editor.logoutAsk = !editor.logoutAsk;
                         }
                     }
                 }

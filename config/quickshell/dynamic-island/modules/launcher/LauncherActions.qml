@@ -47,30 +47,12 @@ Singleton {
             keepOpen: true,
             run: () => LauncherState.mode = "theme"
         },
-        // Untermenues der Notch – dieselben Ansichten wie per Tastenkuerzel
+        // Nur Untermenues ohne eigenes Tastenkuerzel; Steuerung, System, Power usw. haben eins
         {
             name: "Medien",
             icon: "music_note",
             keepOpen: true,
             run: () => LauncherState.mode = "media"
-        },
-        {
-            name: "Steuerung",
-            icon: "toggle_on",
-            keepOpen: true,
-            run: () => LauncherState.mode = "control"
-        },
-        {
-            name: "Benachrichtigungen",
-            icon: "notifications",
-            keepOpen: true,
-            run: () => LauncherState.mode = "notifications"
-        },
-        {
-            name: "System",
-            icon: "monitoring",
-            keepOpen: true,
-            run: () => LauncherState.mode = "system"
         },
         // Systemseite der Einstellungen, auch ueber ">update" auffindbar
         {
@@ -78,31 +60,6 @@ Singleton {
             desc: "Shell-Version und Updates",
             icon: "system_update",
             run: () => SettingsState.openPage("system", {})
-        },
-        {
-            name: "Power",
-            icon: "power_settings_new",
-            keepOpen: true,
-            run: () => LauncherState.mode = "power"
-        },
-        {
-            name: "Tastenkürzel",
-            desc: "SUPER+K",
-            icon: "keyboard",
-            keepOpen: true,
-            run: () => LauncherState.mode = "keys"
-        },
-        {
-            name: "Zwischenablage",
-            desc: "SUPER+V",
-            icon: "content_paste",
-            keepOpen: true,
-            run: () => LauncherState.mode = "clipboard"
-        },
-        {
-            name: "Text aus Bildschirm",
-            icon: "document_scanner",
-            run: () => Screenshot.open("ocr")
         },
         {
             name: "Einstellungen",
@@ -114,11 +71,6 @@ Singleton {
             desc: "Anordnung, Auflösung, Skalierung",
             icon: "desktop_windows",
             run: () => SettingsState.openPage("monitors", {})
-        },
-        {
-            name: "Zufälliges Wallpaper",
-            icon: "shuffle",
-            run: () => Wallpapers.random()
         }
     ]
 

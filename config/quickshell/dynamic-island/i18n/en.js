@@ -1320,5 +1320,14 @@ var strings = {
     "Modus": "Mode",
     "Flächen": "Surfaces",
     "Farbschemata": "Color schemes",
-    "Schema suchen…": "Search schemes…"
+    "Schema suchen…": "Search schemes…",
+    "%1 auf %2": "%1 on %2",
+    "Administrator": "Administrator",
+    "Angemeldet seit": "Signed in since",
+    "Gestern, %1": "Yesterday, %1",
+    "Heute, %1": "Today, %1",
+    "Sitzung": "Session",
+    "Standardkonto": "Standard account",
+    "Wirklich abmelden?": "Really log out?",
+    "seit %1": "for %1"
 };
