@@ -508,6 +508,7 @@ Item {
                            : row.entry?.editor === "system" ? systemEditor
                            : row.entry?.editor === "account" ? accountEditor
                            : row.entry?.editor === "wallpaperhero" ? heroEditor
+                           : row.entry?.editor === "freesince" ? freeSinceEditor
                            : null
         }
 
@@ -577,6 +578,12 @@ Item {
             WallpaperHero {
                 inLibrary: false
             }
+        }
+
+        Component {
+            id: freeSinceEditor
+
+            FreeSinceEditor {}
         }
     }
 }

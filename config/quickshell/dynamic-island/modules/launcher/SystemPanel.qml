@@ -27,5 +27,6 @@ ViewPanel {
         showDisk: Config.notch.sysDisk
         showTemps: Config.notch.sysTemps
         showThrottle: Config.notch.sysThrottle
+        showFreedom: Config.notch.sysFreedom
     }
 }

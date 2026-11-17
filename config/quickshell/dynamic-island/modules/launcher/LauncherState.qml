@@ -79,7 +79,7 @@ Singleton {
     readonly property bool mediaHasCards: ["mediaSources", "mediaCover", "mediaTitle", "mediaProgress",
         "mediaControls", "mediaQueue"].some(k => Config.notch[k]) || Config.media.lyrics
     readonly property bool systemHasCards: ["sysCpu", "sysGpu", "sysVram", "sysRam", "sysDisk",
-        "sysTemps", "sysThrottle"].some(k => Config.notch[k])
+        "sysTemps", "sysThrottle", "sysFreedom"].some(k => Config.notch[k])
     readonly property var views: ["overview"].concat(
         [["media", Config.notch.pageMedia && root.mediaHasCards], ["control", Config.notch.pageControl],
          ["notifications", Config.notch.pageNotifications], ["system", Config.notch.pageSystem && root.systemHasCards]]

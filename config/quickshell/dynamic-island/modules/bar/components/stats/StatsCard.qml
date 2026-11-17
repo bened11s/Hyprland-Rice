@@ -24,6 +24,7 @@ Column {
     property bool showDisk: true
     property bool showTemps: true
     property bool showThrottle: true
+    property bool showFreedom: true
 
     Text {
         font.family: Config.font
@@ -147,6 +148,49 @@ Column {
                         font.pixelSize: 11
                     }
                 }
+            }
+        }
+    }
+
+    // Seit wann das System ohne Windows laeuft: Tag der Installation aus
+    // SystemStats (Erstellungsdatum des Wurzeldateisystems, sonst Pacman-Log).
+    Item {
+        width: parent.width
+        height: 26
+        visible: card.showFreedom && SystemStats.freeDays >= 0
+
+        Text {
+            id: freeIcon
+
+            anchors.verticalCenter: parent.verticalCenter
+            text: "verified_user"
+            color: Colors.fgSurfaceVariant
+            font.family: "Material Symbols Outlined"
+            font.pixelSize: 16
+        }
+
+        Row {
+            anchors {
+                left: freeIcon.right
+                leftMargin: 8
+                verticalCenter: parent.verticalCenter
+            }
+            spacing: 5
+
+            Text {
+                text: I18n.tr("Microslopfrei seit %1").arg(
+                          Qt.formatDate(new Date(SystemStats.freeStart + "T00:00:00"), "dd.MM.yyyy"))
+                color: Colors.fgBackground
+                font.family: Config.font
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+            }
+
+            Text {
+                text: I18n.tr("%1 Tage").arg(SystemStats.freeDays)
+                color: Colors.fgSurfaceVariant
+                font.family: Config.font
+                font.pixelSize: 11
             }
         }
     }

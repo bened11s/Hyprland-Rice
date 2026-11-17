@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 
 import qs.modules.services.core
+import qs.modules.services.config
 
 // Auslastung und Temperaturen aus /proc und /sys.
 //
@@ -57,6 +58,33 @@ Singleton {
     property var nvmeTemps: []       // [°C, …]
     property real waterTemp: 0       // Wasserkuehlung, 0 = keine
 
+    // ---- Microslopfrei ----
+    // Tag seit dem das Geraet ohne Windows laeuft. Geraetespezifisch: das
+    // selbst gesetzte Datum (Config.notch.freeSince) gewinnt, sonst das
+    // erkannte Installationsdatum (Geburtszeit des Wurzeldateisystems,
+    // ersatzweise der aelteste Pacman-Eintrag – siehe freeProc).
+    property string freeSince: ""          // ISO "2026-07-26", "" = unbekannt
+    property bool freeSinceForeign: false  // true = Datum aus dem Pacman-Log
+    property bool freeSinceTried: false
+
+    readonly property string freeStart: (Config.notch.freeSince ?? "") !== "" ? Config.notch.freeSince
+                                                                            : root.freeSince
+
+    // Ganze Kalendertage seit einem ISO-Datum, -1 = unbekannt. Ueber
+    // Mitternacht gerechnet, damit die Zeitumstellung (23/25-Stunden-Tag)
+    // den Zaehler nicht um einen Tag verschiebt.
+    function daysSince(iso: string): int {
+        const since = new Date(iso + "T00:00:00");
+        if (iso === "" || isNaN(since.getTime()))
+            return -1;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return Math.max(0, Math.round((today - since) / 86400000));
+    }
+
+    // Ganze Tage seit freeStart, -1 = unbekannt
+    readonly property int freeDays: root.daysSince(root.freeStart)
+
     // Fuer die Differenz der CPU-Zeiten zwischen zwei Takten
     property var prevCpu: null
 
@@ -78,6 +106,9 @@ Singleton {
     function refresh(): void {
         if (!poll.running)
             poll.running = true;
+        // Das Installationsdatum aendert sich nicht – einmal reicht
+        if (!root.freeSinceTried && !freeProc.running)
+            freeProc.running = true;
     }
 
     // Einmalig: der Prozessorname, gekuerzt um die ueblichen Floskeln
@@ -93,6 +124,28 @@ Singleton {
                 .replace(/ CPU| Processor| \d+-Core/g, "")
                 .replace(/\s+/g, " ")
                 .trim()
+        }
+    }
+
+    // Einmalig: Geburtszeit des Wurzeldateisystems. Manche Dateisysteme
+    // kennen keine ("-" bei ext4 auf aelteren Kernen) – dann der aelteste
+    // Pacman-Eintrag, also der Tag der Installation.
+    Process {
+        id: freeProc
+
+        command: ["sh", "-c",
+            'd=$(stat -c %w / 2>/dev/null | cut -d" " -f1);'
+            + ' case "$d" in ""|-*) d=$(head -1 /var/log/pacman.log 2>/dev/null | cut -c2-11); root=1;; esac;'
+            + ' echo "${d:-}${root:+ log}"']
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const f = text.trim().split(/\s+/);
+                root.freeSinceTried = true;
+                root.freeSinceForeign = f.includes("log");
+                if (/^\d{4}-\d{2}-\d{2}$/.test(f[0] ?? ""))
+                    root.freeSince = f[0];
+            }
         }
     }
 

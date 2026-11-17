@@ -132,6 +132,23 @@ Singleton {
         "notch.sysDisk": { title: "Platte", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
         "notch.sysTemps": { title: "Weitere Temperaturen", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
         "notch.sysThrottle": { title: "Drosselungs-Hinweis", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysFreedom": {
+            title: "Microslopfrei seit",
+            desc: "Tage seit der Installation (Datum aus dem Wurzeldateisystem, sonst Pacman-Log)",
+            group: "Anzeigen",
+            page: "notch-system",
+            requires: { "appearance.layout": "notch", "notch.pageSystem": true }
+        },
+        // Startdatum des Zaehlers; leer = automatisch (Installationsdatum des
+        // Geraets). Geraetespezifisch, weil shell.json pro Rechner gilt.
+        "notch.freeSince": {
+            title: "Startdatum",
+            desc: "Leer = Installationsdatum dieses Geraets",
+            group: "Anzeigen",
+            page: "notch-system",
+            editor: "freesince",
+            requires: { "appearance.layout": "notch", "notch.pageSystem": true, "notch.sysFreedom": true }
+        },
         // Akku in der eingeklappten Notch: Batterie neben der Uhr oder Ring
         // innen am Rand mit Batterie unten in der Mitte (NotchBatteryRing)
         "notch.batteryStyle": {
@@ -713,6 +730,9 @@ Singleton {
                 property bool sysDisk: true
                 property bool sysTemps: true
                 property bool sysThrottle: true
+                property bool sysFreedom: true
+                // ISO-Datum ("2026-05-13"), leer = Installationsdatum
+                property string freeSince: ""
                 // "symbol" | "ring"
                 property string batteryStyle: "symbol"
                 // "system" | "akku" | "visualiser"
