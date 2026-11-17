@@ -15,6 +15,7 @@ import "modules/window"
 import qs.modules.services.plugins
 import qs.modules.services.sounds
 import qs.modules.services.system
+import qs.modules.services.hypr
 // Die Desktop-Ebene startet das Plugin `desktop` (plugins/desktop/Main.qml).
 // Der Import bleibt hier, damit die Shell das Modul beim Start kennt –
 // Plugin-QML darf nur Module importieren, die schon statisch geladen sind.
@@ -37,6 +38,9 @@ ShellRoot {
     // Shell-Update-Pruefung im Hintergrund (system.updateCheckHours, git
     // fetch) laeuft auch, bevor jemand die Notch aufklappt
     readonly property int updateCheckHours: ShellUpdate.checkHours
+    // Monitor-Profile: haelt den Dienst (und damit `ipc call monitorprofiles`)
+    // auch bereit, bevor jemand Einstellungen > Monitore oeffnet
+    readonly property string monitorProfileMatch: Monitors.matchingProfile
 
     Wallpaper {}
     Bar {}

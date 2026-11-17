@@ -315,7 +315,9 @@ Singleton {
     // specs: Regeln, die probeweise gelten sollen; resets: keys, deren Regel
     // auf die Vorgabe zurueck soll (bevorzugt / auto / auto).
     // previous: der Stand davor (snapshot je betroffenem Monitor).
-    function apply(specs: var, resets: var, previous: var): void {
+    // ask = true: 15-s-Frage "Einstellungen behalten?" (Seite, Profile per Klick).
+    // ask = false: sofort behalten (Kommandozeile, wo niemand die Frage sieht).
+    function apply(specs: var, resets: var, previous: var, ask: bool): void {
         if (applyProc.running)
             return;
         const chunk = [];
@@ -323,13 +325,17 @@ Singleton {
             chunk.push(root.luaOf(s));
         for (const r of resets)
             chunk.push(root.luaOf({ output: r, mode: "preferred", position: "auto", scale: "auto" }));
-        if (chunk.length === 0)
+        if (chunk.length === 0) {
+            // Nichts zu aendern – ein Profil gilt trotzdem als gewaehlt
+            if (ask === false)
+                root.applied++;
             return;
+        }
         root.lastError = "";
         root.pendingSpecs = specs;
         root.pendingResets = resets;
         root.previousSpecs = previous;
-        applyProc.ask = true;
+        applyProc.ask = ask !== false;
         applyProc.command = ["hyprctl", "eval", chunk.join("\n")];
         applyProc.running = true;
     }
@@ -348,6 +354,12 @@ Singleton {
         if (!root.confirming)
             return;
         root.countdown = 0;
+        root.commitPending();
+    }
+
+    // Uebernimmt die zuletzt angewendeten Regeln in monitors.lua – aus der
+    // Frage heraus (keep) oder direkt (apply mit ask = false).
+    function commitPending(): void {
         const managed = ["mode", "position", "scale", "transform", "vrr", "disabled", "mirror"];
         const next = Object.assign({}, root.rules);
         for (const s of root.pendingSpecs) {
@@ -411,13 +423,16 @@ Singleton {
                 root.lastError = out;
             if (code !== 0 && root.lastError === "")
                 root.lastError = "hyprctl eval: Code " + code;
-            if (applyProc.ask && root.lastError === "")
-                root.countdown = root.confirmSeconds;
-            else if (applyProc.ask) {
-                // Nichts gilt – nichts zu fragen
+            if (root.lastError !== "") {
+                // Nichts gilt – nichts zu fragen und nichts zu speichern
                 root.pendingSpecs = [];
                 root.pendingResets = [];
                 root.previousSpecs = [];
+            } else if (applyProc.ask) {
+                root.countdown = root.confirmSeconds;
+            } else {
+                // Ohne Frage (Kommandozeile): direkt behalten
+                root.commitPending();
             }
             refreshDelay.restart();
         }
@@ -533,6 +548,107 @@ Singleton {
         onFileChanged: if (!saveGuard.running) root.readRules()
     }
 
+    // ---- Profile -------------------------------------------------------------
+    // Gespeicherte Anordnungen, z. B. "Nur Laptop", "Docked", "Praesentation".
+    // Ablage pro Benutzer unter ~/.local/state/dynamic-island/ – bewusst nicht
+    // im Repo: Anschluesse, Modelle und Skalierung sind je Rechner verschieden.
+    // Ein Profil merkt sich alle Monitore, die beim Speichern angeschlossen
+    // waren (auch ausgeschaltete). Beim Anwenden kommen Monitore, die jetzt
+    // zusaetzlich haengen, zurueck auf ihre Vorgabe.
+    readonly property string profilesPath: Quickshell.env("DYNAMIC_ISLAND_PROFILES_JSON")
+        || Quickshell.env("HOME") + "/.local/state/dynamic-island/monitor-profiles.json"
+    // [{ name, saved: Unix-Sekunden, monitors: [{ output, mode, position, scale, transform, vrr, disabled }] }]
+    property var profiles: []
+    property bool profilesLoaded: false
+    property string profilesError: ""
+
+    // Profil, dessen Anschluesse genau zur aktuellen Verkabelung passen
+    readonly property string matchingProfile: {
+        const have = root.monitors.map(m => m.key).sort().join("|");
+        if (have === "")
+            return "";
+        for (const p of root.profiles)
+            if (root.profileOutputs(p).join("|") === have)
+                return p.name;
+        return "";
+    }
+
+    function profileOutputs(p: var): var {
+        return ((p && p.monitors) || []).map(s => s.output).sort();
+    }
+
+    // Aktueller Stand aller Monitore als Profil-Eintraege
+    function profileSnapshot(): var {
+        return root.monitors.map(m => root.snapshot(m));
+    }
+
+    function saveProfile(name: string): bool {
+        const n = (name || "").trim();
+        if (n === "")
+            return false;
+        const list = root.profiles.filter(p => p.name !== n);
+        list.push({ name: n, saved: Math.floor(Date.now() / 1000), monitors: root.profileSnapshot() });
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        root.profiles = list;
+        root.profilesError = "";
+        profilesFile.setText(JSON.stringify({ version: 1, profiles: list }, null, 2) + "\n");
+        return true;
+    }
+
+    function deleteProfile(name: string): bool {
+        const list = root.profiles.filter(p => p.name !== name);
+        if (list.length === root.profiles.length)
+            return false;
+        root.profiles = list;
+        profilesFile.setText(JSON.stringify({ version: 1, profiles: list }, null, 2) + "\n");
+        return true;
+    }
+
+    // ask = true: 15-s-Frage wie bei "Uebernehmen" (Seite, Klick).
+    // ask = false: sofort behalten (Kommandozeile, wo niemand die Frage sieht).
+    function applyProfile(name: string, ask: bool): bool {
+        const p = root.profiles.find(x => x.name === name);
+        if (!p)
+            return false;
+        const specs = p.monitors.map(s => Object.assign({}, s));
+        const inProfile = specs.map(s => s.output);
+        // Haengt jetzt und fehlt im Profil: zurueck auf die Vorgabe
+        const resets = root.monitors.filter(m => !m.disabled && !inProfile.includes(m.key)).map(m => m.key);
+        const previous = root.monitors.filter(m => inProfile.includes(m.key) || resets.includes(m.key))
+                           .map(m => root.snapshot(m));
+        root.apply(specs, resets, previous, ask !== false);
+        return true;
+    }
+
+    function readProfiles(): void {
+        profilesFile.reload();
+    }
+
+    FileView {
+        id: profilesFile
+
+        path: root.profilesPath
+        watchChanges: true
+        printErrors: false
+        atomicWrites: true
+        onLoaded: {
+            let list = [];
+            try {
+                const data = JSON.parse(text());
+                list = Array.isArray(data) ? data : (data && Array.isArray(data.profiles) ? data.profiles : []);
+                root.profilesError = "";
+            } catch (e) {
+                root.profilesError = I18n.tr("monitor-profiles.json ist fehlerhaft – Profile werden nicht gespeichert");
+            }
+            root.profiles = list.filter(p => p && typeof p.name === "string" && Array.isArray(p.monitors));
+            root.profilesLoaded = true;
+        }
+        onLoadFailed: {
+            root.profiles = [];
+            root.profilesLoaded = true;
+        }
+    }
+
     // qs -c dynamic-island ipc call monitors list
     IpcHandler {
         target: "monitors"
@@ -554,5 +670,36 @@ Singleton {
         }
     }
 
-    Component.onCompleted: root.readRules()
+    // Profile fuer die Kommandozeile: qs -c dynamic-island ipc call monitorprofiles list
+    // (eigener Target, weil "monitors" schon das Bildschirm-Fenster belegt)
+    IpcHandler {
+        target: "monitorprofiles"
+
+        function profileList(): string {
+            return JSON.stringify(root.profiles.map(p => ({
+                name: p.name,
+                saved: p.saved,
+                outputs: root.profileOutputs(p),
+                active: p.name === root.matchingProfile
+            })), null, 2);
+        }
+        function profileMatch(): string {
+            return root.matchingProfile;
+        }
+        function profileSave(name: string): string {
+            return root.saveProfile(name) ? "ok" : "error: Name fehlt";
+        }
+        function profileApply(name: string): string {
+            return root.applyProfile(name, false) ? "ok" : "error: Profil nicht gefunden";
+        }
+        function profileDelete(name: string): string {
+            return root.deleteProfile(name) ? "ok" : "error: Profil nicht gefunden";
+        }
+    }
+
+    Component.onCompleted: {
+        // Ablage anlegen, sonst kann das erste Speichern nicht schreiben
+        Quickshell.execDetached(["mkdir", "-p", String(root.profilesPath).replace(/\/[^\/]*$/, "")]);
+        root.readRules();
+    }
 }

@@ -44,9 +44,10 @@ Singleton {
         root.toggle(root.focusedScreen());
     }
 
-    // Erreichbar ueber:  qs -c dynamic-island ipc call monitors toggle
+    // Erreichbar ueber:  qs -c dynamic-island ipc call monitorwindow toggle
+    // (eigener Target: "monitors" gehoert dem Dienst services/hypr/Monitors)
     IpcHandler {
-        target: "monitors"
+        target: "monitorwindow"
 
         function toggle(): void {
             root.toggleOnFocused();

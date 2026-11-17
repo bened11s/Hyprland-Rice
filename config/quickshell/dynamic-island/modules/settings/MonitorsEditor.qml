@@ -45,6 +45,11 @@ Item {
     // Ausgeschaltete Monitore fehlen in der Anordnung – dann braucht es den Waehler im Kopf
     readonly property bool needsPicker: editor.monitors.some(m => editor.effective(m).disabled)
 
+    // ---- Profile ----
+    property bool profileNameOpen: false
+    property string profileName: ""
+    property string deleteAsk: ""
+
     // Nach dem Behalten/Zuruecksetzen ist alles im gemeldeten Stand
     Connections {
         target: Monitors
@@ -163,6 +168,16 @@ Item {
             specs.push(spec);
         }
         Monitors.apply(specs, [], previous);
+    }
+
+    // ---- Profile ----
+
+    // Speichert die aktuelle Anordnung unter dem eingegebenen Namen
+    function saveProfile(): void {
+        if (!Monitors.saveProfile(editor.profileName))
+            return;
+        editor.profileNameOpen = false;
+        editor.profileName = "";
     }
 
     function resetSelected(): void {
@@ -654,6 +669,235 @@ Item {
                                 const p = canvas.dropPoint(block.name, block.modelData.x, block.modelData.y, drag.last.x, drag.last.y);
                                 editor.set(block.name, { x: p.x, y: p.y });
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- Profile ----
+        // Gespeicherte Anordnungen ("Nur Laptop", "Docked", …). Bewusst ohne
+        // feste Namen: jeder Rechner hat andere Anschluesse.
+        Rectangle {
+            id: profileCard
+
+            width: parent.width
+            implicitHeight: profileCol.implicitHeight + 24
+            radius: 16
+            color: Colors.alpha(Colors.fgSurface, 0.035)
+            border.width: 1
+            border.color: Colors.alpha(Colors.outline, 0.14)
+
+            Column {
+                id: profileCol
+
+                x: 14
+                y: 12
+                width: parent.width - 28
+                spacing: 6
+
+                // Kopf: Titel, passendes Profil, "Neu"
+                Item {
+                    width: parent.width
+                    height: 24
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+                        text: I18n.tr("Profile")
+                        color: Colors.fgBackground
+                        font.family: Config.font
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            leftMargin: 60
+                            right: addButton.left
+                            rightMargin: 8
+                            verticalCenter: parent.verticalCenter
+                        }
+                        elide: Text.ElideRight
+                        text: Monitors.matchingProfile !== ""
+                              ? I18n.tr("passt: %1").arg(Monitors.matchingProfile)
+                              : Monitors.profilesError !== "" ? Monitors.profilesError
+                              : I18n.tr("keine Anordnung passt zur aktuellen Verkabelung")
+                        color: Monitors.profilesError !== "" ? Colors.error : Colors.alpha(Colors.fgSurfaceVariant, 0.85)
+                        font.family: Config.font
+                        font.pixelSize: 10
+                    }
+
+                    ActionButton {
+                        id: addButton
+
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+                        icon: editor.profileNameOpen ? "close" : "add"
+                        onClicked: {
+                            editor.profileNameOpen = !editor.profileNameOpen;
+                            if (editor.profileNameOpen) {
+                                editor.profileName = "";
+                                // erst sichtbar machen, dann fokussieren
+                                Qt.callLater(() => nameField.forceActiveFocus());
+                            }
+                        }
+                    }
+                }
+
+                // Name eingeben (Enter speichert, Esc bricht ab)
+                Rectangle {
+                    width: parent.width
+                    height: 30
+                    radius: 8
+                    visible: editor.profileNameOpen
+                    color: Colors.alpha(Colors.fgSurface, 0.08)
+                    border.width: 1
+                    border.color: Colors.alpha(Colors.outline, 0.3)
+
+                    TextInput {
+                        id: nameField
+
+                        anchors {
+                            fill: parent
+                            leftMargin: 10
+                            rightMargin: 10
+                        }
+                        verticalAlignment: TextInput.AlignVCenter
+                        text: editor.profileName
+                        onTextChanged: editor.profileName = text
+                        color: Colors.fgBackground
+                        font.family: Config.font
+                        font.pixelSize: 12
+                        selectionColor: Colors.primary
+                        selectedTextColor: Colors.fgPrimary
+                        clip: true
+
+                        // Platzhalter, solange leer
+                        Text {
+                            anchors.fill: parent
+                            verticalAlignment: Text.AlignVCenter
+                            visible: nameField.text === ""
+                            text: I18n.tr("Name, z. B. Docked oder Nur Laptop")
+                            color: Colors.alpha(Colors.fgSurfaceVariant, 0.7)
+                            font: nameField.font
+                        }
+
+                        Keys.onReturnPressed: editor.saveProfile()
+                        Keys.onEnterPressed: editor.saveProfile()
+                        Keys.onEscapePressed: {
+                            editor.profileNameOpen = false;
+                            event.accepted = true;
+                        }
+                    }
+                }
+
+                // Leer
+                Text {
+                    width: parent.width
+                    visible: Monitors.profiles.length === 0 && !editor.profileNameOpen
+                    text: Monitors.profilesLoaded
+                          ? I18n.tr("Noch keine Profile – „+“ speichert die aktuelle Anordnung")
+                          : I18n.tr("Lese Profile …")
+                    color: Colors.alpha(Colors.fgSurfaceVariant, 0.75)
+                    font.family: Config.font
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+
+                // Liste
+                Repeater {
+                    model: Monitors.profiles
+
+                    delegate: Rectangle {
+                        id: profileRow
+
+                        required property var modelData
+                        readonly property bool isActive: profileRow.modelData.name === Monitors.matchingProfile
+                        readonly property bool isDeleteAsk: editor.deleteAsk === profileRow.modelData.name
+
+                        width: profileCol.width
+                        height: 30
+                        radius: 8
+                        color: profileRow.isActive ? Colors.alpha(Colors.primary, 0.14)
+                             : rowHover.hovered ? Colors.alpha(Colors.fgSurface, 0.07)
+                             : "transparent"
+
+                        Behavior on color {
+                            ColorAnimation { duration: Appearance.fadeDuration }
+                        }
+
+                        HoverHandler {
+                            id: rowHover
+                        }
+
+                        TapHandler {
+                            enabled: !editor.locked
+                            onTapped: {
+                                editor.pending = {};
+                                editor.deleteAsk = "";
+                                Monitors.applyProfile(profileRow.modelData.name, true);
+                            }
+                        }
+
+                        Row {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 10
+                                right: parent.right
+                                rightMargin: 6
+                                verticalCenter: parent.verticalCenter
+                            }
+                            spacing: 8
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: profileRow.modelData.name
+                                color: profileRow.isActive ? Colors.primary : Colors.fgBackground
+                                font.family: Config.font
+                                font.pixelSize: 12
+                                font.weight: profileRow.isActive ? Font.DemiBold : Font.Normal
+                                elide: Text.ElideRight
+                                width: parent.width - deleteButton.width - 18
+                            }
+                        }
+
+                        // Erster Klick fragt nach, zweiter loescht
+                        ActionButton {
+                            id: deleteButton
+
+                            anchors {
+                                right: parent.right
+                                rightMargin: 4
+                                verticalCenter: parent.verticalCenter
+                            }
+                            icon: profileRow.isDeleteAsk ? "delete_forever" : "delete"
+                            onClicked: {
+                                if (profileRow.isDeleteAsk) {
+                                    Monitors.deleteProfile(profileRow.modelData.name);
+                                    editor.deleteAsk = "";
+                                } else {
+                                    editor.deleteAsk = profileRow.modelData.name;
+                                }
+                            }
+                        }
+
+                        // Aktive Markierung links
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 3
+                            height: 16
+                            radius: 1.5
+                            visible: profileRow.isActive
+                            color: Colors.primary
                         }
                     }
                 }

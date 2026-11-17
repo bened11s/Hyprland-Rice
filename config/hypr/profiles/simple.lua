@@ -549,6 +549,13 @@ bind("SUPER + ALT + V", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island clipboar
 -- Farbpipette
 bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a"), desc("Farbpipette"))
 
+-- Bildschirm-Profile (Einstellungen > Monitore, Ablage pro Benutzer)
+bind("SUPER + ALT + M", hl.dsp.exec_cmd("$HOME/.config/hypr/scripts/monitor-profile next"),
+	desc("Naechstes Bildschirm-Profil"))
+bind("SUPER + ALT + SHIFT + M", hl.dsp.exec_cmd(
+	"sh -c 'n=$(fuzzel --dmenu --prompt=\"Profil speichern: \") && [ -n \"$n\" ] && $HOME/.config/hypr/scripts/monitor-profile save \"$n\"'"),
+	desc("Bildschirm-Profil speichern"))
+
 -- Emoji-/Glyph-Picker
 bind("SUPER + Period", hl.dsp.exec_cmd("pkill fuzzel || dynamic-island emoji -p"), desc("Emoji-Picker"))
 

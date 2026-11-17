@@ -547,6 +547,11 @@ link_files() {
     fi
     link "$DI_DIR/scripts/hypr-profile" "$BIN_DIR/hypr-profile"
     link "$DI_DIR/scripts/theme-set" "$BIN_DIR/theme-set"
+    # Bildschirm-Profile (config/hypr ist ins Home verlinkt, ~/.local/bin macht
+    # den Befehl von ueberall erreichbar)
+    if [ -x "$CONFIG_DIR/hypr/scripts/monitor-profile" ]; then
+        link "$CONFIG_DIR/hypr/scripts/monitor-profile" "$BIN_DIR/monitor-profile"
+    fi
     if command -v fish >/dev/null 2>&1; then
         link "$DI_DIR/completions/dynamic-island.fish" "$CONFIG_DIR/fish/completions/dynamic-island.fish"
     else

@@ -1,0 +1,116 @@
+#!/bin/sh
+# Monitor-Profile der Dynamic Island.
+#
+#   monitor-profile list          gespeicherte Profile anzeigen
+#   monitor-profile save <Name>   aktuelle Anordnung speichern
+#   monitor-profile apply <Name>  Profil anwenden (sofort, ohne Rueckfrage)
+#   monitor-profile delete <Name> Profil loeschen
+#   monitor-profile match         Name des passenden Profils (leer = keins)
+#   monitor-profile next          naechstes Profil durchschalten
+#
+# Die Profile liegen pro Benutzer in
+#   ${XDG_STATE_HOME:-~/.local/state}/dynamic-island/monitor-profiles.json
+# und gehoeren bewusst nicht ins Repo: Anschluesse, Modelle und Skalierung
+# sind je Rechner verschieden.
+#
+# Anwenden laeuft ueber die Shell (qs ipc), damit das Profil wie beim Klick
+# in den Einstellungen gesetzt und in ~/.config/hypr/monitors.lua gespeichert
+# wird. Ohne laufende Shell geht nichts – dann kommt ein Hinweis.
+#
+# Optionen: MONITOR_PROFILE_IPC="qs -c dynamic-island" (Test-Shell)
+
+set -eu
+
+IPC_QSCMD=${MONITOR_PROFILE_IPC:-"qs -c dynamic-island"}
+
+usage() {
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+die() {
+    echo "monitor-profile: $*" >&2
+    exit 1
+}
+
+ipc() {
+    out=$($IPC_QSCMD ipc call monitorprofiles "$@" 2>&1) || \
+        die "Dynamic Island laeuft nicht (${IPC_QSCMD}). Profile brauchen die Shell."
+    case $out in
+        *"Function not found"*|*"target not found"*|*"Could not connect"*)
+            die "Monitor-Profile braucht die Dynamic Island (Shell laeuft nicht)." ;;
+    esac
+    printf '%s\n' "$out"
+}
+
+need_shell() {
+    ipc profileList >/dev/null
+}
+
+cmd_list() {
+    need_shell
+    ipc profileList | jq -r '
+        if length == 0 then "keine Profile gespeichert"
+        else .[] | (if .active then "* " else "  " end) + .name
+             + "  (" + (.outputs | length | tostring) + " Anschluesse)"
+        end'
+}
+
+cmd_save() {
+    [ $# -gt 0 ] || die "Name fehlt: monitor-profile save <Name>"
+    need_shell
+    out=$(ipc profileSave "$*")
+    [ "$out" = "ok" ] || die "$out"
+    echo "gespeichert: $*"
+}
+
+cmd_apply() {
+    [ $# -gt 0 ] || die "Name fehlt: monitor-profile apply <Name>"
+    need_shell
+    out=$(ipc profileApply "$*")
+    [ "$out" = "ok" ] || die "$out"
+    echo "angewendet: $*"
+}
+
+cmd_delete() {
+    [ $# -gt 0 ] || die "Name fehlt: monitor-profile delete <Name>"
+    need_shell
+    out=$(ipc profileDelete "$*")
+    [ "$out" = "ok" ] || die "$out"
+    echo "geloescht: $*"
+}
+
+cmd_match() {
+    need_shell
+    ipc profileMatch
+}
+
+# Profile in der Reihenfolge der Liste durchschalten
+cmd_next() {
+    need_shell
+    list=$(ipc profileList)
+    count=$(printf '%s' "$list" | jq 'length')
+    [ "$count" -gt 0 ] || die "keine Profile gespeichert"
+    cur=$(ipc profileMatch)
+    next=$(printf '%s' "$list" | jq -r --arg cur "$cur" '
+        (map(.name) | index($cur)) as $i
+        | if $i == null then .[0].name
+          else .[($i + 1) % length].name end')
+    [ -n "$next" ] || die "kein naechstes Profil"
+    cmd_apply "$next"
+}
+
+[ $# -gt 0 ] || { usage; exit 1; }
+
+sub=$1
+shift
+
+case "$sub" in
+    list) cmd_list ;;
+    save) cmd_save "$@" ;;
+    apply) cmd_apply "$@" ;;
+    delete) cmd_delete "$@" ;;
+    match) cmd_match ;;
+    next) cmd_next ;;
+    -h|--help|help) usage ;;
+    *) usage; exit 1 ;;
+esac
