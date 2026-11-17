@@ -368,6 +368,11 @@ Surface {
                 anchors.verticalCenter: parent.verticalCenter
                 percent: Power.percent
                 charging: Power.charging
+                // Schimmer nur beim echten Laden: "voll" (fully-charged am
+                // Kabel) gilt sonst als Laden und laesst die Animation endlos
+                // laufen – die Karte haengt auch eingeklappt im Notch und
+                // zeichnet dann dauerhaft das ganze Leistenfenster neu.
+                animate: Power.activelyCharging
             }
 
             Text {

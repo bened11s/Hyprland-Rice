@@ -5,6 +5,9 @@
     "terminal": {
       "folderLooks": true,
       "theme": true
+    },
+    "desktop": {
+      "hidden": true
     }
   }
 }

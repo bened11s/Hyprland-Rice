@@ -142,7 +142,12 @@ Item {
                     }
 
                     SequentialAnimation on x {
+                        // "Voll am Kabel" meldet UPower als fully-charged, das
+                        // zaehlt hier als Laden. Ohne die 99,5-%-Grenze laeuft
+                        // der Schimmer dann endlos und zeichnet die Leiste (und
+                        // damit den ganzen Output) dauerhaft neu.
                         running: glyph.charging && glyph.visible && glyph.animate
+                            && glyph.percent < 99.5
                         loops: Animation.Infinite
 
                         NumberAnimation {

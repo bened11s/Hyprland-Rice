@@ -47,8 +47,8 @@
         "fullscreen": true,
         "lockMinutes": 3,
         "lockOnSleep": true,
-        "media": true,
-        "screenOffMinutes": 4,
+        "media": false,
+        "screenOffMinutes": 3,
         "suspendMinutes": 0,
         "warnSeconds": 10
     },
@@ -76,12 +76,13 @@
         "batteries": true,
         "batteryPriority": "system",
         "batteryStyle": "symbol",
-        "bell": true,
+        "bell": false,
         "calendar": true,
         "clock": true,
         "clockStyle": "digital",
         "controlTray": true,
         "date": true,
+        "freeSince": "",
         "hoverOpen": true,
         "media": true,
         "mediaControls": true,
@@ -102,6 +103,7 @@
         "stats": true,
         "sysCpu": true,
         "sysDisk": true,
+        "sysFreedom": true,
         "sysGpu": true,
         "sysRam": true,
         "sysTemps": true,
@@ -149,8 +151,17 @@
     },
     "vpn": {
         "custom": [
+            {
+                "connect": "tailscale up",
+                "connectedRegex": "100\\.\\d+\\.\\d+\\.\\d+",
+                "disconnect": "tailscale down",
+                "icon": "dns",
+                "id": "custom-mwl31csu",
+                "name": "Tailscale",
+                "status": "tailscale status"
+            }
         ],
-        "provider": "nordvpn"
+        "provider": "custom-mwl31csu"
     },
     "wallpaper": {
         "duration": 700,

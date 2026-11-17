@@ -54,6 +54,15 @@ hl.window_rule({
     opacity = vars.activeWindowOpacity .. " " .. vars.inActiveWindowOpacity .. " override",
 })
 
+-- Nox Hörbücher: schwebt zentriert, volle Deckkraft damit Glas/Blur der App wirkt
+hl.window_rule({
+    match = { class = "dev.nox.audiobooks" },
+    float = true,
+    size = "1320 860",
+    center = true,
+    opacity = "1 1 override",
+})
+
 -- Sized & Centered Floaters
 hl.window_rule({ match = { class = "foot", title = "nmtui" }, tag = "+float_60_70" })
 hl.window_rule({ match = { class = "org.pulseaudio.pavucontrol|yad-icon-browser" }, tag = "+float_60_70" })
