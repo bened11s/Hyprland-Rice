@@ -151,3 +151,20 @@ Spalten fluchten.
   seit den Dropdowns keinen Verwender mehr.
 - Transparenz (`appearance.transparency`) wirkt ohne Blur hinter den Pillen.
 - Nie live geklickt: Dropdowns, ⋮-Menüs, Farben-Seite, Zurück-Pfeil.
+
+## Passwortfelder / pkexec-Dialog (2026-11-21)
+
+- Passwörter nehmen `widgets/PasswordField` (Punkte-Pille wie im Lock, Höhe 44,
+  `error` rot, `shake()`, `checking` = Welle) statt `AccountField` – im
+  pkexec-Dialog (`notch/AuthPanel`) und bei Konto > Passwort ändern.
+- pkexec-Dialog: Kopf wie ein Leisten-Eintrag (shield_lock im 38-px-Kreis
+  `alpha(primary, 0.18)`), daneben die polkit-Meldung 13 px – kein eigener
+  Titel, die Meldung sagt schon, wofür. „Als …“ nur bei fremder Identität
+  (root). Knöpfe = `system/TextButton` (Abbrechen `tonal`: primary 0.24 + primary-Schrift), Höhe folgt dem Inhalt.
+- Feld über die volle Kartenbreite (20 px Rand), Abbrechen links, Bestätigen rechts – 268 px mittig
+  wirkte verloren. shield_lock ungefüllt – mit FILL stanzt es das Schloss als Loch aus.
+- Meldung bis 6 Zeilen mit `Text.Wrap` (der Befehl ist der Inhalt, lange Pfade brechen um);
+  höhere Blöcke beginnen bündig an der Kreis-Oberkante statt darüber hinauszuragen.
+  PAM-Prompt „Password“ folgt der Shell-Sprache. Fehlerzeile darf die Karte wachsen
+  lassen – kein dauerhaft reservierter Platz.
+- Screenshots: `docs/notch-shot/shot.sh auth[:failed|:root|:long]` (polkit-Attrappe `FakeAuth.qml`).

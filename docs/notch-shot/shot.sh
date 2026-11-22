@@ -3,6 +3,7 @@
 #   shot.sh <zustand> <ausgabe.png> [breite hoehe]
 #   Zustaende: collapsed, overview, media, control, notifications, system,
 #              power, apps, clipboard, keys
+#              auth[:failed|:root|:long] (pkexec-Dialog mit Attrappe statt polkit)
 #              plugin:<id> (Notch-Ansicht), wallpaper:<id> (Sektion der Wallpaper-Auswahl)
 #   Umgebung: SRC, OUT, DELAY, LOG wie bei settings-shot; PRE = Befehl vor
 #             dem Start in der Sandbox (z. B. shell.json im Wegwerf-HOME ändern).
@@ -23,6 +24,8 @@ trap 'rm -rf "$WORK"' EXIT
 
 rsync -a --exclude .qmlls.ini "$SRC/" "$WORK/copy/"
 cp "$HERE/harness.qml" "$WORK/copy/shell.qml"
+# pkexec-Dialog ohne polkit: Auth durch Attrappe ersetzen
+case "$1" in auth*) cp "$HERE/FakeAuth.qml" "$WORK/copy/modules/services/auth/Auth.qml" ;; esac
 # hyprctl-Attrappe mit echten Monitordaten (nur lesend geholt)
 hyprctl monitors all -j > "$WORK/bin/monitors.json" 2>/dev/null || echo '[]' > "$WORK/bin/monitors.json"
 cat > "$WORK/bin/hyprctl" <<EOF

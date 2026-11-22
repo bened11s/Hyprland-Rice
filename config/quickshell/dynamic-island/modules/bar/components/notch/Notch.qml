@@ -354,6 +354,17 @@ Item {
         }
     }
 
+    // Solange polkit fragt, bleibt der Launcher zu – sonst liegen beide
+    // Ansichten uebereinander (Launcher waehrend der Abfrage geoeffnet)
+    Connections {
+        target: LauncherState
+
+        function onOpenChanged(): void {
+            if (LauncherState.open && Auth.active)
+                Qt.callLater(LauncherState.close);
+        }
+    }
+
     Timer {
         id: openTimer
         interval: 200

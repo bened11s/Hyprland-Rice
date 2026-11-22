@@ -73,6 +73,9 @@ Item {
                 newPw.clear();
                 repeatPw.clear();
                 editor.pwOpen = false;
+            } else if (User.busy === "" && editor.pwOpen && User.lastError !== "") {
+                newPw.shake();
+                repeatPw.shake();
             }
         }
     }
@@ -355,23 +358,29 @@ Item {
                 topPadding: 12
                 spacing: 8
 
-                AccountField {
+                // Wie das Passwortfeld des Sperrbildschirms (Punkte statt Sternchen)
+                PasswordField {
                     id: newPw
 
                     width: parent.width - 32
-                    password: true
                     placeholder: I18n.tr("Neues Passwort")
+                    checking: User.busy === "password"
                     onAccepted: repeatPw.forceActiveFocus()
                 }
 
-                AccountField {
+                PasswordField {
                     id: repeatPw
 
                     width: parent.width - 32
-                    password: true
                     placeholder: I18n.tr("Wiederholen")
-                    border.color: editor.pwMismatch ? Colors.alpha(Colors.error, 0.7) : "transparent"
-                    onAccepted: if (editor.pwValid) User.setPassword(newPw.text)
+                    error: editor.pwMismatch
+                    checking: User.busy === "password"
+                    onAccepted: {
+                        if (editor.pwValid)
+                            User.setPassword(newPw.text);
+                        else
+                            repeatPw.shake();
+                    }
                 }
 
                 Item {

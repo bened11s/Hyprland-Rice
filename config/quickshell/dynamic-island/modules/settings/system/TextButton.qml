@@ -5,12 +5,14 @@ import qs
 import qs.modules.services.config
 import qs.modules.widgets
 
-// Schlichter Textknopf der Info-Seite; `filled` ist die Hauptaktion.
+// Schlichter Textknopf der Info-Seite; `filled` ist die Hauptaktion,
+// `tonal` eine sichtbare Nebenaktion (primary-Schimmer, primary-Schrift).
 Rectangle {
     id: button
 
     required property string label
     property bool filled: false
+    property bool tonal: false
     signal clicked()
 
     implicitWidth: buttonLabel.implicitWidth + 24
@@ -18,7 +20,8 @@ Rectangle {
     radius: 8
     opacity: enabled ? 1 : 0.4
     color: button.filled ? Colors.alpha(Colors.primary, buttonHover.hovered ? 0.85 : 1)
-                         : Colors.alpha(Colors.fgSurface, buttonHover.hovered ? 0.14 : 0.08)
+         : button.tonal ? Colors.alpha(Colors.primary, buttonHover.hovered ? 0.34 : 0.24)
+         : Colors.alpha(Colors.fgSurface, buttonHover.hovered ? 0.14 : 0.08)
 
     Behavior on color {
         ColorAnimation { duration: Appearance.fadeDuration }
@@ -30,7 +33,7 @@ Rectangle {
 
         anchors.centerIn: parent
         text: button.label
-        color: button.filled ? Colors.fgPrimary : Colors.fgSurface
+        color: button.filled ? Colors.fgPrimary : button.tonal ? Colors.primary : Colors.fgSurface
         font.family: Config.font
         font.pixelSize: 12
         font.weight: Font.Medium

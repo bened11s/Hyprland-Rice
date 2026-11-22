@@ -37,7 +37,7 @@ ShellRoot {
             if (s === "overview") notch.expanded = true;
             else if (s.startsWith("plugin:")) LauncherState.showPluginView(null, s.slice(7));
             else if (s.startsWith("wallpaper:")) LauncherState.showWallpaperSection(null, s.slice(10));
-            else if (s !== "collapsed") LauncherState.showMode(null, s);
+            else if (s !== "collapsed" && !s.startsWith("auth")) LauncherState.showMode(null, s);
         }
     }
     Timer {

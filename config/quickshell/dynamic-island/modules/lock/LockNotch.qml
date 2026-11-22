@@ -265,11 +265,12 @@ Item {
                 }
                 height: 60
 
-                Avatar {
+                LockAvatar {
                     id: avatar
 
                     anchors.verticalCenter: parent.verticalCenter
                     size: 48
+                    fg: notch.fg
                     ring: notch.stateColor
                 }
 
@@ -294,7 +295,7 @@ Item {
                     PasswordDots {
                         anchors.centerIn: parent
                         width: parent.width - 32
-                        count: notch.context.buffer.length
+                        count: notch.context.phase === "checking" ? notch.context.submittedLength : notch.context.buffer.length
                         color: notch.stateColor
                         checking: notch.context.phase === "checking"
                     }
@@ -383,77 +384,6 @@ Item {
 
     // ---- Bausteine ----
 
-    // Vorhaengeschloss, selbst gezeichnet: Koerper als runde Platte, Buegel
-    // als Bogen. `open` hebt den Buegel heraus und kippt ihn – mit Feder,
-    // wie das Schloss beim Entsperren aufspringt.
-    component LockGlyph: Item {
-        id: glyph
-
-        property real size: 16
-        property color color: "white"
-        property bool open: false
-
-        readonly property real stroke: Math.max(1.6, glyph.size * 0.16)
-        readonly property real legX: glyph.size * 0.5 - glyph.size * 0.36 + glyph.stroke / 2
-
-        width: glyph.size
-        height: glyph.size * 1.25
-
-        Behavior on color { ColorAnimation { duration: Appearance.fadeDuration } }
-
-        Shape {
-            id: shackle
-
-            width: glyph.size
-            height: glyph.size * 0.75
-            preferredRendererType: Shape.CurveRenderer
-            transform: [
-                Rotation {
-                    origin.x: glyph.size - glyph.legX
-                    origin.y: glyph.size * 0.62
-                    angle: glyph.open ? 22 : 0
-
-                    Behavior on angle {
-                        NumberAnimation { duration: Appearance.morphDuration; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
-                    }
-                },
-                Translate {
-                    y: glyph.open ? -glyph.size * 0.2 : 0
-
-                    Behavior on y {
-                        NumberAnimation { duration: Appearance.morphDuration; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
-                    }
-                }
-            ]
-
-            ShapePath {
-                strokeWidth: glyph.stroke
-                strokeColor: glyph.color
-                fillColor: "transparent"
-                capStyle: ShapePath.RoundCap
-
-                startX: glyph.legX
-                startY: glyph.size * 0.66
-                PathLine { x: glyph.legX; y: glyph.size * 0.42 }
-                PathArc {
-                    x: glyph.size - glyph.legX
-                    y: glyph.size * 0.42
-                    radiusX: glyph.size * 0.5 - glyph.legX
-                    radiusY: glyph.size * 0.5 - glyph.legX
-                }
-                PathLine { x: glyph.size - glyph.legX; y: glyph.size * 0.66 }
-            }
-        }
-
-        Rectangle {
-            y: glyph.size * 0.58
-            width: glyph.size
-            height: glyph.size * 0.67
-            radius: glyph.size * 0.2
-            color: glyph.color
-        }
-    }
-
     component Icon: Text {
         property real size: 18
 
@@ -462,135 +392,4 @@ Item {
         font.variableAxes: { "FILL": 1 }
     }
 
-    // ~/.face als Kreis mit Ring in der Zustandsfarbe; ohne Bild das Symbol
-    component Avatar: Item {
-        id: av
-
-        property real size: 48
-        property color ring: "white"
-
-        width: av.size
-        height: av.size
-
-        Rectangle {
-            anchors.fill: parent
-            radius: width / 2
-            color: Colors.alpha(notch.fg, 0.08)
-            border.width: 2
-            border.color: Colors.alpha(av.ring, 0.85)
-
-            Behavior on border.color { ColorAnimation { duration: Appearance.fadeDuration } }
-        }
-
-        Image {
-            id: face
-
-            anchors.fill: parent
-            anchors.margins: 4
-            source: "file://" + Quickshell.env("HOME") + "/.face"
-            sourceSize: Qt.size(96, 96)
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            visible: false
-        }
-
-        Rectangle {
-            id: faceMask
-
-            anchors.fill: face
-            radius: width / 2
-            layer.enabled: true
-            visible: false
-        }
-
-        MultiEffect {
-            anchors.fill: face
-            source: face
-            maskEnabled: true
-            maskSource: faceMask
-            visible: face.status === Image.Ready
-        }
-
-        Icon {
-            anchors.centerIn: parent
-            visible: face.status !== Image.Ready
-            text: "person"
-            size: av.size * 0.5
-            color: notch.fg
-        }
-    }
-
-    // Ein Punkt je Zeichen. Neue Punkte ploppen auf; sind es mehr, als in
-    // das Feld passen, ruecken sie zusammen. Beim Pruefen laeuft eine Welle.
-    component PasswordDots: Item {
-        id: dots
-
-        property int count: 0
-        property color color: "white"
-        property bool checking: false
-
-        readonly property real dot: 10
-        readonly property real gap: Math.min(8, Math.max(2, (dots.width - dots.count * dots.dot) / Math.max(1, dots.count - 1)))
-        readonly property int shownCount: Math.max(0, Math.min(dots.count, Math.floor((dots.width + 2) / (dots.dot + 2))))
-
-        height: dots.dot
-
-        // Ein Zahl-Modell wuerde bei jedem Zeichen alle Punkte neu anlegen
-        // (und alle ploppen lassen) – das ListModel waechst nur am Ende
-        ListModel { id: dotModel }
-
-        onShownCountChanged: {
-            while (dotModel.count < dots.shownCount)
-                dotModel.append({});
-            if (dotModel.count > dots.shownCount)
-                dotModel.remove(dots.shownCount, dotModel.count - dots.shownCount);
-        }
-        Component.onCompleted: dots.shownCountChanged()
-
-        Row {
-            anchors.centerIn: parent
-            spacing: dots.gap
-
-            Repeater {
-                model: dotModel
-
-                Rectangle {
-                    id: d
-
-                    required property int index
-
-                    width: dots.dot
-                    height: dots.dot
-                    radius: width / 2
-                    color: dots.color
-
-                    Behavior on color { ColorAnimation { duration: Appearance.fadeDuration } }
-
-                    // Erst klein anlegen, dann per Behavior aufploppen
-                    property bool born: false
-                    scale: d.born ? 1 : 0.2
-                    Component.onCompleted: d.born = true
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: Appearance.fadeDuration * 1.4
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 2.4
-                        }
-                    }
-
-                    SequentialAnimation on opacity {
-                        running: dots.checking
-                        loops: Animation.Infinite
-                        alwaysRunToEnd: true
-
-                        PauseAnimation { duration: Math.max(0, d.index) * 55 }
-                        NumberAnimation { to: 0.25; duration: 260; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1; duration: 260; easing.type: Easing.InOutSine }
-                        PauseAnimation { duration: Math.max(0, (dots.shownCount - d.index) * 55) }
-                    }
-                }
-            }
-        }
-    }
 }

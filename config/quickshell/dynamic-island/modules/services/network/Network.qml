@@ -99,14 +99,13 @@ Singleton {
     }
 
     // Laeuft gerade eine Funk-Suche nach neuen Netzen
-    readonly property bool scanning: rescanProc.running || rescanFollowUp.running
+    readonly property bool scanning: rescanProc.running
 
     // ---- Abfragen ----
     // Zweistufig: `--rescan yes` blockiert ~6 s, bevor nmcli ueberhaupt etwas
     // liefert. Deshalb zuerst SOFORT die zwischengespeicherte Liste (~60 ms),
-    // und die Suche nach neuen Netzen laeuft daneben (`nmcli device wifi
-    // rescan` kehrt gleich zurueck, der NetworkManager sucht weiter). Danach
-    // wird zweimal nachgelesen – neue Netze tauchen nach und nach auf.
+    // und die Suche nach neuen Netzen laeuft daneben in rescanProc; ist sie
+    // fertig, wird einmal nachgelesen.
     function refresh(rescan: bool): void {
         scan.rescan = "no";
         if (scan.running)
@@ -115,7 +114,6 @@ Singleton {
             scan.running = true;
 
         if (rescan && !rescanProc.running) {
-            rescanFollowUp.round = 0;
             rescanProc.running = true;
         }
     }
@@ -341,27 +339,15 @@ Singleton {
         onTriggered: root.failedTarget = ""
     }
 
-    // Suche anstossen (ohne zu warten)
+    // Funk-Suche, die erst endet, wenn die Suche fertig ist (~6–8 s), dann
+    // genau einmal nachlesen. Frueher: `wifi rescan` (kehrt sofort zurueck)
+    // + blindes Nachlesen nach 2,5/5 s – beides vor dem Ende der Suche, neue
+    // Netze kamen erst mit dem naechsten 5-s-Takt.
     Process {
         id: rescanProc
 
-        command: ["nmcli", "device", "wifi", "rescan"]
-        onExited: rescanFollowUp.restart()
-    }
-
-    // Nach der Suche zweimal nachlesen (2,5 s und 5 s)
-    Timer {
-        id: rescanFollowUp
-
-        property int round: 0
-
-        interval: 2500
-        onTriggered: {
-            root.refresh(false);
-            rescanFollowUp.round++;
-            if (rescanFollowUp.round < 2)
-                rescanFollowUp.restart();
-        }
+        command: ["nmcli", "-t", "-f", "SSID", "device", "wifi", "list", "--rescan", "yes"]
+        onExited: root.refresh(false)
     }
 
     Process {

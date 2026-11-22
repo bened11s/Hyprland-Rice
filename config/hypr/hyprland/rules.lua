@@ -33,7 +33,7 @@ hl.window_rule({ match = { tag = "float" }, float = true })
 -- Opaque Apps (Terminal, Image Viewers, Creative Software, Games) as they prefer native transparency as required
 hl.window_rule({
     match = {
-        class = "foot|equibop|org.quickshell|imv|swappy|krita|gimp|inkscape|darktable|resolve|kdenlive|shotcut|blender|godot|(steam_app_(default|[0-9]+))|gamescope|deckhand",
+        class = "foot|equibop|org.quickshell|imv|swappy|krita|gimp|inkscape|darktable|resolve|kdenlive|shotcut|blender|godot|zen|(steam_app_(default|[0-9]+))|gamescope|deckhand|VirtualBox Machine",
     },
     tag = "+opaque_app",
 })

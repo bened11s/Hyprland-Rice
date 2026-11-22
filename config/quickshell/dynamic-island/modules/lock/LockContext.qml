@@ -22,6 +22,8 @@ Scope {
     id: root
 
     property string buffer: ""
+    // Laenge beim Absenden: PAM leert den Puffer, die Punkte wellen trotzdem weiter
+    property int submittedLength: 0
     property string phase: "idle"
     // Text unter den Punkten: Fehler, faillock-Sperre, PAM-Rueckfragen
     property string message: ""
@@ -86,6 +88,7 @@ Scope {
     function submit(): void {
         if (root.busy || root.buffer.length === 0)
             return;
+        root.submittedLength = root.buffer.length;
         root.phase = "checking";
         root.message = "";
         if (!pam.start()) {

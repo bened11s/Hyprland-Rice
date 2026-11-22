@@ -1,9 +1,13 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import Quickshell
 
 import qs
 import qs.modules.services.config
+import qs.modules.widgets
+import qs.modules.settings.system
+import qs.modules.services.user
 
 Item {
     id: panel
@@ -19,7 +23,11 @@ Item {
     readonly property alias maxOuterHeight: panel.outerHeight
 
     implicitWidth: 440
-    implicitHeight: 238
+    implicitHeight: buttons.y + buttons.height + 18
+
+    // Fehlschlag: rot + schuetteln wie im Lock; Pruefen: Punkte als Welle
+    property bool failed: false
+    property bool checking: false
 
     anchors {
         left: parent.left
@@ -34,48 +42,85 @@ Item {
     Component.onCompleted: if (panel.active) Qt.callLater(panel.activeChanged)
 
     onActiveChanged: {
-        password.text = "";
+        password.clear();
+        panel.failed = false;
+        panel.checking = false;
         if (active)
             Qt.callLater(password.forceActiveFocus);
     }
 
     Keys.onEscapePressed: panel.flow?.cancelAuthenticationRequest()
 
-    Text {
+    // Kopf wie ein Eintrag der Einstellungs-Leiste: Symbol im 38-px-Kreis,
+    // daneben die polkit-Meldung (sagt schon, wofuer – kein eigener Titel)
+    Rectangle {
         id: shield
 
         anchors {
             left: parent.left
             top: parent.top
             leftMargin: 20
-            topMargin: 14
+            topMargin: 18
         }
-        text: "shield_lock"
-        color: Colors.primary
-        font.family: "Material Symbols Outlined"
-        font.pixelSize: 27
-        font.variableAxes: ({ wght: 600 })
+        width: 38
+        height: 38
+        radius: 19
+        color: Colors.alpha(Colors.primary, 0.18)
+
+        Text {
+            anchors.centerIn: parent
+            text: "shield_lock"
+            color: Colors.primary
+            font.family: "Material Symbols Outlined"
+            font.pixelSize: 20
+            // ungefuellt: gefuellt stanzt Material Symbols das Schloss als Loch aus
+            font.variableAxes: { "wght": 500 }
+        }
     }
 
-    Text {
-        font.family: Config.font
+    Column {
+        id: heading
+
         anchors {
             left: shield.right
             right: parent.right
-            top: parent.top
             leftMargin: 12
             rightMargin: 20
-            topMargin: 13
         }
-        text: I18n.tr("Authentifizierung erforderlich")
-        color: Colors.fgBackground
-        font.pixelSize: 16
-        font.weight: Font.DemiBold
+        // Ein-/Zweizeiler mittig am Kreis, hoehere Bloecke buendig oben statt darueber hinaus
+        y: shield.y + Math.max(0, (shield.height - height) / 2)
+        spacing: 2
+
+        Text {
+            id: message
+
+            width: parent.width
+            text: panel.flow?.message || I18n.tr("Eine Anwendung benötigt zusätzliche Berechtigungen.")
+            color: Colors.fgSurface
+            font.family: Config.font
+            font.pixelSize: 13
+            // Die Meldung ist der freizugebende Befehl: lange Pfade umbrechen, nicht kuerzen
+            wrapMode: Text.Wrap
+            maximumLineCount: 6
+            elide: Text.ElideRight
+        }
+
+        // Nur wenn nicht das eigene Konto gefragt ist (z. B. root)
+        Text {
+            width: parent.width
+            visible: text !== ""
+            text: panel.flow?.selectedIdentity && !panel.ownIdentity(panel.flow.selectedIdentity)
+                ? I18n.tr("Als %1").arg(panel.flow.selectedIdentity.displayName) : ""
+            color: Colors.fgSurfaceVariant
+            font.family: Config.font
+            font.pixelSize: 11
+            elide: Text.ElideRight
+        }
     }
 
-    Text {
-        id: message
-        font.family: Config.font
+    // Wie das Passwortfeld des Sperrbildschirms: Punkte-Pille
+    PasswordField {
+        id: password
 
         anchors {
             left: parent.left
@@ -83,167 +128,73 @@ Item {
             top: shield.bottom
             leftMargin: 20
             rightMargin: 20
-            topMargin: 10
+            // Mehrzeilige Meldung ragt unter den Kreis
+            topMargin: 16 + Math.max(0, heading.y + heading.height - shield.y - shield.height)
         }
-        text: panel.flow?.message ?? I18n.tr("Eine Anwendung benötigt zusätzliche Berechtigungen.")
-        color: Colors.fgSurfaceVariant
-        font.pixelSize: 11
-        wrapMode: Text.WordWrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
+        enabled: panel.flow?.isResponseRequired ?? false
+        reveal: panel.flow?.responseVisible ?? false
+        error: panel.failed
+        checking: panel.checking
+        placeholder: panel.checking ? ""
+            : panel.flow?.isResponseRequired
+                ? panel.promptText((panel.flow.inputPrompt ?? "").replace(/:\s*$/, ""))
+                : I18n.tr("Authentifizierung wird vorbereitet…")
+        onTextChanged: if (text !== "") panel.failed = false
+        onAccepted: panel.submit()
     }
 
     Text {
-        id: identity
+        id: supplementary
         font.family: Config.font
-
         anchors {
-            left: message.left
-            right: message.right
-            top: message.bottom
-            topMargin: 7
+            left: password.left
+            right: password.right
+            top: password.bottom
+            topMargin: text !== "" ? 6 : 0
         }
-        text: panel.flow?.selectedIdentity
-            ? I18n.tr("Als %1").arg(panel.flow.selectedIdentity.displayName) : ""
-        color: Colors.alpha(Colors.fgSurfaceVariant, 0.72)
-        font.pixelSize: 10
+        height: text !== "" ? 16 : 0
+        horizontalAlignment: Text.AlignHCenter
+        text: panel.flow?.supplementaryMessage || (panel.failed ? I18n.tr("Falsches Passwort") : "")
+        color: panel.flow?.supplementaryIsError || panel.failed ? Colors.error : Colors.fgSurfaceVariant
+        font.pixelSize: 11
+        font.weight: Font.Medium
         elide: Text.ElideRight
     }
 
-    Rectangle {
-        id: inputBox
+    // Textknoepfe wie in den Einstellungen: Abbrechen links, Bestaetigen rechts
+    Item {
+        id: buttons
 
         anchors {
             left: parent.left
             right: parent.right
-            top: identity.bottom
+            top: supplementary.bottom
             leftMargin: 20
             rightMargin: 20
-            topMargin: 10
+            topMargin: 14
         }
-        height: 42
-        radius: 12
-        color: Colors.surfaceContainer
-        border.width: password.activeFocus ? 1 : 0
-        border.color: Colors.primary
+        height: confirm.height
 
-        TextInput {
-            id: password
-            font.family: Config.font
+        // Beide gleich breit, egal wie lang die Beschriftung ist
+        TextButton {
+            id: cancel
 
-            anchors {
-                fill: parent
-                leftMargin: 13
-                rightMargin: 13
-            }
-            enabled: panel.flow?.isResponseRequired ?? false
-            verticalAlignment: TextInput.AlignVCenter
-            color: Colors.fgSurface
-            selectionColor: Colors.alpha(Colors.primary, 0.35)
-            font.pixelSize: 12
-            echoMode: panel.flow?.responseVisible ? TextInput.Normal : TextInput.Password
-            passwordCharacter: "*"
-            clip: true
-
-            Keys.onReturnPressed: panel.submit()
-            Keys.onEnterPressed: panel.submit()
-
-            Text {
-                anchors.fill: parent
-                visible: password.text === ""
-                text: panel.flow?.isResponseRequired
-                    ? (panel.flow.inputPrompt || I18n.tr("Passwort"))
-                    : I18n.tr("Authentifizierung wird vorbereitet...")
-                color: Colors.alpha(Colors.fgSurfaceVariant, 0.65)
-                font: password.font
-                verticalAlignment: Text.AlignVCenter
-            }
-        }
-    }
-
-    Text {
-        font.family: Config.font
-        anchors {
-            left: inputBox.left
-            right: inputBox.right
-            top: inputBox.bottom
-            topMargin: 6
-        }
-        height: 16
-        text: panel.flow?.supplementaryMessage ?? ""
-        color: panel.flow?.supplementaryIsError ? Colors.error : Colors.fgSurfaceVariant
-        font.pixelSize: 10
-        elide: Text.ElideRight
-    }
-
-    Rectangle {
-        id: cancelButton
-
-        anchors {
-            right: confirmButton.left
-            bottom: parent.bottom
-            rightMargin: 9
-            bottomMargin: 14
-        }
-        width: 88
-        height: 36
-        radius: 11
-        color: cancelHover.hovered ? Colors.surfaceBright : Colors.surfaceContainer
-
-        Text {
-            font.family: Config.font
-            anchors.centerIn: parent
-            text: I18n.tr("Abbrechen")
-            color: Colors.fgSurface
-            font.pixelSize: 11
-            font.weight: Font.Medium
+            anchors.left: parent.left
+            width: Math.max(cancel.implicitWidth, confirm.implicitWidth)
+            tonal: true
+            label: I18n.tr("Abbrechen")
+            onClicked: panel.flow?.cancelAuthenticationRequest()
         }
 
-        HoverHandler {
-            id: cancelHover
-            cursorShape: Qt.PointingHandCursor
-        }
+        TextButton {
+            id: confirm
 
-        TapHandler {
-            onTapped: panel.flow?.cancelAuthenticationRequest()
-        }
-    }
-
-    Rectangle {
-        id: confirmButton
-
-        readonly property bool ready: panel.flow?.isResponseRequired ?? false
-
-        anchors {
-            right: parent.right
-            bottom: parent.bottom
-            rightMargin: 20
-            bottomMargin: 14
-        }
-        width: 112
-        height: 36
-        radius: 11
-        color: ready ? (confirmHover.hovered ? Colors.shade(Colors.primary, 0.08) : Colors.primary)
-                     : Colors.alpha(Colors.primary, 0.35)
-
-        Text {
-            font.family: Config.font
-            anchors.centerIn: parent
-            text: I18n.tr("Bestätigen")
-            color: Colors.fgPrimary
-            font.pixelSize: 11
-            font.weight: Font.DemiBold
-        }
-
-        HoverHandler {
-            id: confirmHover
-            enabled: confirmButton.ready
-            cursorShape: Qt.PointingHandCursor
-        }
-
-        TapHandler {
-            enabled: confirmButton.ready
-            onTapped: panel.submit()
+            anchors.right: parent.right
+            width: cancel.width
+            filled: true
+            label: I18n.tr("Bestätigen")
+            enabled: (panel.flow?.isResponseRequired ?? false) && !panel.checking
+            onClicked: panel.submit()
         }
     }
 
@@ -253,15 +204,31 @@ Item {
 
         function onIsResponseRequiredChanged(): void {
             if (panel.flow?.isResponseRequired) {
-                password.text = "";
+                panel.checking = false;
+                password.clear();
                 Qt.callLater(password.forceActiveFocus);
             }
         }
 
         function onAuthenticationFailed(): void {
-            password.text = "";
+            panel.checking = false;
+            panel.failed = true;
+            password.clear();
+            password.shake();
             Qt.callLater(password.forceActiveFocus);
         }
+    }
+
+    // polkit nennt das eigene Konto mal per Login, mal per Klarname
+    function ownIdentity(id: var): bool {
+        const name = id.displayName ?? "";
+        return name === User.user || (User.name !== "" && name === User.name)
+            || (id.string ?? "") === "unix-user:" + User.user;
+    }
+
+    // PAM fragt in der Systemsprache; das uebliche "Password" folgt der Shell-Sprache
+    function promptText(prompt: string): string {
+        return prompt === "" || /^passwor[dt]$/i.test(prompt) ? I18n.tr("Passwort") : prompt;
     }
 
     function submit(): void {
@@ -269,6 +236,6 @@ Item {
             return;
 
         flow.submit(password.text);
-        password.text = "";
+        panel.checking = true;
     }
 }
