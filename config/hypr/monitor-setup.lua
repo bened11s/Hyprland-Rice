@@ -89,14 +89,56 @@ local function auto_offset(name)
     return 0
 end
 
--- Workspace-Versatz eines Monitors (Name) bzw. des fokussierten (nil)
-function M.offset(name)
-    if not name then
-        local mon = hl.get_active_monitor()
-        name = mon and mon.name
-        if not name then return 0 end
+-- Beschreibung zu einem Ausgangsnamen ("HDMI-A-1" -> "ASUSTek ..."). Noetig,
+-- weil monitors.lua mit "desc:..." arbeitet, Aufrufer aber auch nur den
+-- Namen kennen koennen.
+local function description_of(name)
+    for _, m in ipairs(hl.get_monitors() or {}) do
+        if m.name == name then return m.description end
     end
-    if M.offsets[name] then return M.offsets[name] end
+    return nil
+end
+
+-- Eintrag in M.offsets finden. monitors.lua schreibt Monitore als
+-- "desc:<Beschreibung>" (stabil ueber Steckplaetze), Hyprlands Lua-Objekt
+-- liefert dagegen .name ("HDMI-A-1") und .description ("ASUSTek ...").
+-- Beides muss treffen, sonst landet jeder Monitor bei 1-10.
+local function lookup_offset(name, desc)
+    if name and M.offsets[name] then return M.offsets[name] end
+    if desc then
+        if M.offsets["desc:" .. desc] then return M.offsets["desc:" .. desc] end
+        -- Kleinschreibung/Leerzeichen am Rand sind harmlos verschieden.
+        local want = desc:lower():gsub("^%s+", ""):gsub("%s+$", "")
+        for output, offset in pairs(M.offsets) do
+            local have = output:lower()
+            if have:sub(1, 5) == "desc:" then have = have:sub(6) end
+            have = have:gsub("^%s+", ""):gsub("%s+$", "")
+            if have == want then return offset end
+        end
+    end
+    return nil
+end
+
+-- Workspace-Versatz eines Monitors (Name oder Monitor-Tabelle) bzw. des
+-- fokussierten (nil)
+function M.offset(name)
+    local desc
+    if type(name) == "table" then
+        desc, name = name.description, name.name
+    elseif not name then
+        local mon = hl.get_active_monitor()
+        if mon then
+            name, desc = mon.name, mon.description
+        end
+    end
+
+    local offset = lookup_offset(name, desc)
+    if offset then return offset end
+    -- Nur der Name bekannt (monitors.lua nutzt "desc:..."): Beschreibung holen
+    if name and not desc then
+        offset = lookup_offset(nil, description_of(name))
+        if offset then return offset end
+    end
     -- Mit monitors.lua gilt nur, was dort steht; ein nicht eingetragener
     -- Monitor nimmt 1-10. Ohne Datei wird automatisch vergeben.
     if M.configured then return 0 end
