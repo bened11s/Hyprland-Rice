@@ -264,6 +264,15 @@ hl.window_rule({
 	idle_inhibit = "always",
 })
 
+-- GTA V laeuft im Randlos-Vollbild und haelt den Zeiger in Menues nicht
+-- selbst fest -> er wandert auf die anderen Monitore. confine_pointer
+-- (Hyprland 0.57) sperrt ihn auf das Fenster. Titel mit, damit die kleine
+-- Wine-Hilfsflaeche derselben Klasse nicht den ganzen Bildschirm sperrt.
+hl.window_rule({
+	match = { class = "steam_app_3240220", title = "Grand Theft Auto V" },
+	confine_pointer = true,
+})
+
 -- Picture-in-Picture: klein, unten rechts, immer sichtbar
 hl.window_rule({
 	match = { title = "Picture(-| )in(-| )[Pp]icture" },
