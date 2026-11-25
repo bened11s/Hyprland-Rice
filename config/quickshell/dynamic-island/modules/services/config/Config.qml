@@ -125,17 +125,12 @@ Singleton {
         "notch.mediaQueue": { title: "Warteschlange", group: "Anzeigen", page: "notch-media", requires: { "appearance.layout": "notch", "notch.pageMedia": true } },
         "notch.controlTray": { title: "Tray-Symbole", group: "Anzeigen", page: "notch-control", requires: { "appearance.layout": "notch", "notch.pageControl": true } },
         "notch.notifTools": { title: "Werkzeugleiste", desc: "Nicht stören, Alle löschen", group: "Anzeigen", page: "notch-notifications", requires: { "appearance.layout": "notch", "notch.pageNotifications": true } },
-        "notch.sysCpu": { title: "CPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysGpu": { title: "GPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysVram": { title: "VRAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysRam": { title: "RAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysDisk": { title: "Platte", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysTemps": { title: "Weitere Temperaturen", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
-        "notch.sysThrottle": { title: "Drosselungs-Hinweis", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        // Zaehler steht als eigene Karte oben auf der Systemseite – dort sucht
+        // man ihn, statt am Ende der Messwerte unter dem Fensterrand zu haengen.
         "notch.sysFreedom": {
             title: "Microslopfrei seit",
             desc: "Tage seit der Installation (Datum aus dem Wurzeldateisystem, sonst Pacman-Log)",
-            group: "Anzeigen",
+            group: "Zähler",
             page: "notch-system",
             requires: { "appearance.layout": "notch", "notch.pageSystem": true }
         },
@@ -144,11 +139,18 @@ Singleton {
         "notch.freeSince": {
             title: "Startdatum",
             desc: "Leer = Installationsdatum dieses Geraets",
-            group: "Anzeigen",
+            group: "Zähler",
             page: "notch-system",
             editor: "freesince",
             requires: { "appearance.layout": "notch", "notch.pageSystem": true, "notch.sysFreedom": true }
         },
+        "notch.sysCpu": { title: "CPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysGpu": { title: "GPU", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysVram": { title: "VRAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysRam": { title: "RAM", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysDisk": { title: "Platte", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysTemps": { title: "Weitere Temperaturen", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
+        "notch.sysThrottle": { title: "Drosselungs-Hinweis", group: "Anzeigen", page: "notch-system", requires: { "appearance.layout": "notch", "notch.pageSystem": true } },
         // Akku in der eingeklappten Notch: Batterie neben der Uhr oder Ring
         // innen am Rand mit Batterie unten in der Mitte (NotchBatteryRing)
         "notch.batteryStyle": {

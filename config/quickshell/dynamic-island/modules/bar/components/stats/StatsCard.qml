@@ -152,45 +152,87 @@ Column {
         }
     }
 
-    // Seit wann das System ohne Windows laeuft: Tag der Installation aus
-    // SystemStats (Erstellungsdatum des Wurzeldateisystems, sonst Pacman-Log).
-    Item {
+    // Seit wann das System ohne Windows laeuft: hervorgehobene Pille mit
+    // grosser Tageszahl, Startdatum klein darunter. Das Datum kommt aus
+    // Config.notch.freeSince, sonst aus SystemStats (Wurzeldateisystem,
+    // ersatzweise Pacman-Log).
+    Rectangle {
         width: parent.width
-        height: 26
+        height: 46
+        radius: 10
         visible: card.showFreedom && SystemStats.freeDays >= 0
+        color: Colors.alpha(Colors.primary, 0.10)
+        border.width: 1
+        border.color: Colors.alpha(Colors.primary, 0.22)
 
-        Text {
-            id: freeIcon
+        Rectangle {
+            id: freeBadge
 
-            anchors.verticalCenter: parent.verticalCenter
-            text: "verified_user"
-            color: Colors.fgSurfaceVariant
-            font.family: "Material Symbols Outlined"
-            font.pixelSize: 16
-        }
-
-        Row {
+            width: 26
+            height: 26
+            radius: 13
             anchors {
-                left: freeIcon.right
-                leftMargin: 8
+                left: parent.left
+                leftMargin: 9
                 verticalCenter: parent.verticalCenter
             }
-            spacing: 5
+            color: Colors.alpha(Colors.primary, 0.18)
 
             Text {
-                text: I18n.tr("Microslopfrei seit %1").arg(
-                          Qt.formatDate(new Date(SystemStats.freeStart + "T00:00:00"), "dd.MM.yyyy"))
-                color: Colors.fgBackground
-                font.family: Config.font
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
+                anchors.centerIn: parent
+                text: "verified_user"
+                color: Colors.primary
+                font.family: "Material Symbols Outlined"
+                font.pixelSize: 15
+            }
+        }
+
+        Column {
+            anchors {
+                left: freeBadge.right
+                leftMargin: 9
+                right: parent.right
+                rightMargin: 10
+                verticalCenter: parent.verticalCenter
+            }
+            spacing: 1
+
+            Item {
+                width: parent.width
+                height: dayCount.implicitHeight
+
+                Text {
+                    id: dayCount
+
+                    text: SystemStats.freeDays
+                    color: Colors.fgBackground
+                    font.family: Config.font
+                    font.pixelSize: 16
+                    font.weight: Font.Bold
+                }
+
+                Text {
+                    anchors {
+                        left: dayCount.right
+                        leftMargin: 5
+                        baseline: dayCount.baseline
+                    }
+                    text: I18n.tr("Tage")
+                    color: Colors.fgSurfaceVariant
+                    font.family: Config.font
+                    font.pixelSize: 10
+                    font.weight: Font.DemiBold
+                }
             }
 
             Text {
-                text: I18n.tr("%1 Tage").arg(SystemStats.freeDays)
+                width: parent.width
+                text: I18n.tr("Microslopfrei seit %1").arg(
+                          Qt.formatDate(new Date(SystemStats.freeStart + "T00:00:00"), "dd.MM.yyyy"))
                 color: Colors.fgSurfaceVariant
                 font.family: Config.font
-                font.pixelSize: 11
+                font.pixelSize: 10
+                elide: Text.ElideRight
             }
         }
     }
