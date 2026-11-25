@@ -36,8 +36,7 @@
     },
     "bluetooth": {
         "adapter": "",
-        "autoConnect": [
-        ],
+        "autoConnect": [],
         "lowBattery": 15,
         "notify": true,
         "scanSeconds": 60
@@ -58,8 +57,7 @@
     "lock": {
         "background": "wallpaper",
         "blur": true,
-        "layout": {
-        },
+        "layout": {},
         "media": true,
         "notifications": true,
         "style": "karte"
@@ -82,7 +80,7 @@
         "clockStyle": "digital",
         "controlTray": true,
         "date": true,
-        "freeSince": "",
+        "freeSince": "2026-05-14",
         "hoverOpen": true,
         "media": true,
         "mediaControls": true,
