@@ -28,6 +28,9 @@ Item {
     // Fehlschlag: rot + schuetteln wie im Lock; Pruefen: Punkte als Welle
     property bool failed: false
     property bool checking: false
+    // Zuletzt abgeschickte Antwort: Enter darf sie waehrend der Pruefung
+    // nicht erneut senden (das Feld bleibt diesmal gefuellt)
+    property string submittedText: ""
 
     anchors {
         left: parent.left
@@ -45,6 +48,7 @@ Item {
         password.clear();
         panel.failed = false;
         panel.checking = false;
+        panel.submittedText = "";
         if (active)
             Qt.callLater(password.forceActiveFocus);
     }
@@ -234,7 +238,11 @@ Item {
     function submit(): void {
         if (!flow?.isResponseRequired)
             return;
+        // Dieselbe Antwort nicht doppelt senden, solange polkit prueft
+        if (panel.checking && password.text === panel.submittedText)
+            return;
 
+        panel.submittedText = password.text;
         flow.submit(password.text);
         panel.checking = true;
     }
