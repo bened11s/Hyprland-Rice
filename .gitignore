@@ -73,3 +73,6 @@ __pycache__/
 
 # Offscreen-Screenshots
 docs/*/shots/
+
+# Manueller Rueckweg fuer diese Maschine (nicht Teil des Repos)
+/restore.py
